@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,6 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { PDVForm } from "./pdv-form";
 import {
   Table,
   TableBody,
@@ -20,19 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Package, Pencil, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 
 interface StockItem {
   id: number;
-  rede: string;
-  loja: string;
   marca: string;
   produto: string;
-  estoque: number;
-  estoqueVirtual: number;
-  corrigido: boolean;
+  estoque: string;
+  estoqueVirtual: string;
 }
 
 interface StoreInventoryFormProps {
@@ -41,66 +38,66 @@ interface StoreInventoryFormProps {
   onComplete: () => void;
 }
 
-export function StoreInventoryForm({ isOpen, onClose, onComplete }: StoreInventoryFormProps) {
+export function StoreInventoryForm({
+  isOpen,
+  onClose,
+  onComplete,
+}: StoreInventoryFormProps) {
+  const [showPDVForm, setShowPDVForm] = useState(false);
   const [selectedMarca, setSelectedMarca] = useState("");
   const [selectedProduto, setSelectedProduto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [estoqueVirtual, setEstoqueVirtual] = useState("");
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [showTable, setShowTable] = useState(false);
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
   const produtos = ["Produto 1", "Produto 2", "Produto 3"];
 
-  const handleAddItem = () => {
+  const handleAdd = () => {
     if (!selectedMarca || !selectedProduto || !estoque || !estoqueVirtual) {
-      toast.error("Todos os campos são obrigatórios");
+      toast.error("Por favor, preencha todos os campos");
       return;
     }
 
     const newItem: StockItem = {
-      id: Date.now(),
-      rede: "Rede Exemplo",
-      loja: "Loja Exemplo",
+      id: editingItem?.id || Date.now(),
       marca: selectedMarca,
       produto: selectedProduto,
-      estoque: Number(estoque),
-      estoqueVirtual: Number(estoqueVirtual),
-      corrigido: false,
+      estoque,
+      estoqueVirtual,
     };
 
-    setStockItems([...stockItems, newItem]);
-    setShowTable(true);
-    resetForm();
-  };
+    if (editingItem) {
+      setStockItems((prev) =>
+        prev.map((item) => (item.id === editingItem.id ? newItem : item))
+      );
+      setEditingItem(null);
+      toast.success("Item atualizado com sucesso!");
+    } else {
+      setStockItems((prev) => [...prev, newItem]);
+      toast.success("Item adicionado com sucesso!");
+    }
 
-  const resetForm = () => {
+    // Limpar campos
     setSelectedMarca("");
     setSelectedProduto("");
     setEstoque("");
     setEstoqueVirtual("");
   };
 
-  const handleDeleteItem = (id: number) => {
-    setStockItems(stockItems.filter(item => item.id !== id));
-    if (stockItems.length === 1) {
-      setShowTable(false);
-    }
-  };
-
-  const handleEditItem = (item: StockItem) => {
+  const handleEdit = (item: StockItem) => {
+    setEditingItem(item);
     setSelectedMarca(item.marca);
     setSelectedProduto(item.produto);
-    setEstoque(item.estoque.toString());
-    setEstoqueVirtual(item.estoqueVirtual.toString());
-    handleDeleteItem(item.id);
+    setEstoque(item.estoque);
+    setEstoqueVirtual(item.estoqueVirtual);
   };
 
-  const handleToggleCorrigido = (id: number) => {
-    setStockItems(stockItems.map(item => 
-      item.id === id ? { ...item, corrigido: !item.corrigido } : item
-    ));
+  const handleDelete = (id: number) => {
+    setStockItems((prev) => prev.filter((item) => item.id !== id));
+    toast.success("Item removido com sucesso!");
   };
 
   const handleSave = () => {
@@ -109,149 +106,156 @@ export function StoreInventoryForm({ isOpen, onClose, onComplete }: StoreInvento
       return;
     }
 
-    // Verificar se todos os itens foram corrigidos
-    const allCorrected = stockItems.every(item => item.corrigido);
-    if (!allCorrected) {
-      toast.error("Todos os itens devem ser marcados como corrigidos antes de salvar");
-      return;
-    }
+    toast.success("Informações gravadas com sucesso!");
+    setShowPDVForm(true);
+  };
 
-    toast.success("Estoque salvo com sucesso!");
-    onComplete(); // Chama o callback que irá abrir o próximo modal
+  const handlePDVClose = () => {
+    setShowPDVForm(false);
+    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Estoque de Loja
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="text-purple-500"
+              >
+                <path
+                  d="M4 7V17C4 17.5304 4.21071 18.0391 4.58579 18.4142C4.96086 18.7893 5.46957 19 6 19H18C18.5304 19 19.0391 18.7893 19.4142 18.4142C19.7893 18.0391 20 17.5304 20 17V7M4 7C4 6.46957 4.21071 5.96086 4.58579 5.58579C4.96086 5.21071 5.46957 5 6 5H18C18.5304 5 19.0391 5.21071 19.4142 5.58579C19.7893 5.96086 20 6.46957 20 7M4 7L12 13L20 7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Estoque de Loja
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <Label>Marca</Label>
-            <Select value={selectedMarca} onValueChange={setSelectedMarca}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a marca" />
-              </SelectTrigger>
-              <SelectContent>
-                {marcas.map(marca => (
-                  <SelectItem key={marca} value={marca}>
-                    {marca}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <div>
+                <Label>Marca</Label>
+                <Select value={selectedMarca} onValueChange={setSelectedMarca}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a marca" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {marcas.map((marca) => (
+                      <SelectItem key={marca} value={marca}>
+                        {marca}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Produto</Label>
+                <Select value={selectedProduto} onValueChange={setSelectedProduto}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o produto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {produtos.map((produto) => (
+                      <SelectItem key={produto} value={produto}>
+                        {produto}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Estoque</Label>
+                <Input
+                  value={estoque}
+                  onChange={(e) => setEstoque(e.target.value)}
+                  type="number"
+                />
+              </div>
+
+              <div>
+                <Label>Estoque Virtual</Label>
+                <Input
+                  value={estoqueVirtual}
+                  onChange={(e) => setEstoqueVirtual(e.target.value)}
+                  type="number"
+                />
+              </div>
+
+              <Button onClick={handleAdd} className="w-full">
+                {editingItem ? "Atualizar Item" : "Adicionar Item"}
+              </Button>
+            </div>
+
+            {stockItems.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Marca</TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Estoque</TableHead>
+                      <TableHead>Estoque Virtual</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stockItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.marca}</TableCell>
+                        <TableCell>{item.produto}</TableCell>
+                        <TableCell>{item.estoque}</TableCell>
+                        <TableCell>{item.estoqueVirtual}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(item)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <Button onClick={handleSave} className="w-full">
+              Gravar Informações
+            </Button>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div>
-            <Label>Produto</Label>
-            <Select value={selectedProduto} onValueChange={setSelectedProduto}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o produto" />
-              </SelectTrigger>
-              <SelectContent>
-                {produtos.map(produto => (
-                  <SelectItem key={produto} value={produto}>
-                    {produto}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Estoque (un/kg)</Label>
-            <Input
-              type="number"
-              value={estoque}
-              onChange={(e) => setEstoque(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <Label>Estoque Virtual (un/kg)</Label>
-            <Input
-              type="number"
-              value={estoqueVirtual}
-              onChange={(e) => setEstoqueVirtual(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-        </div>
-
-        <Button onClick={handleAddItem} className="w-full mb-6">
-          Confirmar
-        </Button>
-
-        {showTable && (
-          <div className="border rounded-lg overflow-hidden mb-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rede</TableHead>
-                  <TableHead>Loja</TableHead>
-                  <TableHead>Marca</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Estoque</TableHead>
-                  <TableHead>Estoque Virtual</TableHead>
-                  <TableHead>Corrigido</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stockItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.rede}</TableCell>
-                    <TableCell>{item.loja}</TableCell>
-                    <TableCell>{item.marca}</TableCell>
-                    <TableCell>{item.produto}</TableCell>
-                    <TableCell>{item.estoque}</TableCell>
-                    <TableCell>{item.estoqueVirtual}</TableCell>
-                    <TableCell>
-                      <Checkbox
-                        checked={item.corrigido}
-                        onCheckedChange={() => handleToggleCorrigido(item.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditItem(item)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={stockItems.length === 0}>
-            Gravar Informações
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {showPDVForm && (
+        <PDVForm
+          isOpen={showPDVForm}
+          onClose={handlePDVClose}
+          onComplete={onComplete}
+        />
+      )}
+    </>
   );
 }
