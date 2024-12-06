@@ -43,8 +43,7 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
   const [pdvItems, setPdvItems] = useState<PDVItem[]>([]);
   const [showTable, setShowTable] = useState(false);
   const [editingItem, setEditingItem] = useState<PDVItem | null>(null);
-  const [selectedImage, setSelectedImage] = useState<{ file: File; index: number } | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<number[]>([]);
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
@@ -88,14 +87,14 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
       return;
     }
 
-    if (isEditing && editingItem) {
+    if (editingItem) {
       // Atualiza o item existente
       setPdvItems(prev => prev.map(item => 
         item.id === editingItem.id
           ? { ...item, marca: selectedMarca, images, pontoExtra }
           : item
       ));
-      setIsEditing(false);
+      setEditingItem(null);
       toast.success("Item atualizado com sucesso!");
     } else {
       // Cria um novo item
@@ -109,8 +108,30 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
       toast.success("Item adicionado com sucesso!");
     }
 
-    setShowTable(true);
     resetForm();
+    setShowTable(true);
+  };
+
+  const handleUpdate = () => {
+    if (!selectedMarca) {
+      toast.error("Por favor, selecione uma marca");
+      return;
+    }
+    
+    if (images.length === 0) {
+      toast.error("Por favor, adicione pelo menos uma imagem");
+      return;
+    }
+
+    // Atualiza o item existente
+    setPdvItems(prev => prev.map(item => 
+      item.id === editingItem?.id
+        ? { ...item, marca: selectedMarca, images, pontoExtra }
+        : item
+    ));
+    setEditingItem(null);
+    resetForm();
+    toast.success("Item atualizado com sucesso!");
   };
 
   const resetForm = () => {
@@ -118,7 +139,7 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
     setPontoExtra(false);
     setImages([]);
     setEditingItem(null);
-    setIsEditing(false);
+    setSelectedImages([]);
   };
 
   const handleEdit = (item: PDVItem) => {
@@ -126,8 +147,8 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
     setPontoExtra(item.pontoExtra);
     setImages([...item.images]);
     setEditingItem(item);
-    setIsEditing(true);
     setShowTable(false);
+    setSelectedImages([]);
   };
 
   const handleDelete = (id: number) => {
@@ -137,160 +158,193 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
     }
   };
 
-  const handleDeleteImage = (imageIndex: number) => {
-    setImages(prev => prev.filter((_, index) => index !== imageIndex));
-    setSelectedImage(null);
+  const handleImageSelect = (index: number) => {
+    setSelectedImages(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else {
+        return [...prev, index];
+      }
+    });
   };
 
-  const handleCancel = () => {
-    resetForm();
-    setShowTable(true);
+  const handleDeleteSelectedImages = () => {
+    if (selectedImages.length === 0) {
+      toast.error("Selecione pelo menos uma imagem para excluir");
+      return;
+    }
+
+    setImages(prev => prev.filter((_, index) => !selectedImages.includes(index)));
+    setSelectedImages([]);
+    toast.success("Imagens selecionadas excluídas com sucesso!");
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
-            <div className="flex items-center gap-2">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-purple-500"
-              >
-                <path
-                  d="M12 9C11.2044 9 10.4413 9.31607 9.87868 9.87868C9.31607 10.4413 9 11.2044 9 12C9 12.7956 9.31607 13.5587 9.87868 14.1213C10.4413 14.6839 11.2044 15 12 15C12.7956 15 13.5587 14.6839 14.1213 14.1213C14.6839 13.5587 15 12.7956 15 12C15 11.2044 14.6839 10.4413 14.1213 9.87868C13.5587 9.31607 12.7956 9 12 9Z"
-                  fill="currentColor"
-                />
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M2 7C2 5.93913 2.42143 4.92172 3.17157 4.17157C3.92172 3.42143 4.93913 3 6 3H18C19.0609 3 20.0783 3.42143 20.8284 4.17157C21.5786 4.92172 22 5.93913 22 7V17C22 18.0609 21.5786 19.0783 20.8284 19.8284C20.0783 20.5786 19.0609 21 18 21H6C4.93913 21 3.92172 20.5786 3.17157 19.8284C2.42143 19.0783 2 18.0609 2 17V7ZM18 5H6C5.46957 5 4.96086 5.21071 4.58579 5.58579C4.21071 5.96086 4 6.46957 4 7V17C4 17.5304 4.21071 18.0391 4.58579 18.4142C4.96086 18.7893 5.46957 19 6 19H18C18.5304 19 19.0391 18.7893 19.4142 18.4142C19.7893 18.0391 20 17.5304 20 17V7C20 6.46957 19.7893 5.96086 19.4142 5.58579C19.0391 5.21071 18.5304 5 18 5Z"
-                  fill="currentColor"
-                />
-              </svg>
-              Ponto de Vendas
-            </div>
-          </DialogTitle>
-          <p className="text-center text-gray-600 mt-2">
-            Mostre o seu trabalho e seu diferencial!
-          </p>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {!showTable && (
-            <>
-              <div>
-                <Label>Marca</Label>
-                <Select value={selectedMarca} onValueChange={setSelectedMarca}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a marca" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {marcas.map(marca => (
-                      <SelectItem key={marca} value={marca}>
-                        {marca}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="border-2 border-dashed rounded-lg p-6 text-center bg-rose-700/20 border-rose-700/50">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex gap-4">
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                      onClick={() => document.getElementById('image-upload')?.click()}
-                    >
-                      <ImagePlus className="w-4 h-4" />
-                      Galeria
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                      onClick={handleCameraCapture}
-                    >
-                      <Camera className="w-4 h-4" />
-                      Câmera
-                    </Button>
-                  </div>
-                  
-                  <input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+              <div className="flex items-center gap-2">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-purple-500"
+                >
+                  <path
+                    d="M12 9C11.2044 9 10.4413 9.31607 9.87868 9.87868C9.31607 10.4413 9 11.2044 9 12C9 12.7956 9.31607 13.5587 9.87868 14.1213C10.4413 14.6839 11.2044 15 12 15C12.7956 15 13.5587 14.6839 14.1213 14.1213C14.6839 13.5587 15 12.7956 15 12C15 11.2044 14.6839 10.4413 14.1213 9.87868C13.5587 9.31607 12.7956 9 12 9Z"
+                    fill="currentColor"
                   />
+                  <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M2 7C2 5.93913 2.42143 4.92172 3.17157 4.17157C3.92172 3.42143 4.93913 3 6 3H18C19.0609 3 20.0783 3.42143 20.8284 4.17157C21.5786 4.92172 22 5.93913 22 7V17C22 18.0609 21.5786 19.0783 20.8284 19.8284C20.0783 20.5786 19.0609 21 18 21H6C4.93913 21 3.92172 20.5786 3.17157 19.8284C2.42143 19.0783 2 18.0609 2 17V7ZM18 5H6C5.46957 5 4.96086 5.21071 4.58579 5.58579C4.21071 5.96086 4 6.46957 4 7V17C4 17.5304 4.21071 18.0391 4.58579 18.4142C4.96086 18.7893 5.46957 19 6 19H18C18.5304 19 19.0391 18.7893 19.4142 18.4142C19.7893 18.0391 20 17.5304 20 17V7C20 6.46957 19.7893 5.96086 19.4142 5.58579C19.0391 5.21071 18.5304 5 18 5Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                Ponto de Vendas
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
-                  {images.length > 0 && (
-                    <div className="flex items-center gap-2 overflow-x-auto p-2 w-full">
-                      {images.map((image, index) => (
-                        <div key={index} className="relative flex-shrink-0">
-                          <img
-                            src={URL.createObjectURL(image)}
-                            alt={`Foto ${index + 1}`}
-                            className="w-[10px] h-[10px] object-cover rounded cursor-pointer"
-                            onClick={() => setSelectedImage({ file: image, index })}
-                          />
-                        </div>
-                      ))}
-                    </div>
+          <div className="space-y-4">
+            <div>
+              <Label>Marca</Label>
+              <Select value={selectedMarca} onValueChange={setSelectedMarca}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  {marcas.map(marca => (
+                    <SelectItem key={marca} value={marca}>
+                      {marca}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="border-2 border-dashed rounded-lg p-6 text-center bg-rose-700/20 border-rose-700/50">
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={() => document.getElementById('image-upload')?.click()}
+                  >
+                    <ImagePlus className="w-4 h-4" />
+                    Galeria
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={handleCameraCapture}
+                  >
+                    <Camera className="w-4 h-4" />
+                    Câmera
+                  </Button>
+                </div>
+                
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+
+                <div className="text-sm text-rose-700">
+                  {images.length > 0 ? (
+                    <p>{images.length} imagem(ns) selecionada(s)</p>
+                  ) : (
+                    <p>Selecione imagens da galeria ou tire uma foto</p>
                   )}
-
-                  <div className="text-sm text-rose-700">
-                    {images.length > 0 ? (
-                      <p>{images.length} imagem(ns) selecionada(s)</p>
-                    ) : (
-                      <p>Selecione imagens da galeria ou tire uma foto</p>
-                    )}
-                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="ponto-extra"
-                  checked={pontoExtra}
-                  onCheckedChange={(checked) => setPontoExtra(checked as boolean)}
-                />
-                <Label htmlFor="ponto-extra" className="text-sm">
-                  Ponto Extra conquistado
-                </Label>
-              </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="ponto-extra"
+                checked={pontoExtra}
+                onCheckedChange={(checked) => setPontoExtra(checked as boolean)}
+              />
+              <Label htmlFor="ponto-extra" className="text-sm">
+                Ponto Extra conquistado
+              </Label>
+            </div>
 
-              <div className="flex justify-end gap-2">
-                {pdvItems.length > 0 && (
-                  <Button variant="outline" onClick={() => setShowTable(true)}>
-                    Voltar para Lista
-                  </Button>
-                )}
-                <Button onClick={handleConfirm} className="bg-blue-500 hover:bg-blue-600">
-                  {isEditing ? "Atualizar" : "Confirmar"}
+            <div className="flex justify-end gap-2 mb-4">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              {editingItem ? (
+                <Button 
+                  onClick={handleUpdate}
+                  className="bg-blue-500 hover:bg-blue-600"
+                >
+                  Atualizar
                 </Button>
-              </div>
-            </>
-          )}
-
-          {showTable && pdvItems.length > 0 && (
-            <>
-              <div className="flex justify-end mb-4">
-                <Button onClick={() => setShowTable(false)} className="bg-blue-500 hover:bg-blue-600">
-                  Adicionar Novo
+              ) : (
+                <Button 
+                  onClick={handleConfirm}
+                  className="bg-blue-500 hover:bg-blue-600"
+                >
+                  Adicionar Item
                 </Button>
+              )}
+            </div>
+
+            {images.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold">Fotos ({images.length})</h3>
+                  {selectedImages.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteSelectedImages}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir ({selectedImages.length})
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                  {images.map((image, index) => (
+                    <div
+                      key={index}
+                      className={`relative cursor-pointer border-2 rounded-lg overflow-hidden aspect-square
+                        ${selectedImages.includes(index) ? 'border-blue-500' : 'border-transparent'}`}
+                      onClick={() => handleImageSelect(index)}
+                    >
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {selectedImages.includes(index) && (
+                        <div className="absolute top-1 right-1">
+                          <Check className="h-3 w-3 text-blue-500" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {pdvItems.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Marca</TableHead>
-                      <TableHead>Quantidade de Fotos</TableHead>
+                      <TableHead>Fotos</TableHead>
                       <TableHead>Ponto Extra</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
@@ -324,44 +378,10 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
                   </TableBody>
                 </Table>
               </div>
-            </>
-          )}
-        </div>
-
-        {selectedImage && (
-          <Dialog open={true} onOpenChange={() => setSelectedImage(null)}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Visualizar Imagem</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <img
-                  src={URL.createObjectURL(selectedImage.file)}
-                  alt="Imagem em tamanho normal"
-                  className="w-full h-auto rounded-lg"
-                />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDeleteImage(selectedImage.index)}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedImage(null)}
-                    className="flex items-center gap-2"
-                  >
-                    <Check className="h-4 w-4" />
-                    Confirmar
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </DialogContent>
-    </Dialog>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
