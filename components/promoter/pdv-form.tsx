@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataCurtaDialog } from "./data-curta-dialog";
 
 interface PDVItem {
   id: number;
@@ -44,6 +45,7 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
   const [showTable, setShowTable] = useState(false);
   const [editingItem, setEditingItem] = useState<PDVItem | null>(null);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
+  const [isDataCurtaOpen, setIsDataCurtaOpen] = useState(false);
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
@@ -296,6 +298,12 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
                   Adicionar Item
                 </Button>
               )}
+              <Button 
+                onClick={() => setIsDataCurtaOpen(true)}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                Gravar
+              </Button>
             </div>
 
             {images.length > 0 && (
@@ -382,6 +390,14 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
           </div>
         </DialogContent>
       </Dialog>
+      <DataCurtaDialog
+        isOpen={isDataCurtaOpen}
+        onClose={() => setIsDataCurtaOpen(false)}
+        onConfirm={() => {
+          setIsDataCurtaOpen(false);
+          // Adicione aqui a lógica para salvar os dados
+        }}
+      />
     </>
   );
 }
