@@ -44,6 +44,9 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
   const [pdvItems, setPdvItems] = useState<PDVItem[]>([]);
   const [showTable, setShowTable] = useState(false);
   const [editingItem, setEditingItem] = useState<PDVItem | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
@@ -64,15 +67,128 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
     }
   };
 
-  const handleCameraCapture = async () => {
+  const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      toast.success("Câmera aberta com sucesso!");
-      stream.getTracks().forEach(track => track.stop());
+      console.log('Iniciando câmera...');
+      
+      // Primeiro, verificar se a API está disponível
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('API de câmera não suportada neste navegador');
+      }
+
+      // Tentar primeiro a câmera traseira
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      console.log('Stream obtido com sucesso:', stream.getVideoTracks()[0].getSettings());
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        
+        // Garantir que o vídeo está carregado antes de mostrar
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Vídeo carregado, dimensões:', {
+            width: videoRef.current?.videoWidth,
+            height: videoRef.current?.videoHeight
+          });
+          videoRef.current?.play();
+          setShowCamera(true);
+        };
+      } else {
+        throw new Error('Referência do vídeo não encontrada');
+      }
     } catch (error) {
-      toast.error("Erro ao acessar a câmera");
+      console.error('Erro ao iniciar câmera:', error);
+      toast.error(error instanceof Error ? error.message : "Erro ao acessar a câmera");
+      stopCamera();
     }
   };
+
+  const capturePhoto = async () => {
+    try {
+      if (!videoRef.current) {
+        throw new Error('Referência do vídeo não encontrada');
+      }
+
+      // Garantir que o vídeo está pronto
+      if (videoRef.current.readyState !== 4) {
+        throw new Error('Vídeo não está pronto para captura');
+      }
+
+      console.log('Iniciando captura...');
+      
+      const canvas = document.createElement('canvas');
+      const video = videoRef.current;
+      
+      // Usar as dimensões reais do vídeo
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      console.log('Dimensões da captura:', {
+        width: canvas.width,
+        height: canvas.height
+      });
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Não foi possível criar contexto do canvas');
+      }
+
+      // Desenhar o frame atual do vídeo
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Converter para blob com qualidade alta
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.95);
+      });
+
+      if (!blob) {
+        throw new Error('Falha ao gerar imagem');
+      }
+
+      // Criar arquivo com nome único
+      const file = new File([blob], `photo-${Date.now()}.jpg`, {
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
+      console.log('Foto capturada com sucesso:', {
+        size: file.size,
+        type: file.type
+      });
+
+      setImages(prev => [...prev, file]);
+      toast.success("Foto capturada com sucesso!");
+      stopCamera();
+    } catch (error) {
+      console.error('Erro ao capturar foto:', error);
+      toast.error(error instanceof Error ? error.message : "Erro ao capturar foto");
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setShowCamera(false);
+  };
+
+  const handleCameraCapture = () => {
+    startCamera();
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const handleConfirm = () => {
     if (!selectedMarca) {
@@ -140,33 +256,64 @@ export function PDVForm({ isOpen, onClose, onComplete }: PDVFormProps) {
                 {/* Componente de Upload de Fotos */}
                 <div className="border-2 border-dashed rounded-lg p-6 text-center bg-rose-700/20 border-rose-700/50">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="flex gap-4">
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <ImagePlus className="w-4 h-4" />
-                        Galeria
-                      </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2"
-                        onClick={handleCameraCapture}
-                      >
-                        <Camera className="w-4 h-4" />
-                        Câmera
-                      </Button>
-                    </div>
-
+                    {showCamera ? (
+                      <div className="relative w-full max-w-md">
+                        <video 
+                          ref={videoRef} 
+                          autoPlay 
+                          playsInline
+                          muted
+                          className="w-full rounded-lg"
+                          style={{ transform: 'scaleX(-1)' }}
+                        />
+                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                          <Button
+                            variant="default"
+                            className="flex items-center gap-2"
+                            onClick={capturePhoto}
+                          >
+                            <Camera className="w-4 h-4" />
+                            Capturar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="flex items-center gap-2"
+                            onClick={stopCamera}
+                          >
+                            <X className="w-4 h-4" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-4">
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <ImagePlus className="w-4 h-4" />
+                          Galeria
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                          onClick={handleCameraCapture}
+                        >
+                          <Camera className="w-4 h-4" />
+                          Câmera
+                        </Button>
+                      </div>
+                    )}
+                    
                     <div className="text-sm text-rose-700">
                       {images.length > 0 ? (
                         <p>{images.length} imagem(ns) selecionada(s)</p>
