@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
 
 // Dados mockados para exemplo
 const mockStores = [
@@ -48,7 +47,6 @@ const mockStores = [
 const networks = Array.from(new Set(mockStores.map(store => store.rede)));
 
 export default function PromotorPage() {
-  const router = useRouter();
   const [selectedStore, setSelectedStore] = useState<typeof mockStores[0] | null>(null);
   const [showBrands, setShowBrands] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,13 +95,9 @@ export default function PromotorPage() {
           {/* Header Section */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                className="bg-rose-100 p-3 rounded-xl hover:bg-rose-200"
-                onClick={() => router.push(`/promotor/pdv/estoque-loja`)}
-              >
+              <div className="bg-rose-100 p-3 rounded-xl">
                 <Store className="w-6 h-6 text-rose-600" />
-              </Button>
+              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   {showBrands ? `${selectedStore?.loja} - Marcas` : "Minhas Lojas"}
