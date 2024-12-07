@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -9,36 +8,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Clock, AlertTriangle, ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Pencil, Trash2, Search } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 
-interface DataCurtaItem {
+interface PesquisaPrecoItem {
   id: number;
   marca: string;
   produto: string;
-  estoque: string;
-  dataValidade: string;
+  preco: string;
+  promo: boolean;
 }
 
-export default function DataCurtaPage() {
+export default function PesquisaPreco() {
   const router = useRouter();
   const [marca, setMarca] = useState("");
   const [produto, setProduto] = useState("");
-  const [estoque, setEstoque] = useState("");
-  const [dataValidade, setDataValidade] = useState("");
-  const [items, setItems] = useState<DataCurtaItem[]>([]);
-  const [editingItem, setEditingItem] = useState<DataCurtaItem | null>(null);
+  const [preco, setPreco] = useState("");
+  const [promo, setPromo] = useState(false);
+  const [items, setItems] = useState<PesquisaPrecoItem[]>([]);
+  const [editingItem, setEditingItem] = useState<PesquisaPrecoItem | null>(null);
   const [showForm, setShowForm] = useState(true);
 
   // Dados mockados para exemplo
@@ -46,7 +40,7 @@ export default function DataCurtaPage() {
   const produtos = ["Produto 1", "Produto 2", "Produto 3"];
 
   const handleConfirm = () => {
-    if (!marca || !produto || !estoque || !dataValidade) {
+    if (!marca || !produto || !preco) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
@@ -54,17 +48,17 @@ export default function DataCurtaPage() {
     if (editingItem) {
       setItems(items.map(item => 
         item.id === editingItem.id 
-          ? { ...item, marca, produto, estoque, dataValidade }
+          ? { ...item, marca, produto, preco, promo }
           : item
       ));
       setEditingItem(null);
     } else {
-      const newItem: DataCurtaItem = {
+      const newItem: PesquisaPrecoItem = {
         id: Date.now(),
         marca,
         produto,
-        estoque,
-        dataValidade,
+        preco,
+        promo,
       };
       setItems([...items, newItem]);
     }
@@ -72,17 +66,17 @@ export default function DataCurtaPage() {
     // Limpar formulário
     setMarca("");
     setProduto("");
-    setEstoque("");
-    setDataValidade("");
+    setPreco("");
+    setPromo(false);
     setShowForm(false);
     toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
   };
 
-  const handleEdit = (item: DataCurtaItem) => {
+  const handleEdit = (item: PesquisaPrecoItem) => {
     setMarca(item.marca);
     setProduto(item.produto);
-    setEstoque(item.estoque);
-    setDataValidade(item.dataValidade);
+    setPreco(item.preco);
+    setPromo(item.promo);
     setEditingItem(item);
     setShowForm(true);
   };
@@ -97,7 +91,7 @@ export default function DataCurtaPage() {
       toast.error("Adicione pelo menos um item antes de gravar");
       return;
     }
-    router.push("/promotor/pdv/avaliacao");
+    router.push("/promotor/pdv/mensagem-sucesso");
   };
 
   return (
@@ -107,11 +101,10 @@ export default function DataCurtaPage() {
         {/* Header com ícone e título */}
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="relative">
-            <Clock className="w-12 h-12 text-red-500" />
-            <AlertTriangle className="w-6 h-6 text-yellow-500 absolute -right-1 -bottom-1" />
+            <Search className="w-12 h-12 text-blue-500" />
           </div>
-          <h2 className="text-2xl font-semibold">Data Curta</h2>
-          <p className="text-gray-600">Produtos que estão perto do vencimento</p>
+          <h2 className="text-2xl font-semibold">Pesquisa de Preço</h2>
+          <p className="text-gray-600">Registre os preços dos produtos</p>
         </div>
 
         {showForm ? (
@@ -143,18 +136,29 @@ export default function DataCurtaPage() {
               </SelectContent>
             </Select>
 
-            <Input
-              placeholder="Estoque (un/kg)"
-              value={estoque}
-              onChange={(e) => setEstoque(e.target.value)}
-            />
-
-            <Input
-              type="date"
-              placeholder="Data de Validade"
-              value={dataValidade}
-              onChange={(e) => setDataValidade(e.target.value)}
-            />
+            <div className="flex items-center gap-4">
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Preço"
+                value={preco}
+                onChange={(e) => setPreco(e.target.value)}
+                className="flex-1"
+              />
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="promo"
+                  checked={promo}
+                  onCheckedChange={(checked) => setPromo(checked as boolean)}
+                />
+                <label
+                  htmlFor="promo"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Promo
+                </label>
+              </div>
+            </div>
 
             {/* Botões do formulário */}
             <div className="flex justify-between items-center pt-4">
@@ -167,16 +171,14 @@ export default function DataCurtaPage() {
                     router.back();
                   }
                 }}
-                className="flex items-center gap-2"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar
+                Cancelar
               </Button>
               <Button
                 onClick={handleConfirm}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-8"
+                className="bg-blue-500 hover:bg-blue-600 text-white"
               >
-                Confirmar
+                Adicionar Item
               </Button>
             </div>
           </div>
@@ -203,8 +205,8 @@ export default function DataCurtaPage() {
                 <TableRow>
                   <TableHead>Marca</TableHead>
                   <TableHead>Produto</TableHead>
-                  <TableHead>Estoque</TableHead>
-                  <TableHead>Data de Validade</TableHead>
+                  <TableHead>Preço</TableHead>
+                  <TableHead>Promo</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -213,8 +215,8 @@ export default function DataCurtaPage() {
                   <TableRow key={item.id}>
                     <TableCell>{item.marca}</TableCell>
                     <TableCell>{item.produto}</TableCell>
-                    <TableCell>{item.estoque}</TableCell>
-                    <TableCell>{item.dataValidade}</TableCell>
+                    <TableCell>R$ {Number(item.preco).toFixed(2)}</TableCell>
+                    <TableCell>{item.promo ? "Sim" : "Não"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button

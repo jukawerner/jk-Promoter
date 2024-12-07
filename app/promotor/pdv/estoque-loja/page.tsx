@@ -21,6 +21,7 @@ import { ArrowLeft, Pencil, Trash2, Store } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { WhatsappButton } from "@/components/whatsapp-button";
 
 interface EstoqueItem {
   id: number;
@@ -101,6 +102,7 @@ export default function EstoqueLoja() {
 
   return (
     <div className="container mx-auto p-6 max-w-[800px]">
+      <WhatsappButton />
       <div className="space-y-6">
         {/* Header com ícone e título */}
         <div className="flex flex-col items-center text-center space-y-2">

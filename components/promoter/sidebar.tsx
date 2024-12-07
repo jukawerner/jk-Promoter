@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -13,13 +12,11 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Store,
   ShoppingCart,
-  BarChart3,
-  Calendar,
-  Settings,
+  Clock,
   LogOut,
   User,
-  Clock,
-  Refrigerator,
+  Camera,
+  Search,
 } from "lucide-react";
 
 const menuItems = [
@@ -29,7 +26,12 @@ const menuItems = [
     href: "/promotor",
   },
   {
-    icon: Refrigerator,
+    icon: ShoppingCart,
+    label: "Estoque da Loja",
+    href: "/promotor/pdv/estoque-loja",
+  },
+  {
+    icon: Camera,
     label: "Ponto de Venda",
     href: "/promotor/pdv/ponto-de-venda",
   },
@@ -39,24 +41,9 @@ const menuItems = [
     href: "/promotor/pdv/data-curta",
   },
   {
-    icon: ShoppingCart,
-    label: "Estoque da Loja",
-    href: "/promotor/pdv/estoque-loja",
-  },
-  {
-    icon: BarChart3,
-    label: "Relatórios",
-    href: "/promotor/relatorios",
-  },
-  {
-    icon: Calendar,
-    label: "Agenda",
-    href: "/promotor/agenda",
-  },
-  {
-    icon: Settings,
-    label: "Configurações",
-    href: "/promotor/configuracoes",
+    icon: Search,
+    label: "Pesquisa Preço",
+    href: "/promotor/pdv/pesquisa-preco",
   },
 ];
 
@@ -67,50 +54,29 @@ export function Sidebar() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full bg-slate-900 text-white w-16 fixed left-0 top-0 bottom-0">
-        <div className="p-4 flex justify-center">
-          <Tooltip delayDuration={0}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-12 h-12 rounded-full p-0 hover:bg-slate-800"
-                onClick={() => router.push("/promotor/perfil")}
-              >
-                <Avatar>
-                  <AvatarImage src="/avatar-placeholder.jpg" alt="Promotor" />
-                  <AvatarFallback>
-                    <User className="h-6 w-6" />
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="bg-slate-800 text-white border-slate-700">
-              Meu Perfil
-            </TooltipContent>
-          </Tooltip>
-        </div>
-
         <div className="flex-1 py-6 flex flex-col items-center gap-4">
-          {menuItems.map((item) => (
-            <Tooltip key={item.href} delayDuration={0}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "w-12 h-12 rounded-xl hover:bg-slate-800",
-                    pathname.startsWith(item.href) && "bg-slate-800"
-                  )}
-                  onClick={() => router.push(item.href)}
-                >
-                  <item.icon className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="bg-slate-800 text-white border-slate-700">
-                {item.label}
-              </TooltipContent>
-            </Tooltip>
-          ))}
+          <nav className="space-y-2">
+            {menuItems.map((item) => (
+              <Tooltip key={item.href} delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "w-12 h-12 rounded-xl hover:bg-slate-800",
+                      pathname.startsWith(item.href) && "bg-slate-800"
+                    )}
+                    onClick={() => router.push(item.href)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-slate-800 text-white border-slate-700">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </nav>
         </div>
         
         <div className="p-4 flex justify-center">
@@ -120,7 +86,7 @@ export function Sidebar() {
                 variant="ghost"
                 size="icon"
                 className="w-12 h-12 rounded-xl hover:bg-slate-800"
-                onClick={() => router.push("/login")}
+                onClick={() => router.push("/")}
               >
                 <LogOut className="h-5 w-5" />
               </Button>

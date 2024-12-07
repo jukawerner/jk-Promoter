@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
-import LogoutButton from "@/components/shared/logout-button";
+import { WhatsappButton } from "@/components/whatsapp-button";
 import { StoreCard } from "@/components/promoter/store-card";
 import { BrandsPage } from "@/components/promoter/brands-page";
 
@@ -32,6 +32,17 @@ const mockStores = [
 
 export default function PromotorPage() {
   const [selectedStore, setSelectedStore] = useState<typeof mockStores[0] | null>(null);
+  const [showBrands, setShowBrands] = useState(false);
+
+  const handleStoreClick = (store: typeof mockStores[0]) => {
+    setSelectedStore(store);
+    setShowBrands(true);
+  };
+
+  const handleBack = () => {
+    setSelectedStore(null);
+    setShowBrands(false);
+  };
 
   return (
     <motion.div
@@ -42,26 +53,31 @@ export default function PromotorPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            {selectedStore ? `Marcas - ${selectedStore.loja}` : "Minhas Lojas"}
+            {showBrands ? `Marcas - ${selectedStore?.loja}` : "Minhas Lojas"}
           </h1>
-          <LogoutButton />
+          <WhatsappButton />
         </div>
 
-        {selectedStore ? (
+        {showBrands ? (
           <BrandsPage
-            store={selectedStore}
-            onBack={() => setSelectedStore(null)}
+            store={selectedStore!}
+            onBack={handleBack}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div 
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
             {mockStores.map((store) => (
               <StoreCard
                 key={store.id}
                 store={store}
-                onClick={() => setSelectedStore(store)}
+                onClick={() => handleStoreClick(store)}
               />
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </motion.div>

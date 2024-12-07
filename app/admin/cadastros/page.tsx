@@ -2,10 +2,17 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ClipboardList, Users, Building } from "lucide-react";
+import { ClipboardList, Users, Building, Truck } from "lucide-react";
 
 export default function CadastrosPage() {
   const menuCards = [
+    {
+      title: "Cadastro de Fornecedor",
+      icon: <Truck className="h-8 w-8" />,
+      href: "/admin/cadastros/fornecedores",
+      description: "Gerencie os fornecedores do sistema",
+      color: "bg-orange-500",
+    },
     {
       title: "Cadastro de Marcas",
       icon: <ClipboardList className="h-8 w-8" />,
