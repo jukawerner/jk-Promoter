@@ -68,7 +68,7 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
 
   const onSubmit = async (data: z.infer<typeof promoterSchema>) => {
     if (selectedBrands.length === 0) {
-      toast.error("Selecione pelo menos uma marca");
+      toast.error("Selecione pelo menos uma empresa");
       return;
     }
 

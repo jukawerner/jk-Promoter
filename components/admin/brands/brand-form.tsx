@@ -37,11 +37,11 @@ export function BrandForm({ onSubmit, onCancel }: BrandFormProps) {
     <form onSubmit={handleSubmit(onSubmitForm)} className="bg-white p-6 rounded-lg shadow-md">
       <div className="space-y-4">
         <div>
-          <Label htmlFor="name">Nome da Marca</Label>
+          <Label htmlFor="name">Nome da Empresa</Label>
           <Input
             id="name"
             {...register("name")}
-            placeholder="Digite o nome da marca"
+            placeholder="Digite o nome da empresa"
             className={errors.name ? "border-red-500" : ""}
           />
           {errors.name && (

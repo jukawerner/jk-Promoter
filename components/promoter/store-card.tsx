@@ -49,7 +49,7 @@ export function StoreCard({ store, onClick }: StoreCardProps) {
   };
 
   const handleStartWork = () => {
-    router.push("/promotor/pdv/estoque-loja");
+    router.push(`/promotor/pdv/estoque-loja?rede=${encodeURIComponent(store.rede)}&loja=${encodeURIComponent(store.loja)}`);
   };
 
   const formattedDate = format(new Date(store.ultimaVisita), "dd 'de' MMMM", {

@@ -83,7 +83,7 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
 
   const onSubmit = (data: z.infer<typeof clientSchema>) => {
     if (selectedBrands.length === 0) {
-      toast.error("Selecione pelo menos uma marca");
+      toast.error("Selecione pelo menos uma empresa");
       return;
     }
 
