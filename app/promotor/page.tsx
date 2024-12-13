@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { WhatsappButton } from "@/components/whatsapp-button";
+import { StoreCard } from "@/components/promoter/store-card";
+import { BrandsPage } from "@/components/promoter/brands-page";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Store } from "lucide-react";
+import { Search, MapPin, Store, Building2, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,13 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { WhatsappButton } from "@/components/whatsapp-button";
-import { StoreCard } from "@/components/promoter/store-card";
-import { BrandsPage } from "@/components/promoter/brands-page";
-import { MapPin, Building2, X } from "lucide-react";
 
 // Dados mockados para exemplo
 const mockStores = [
@@ -52,18 +47,15 @@ const mockStores = [
 const networks = Array.from(new Set(mockStores.map(store => store.rede)));
 
 export default function PromotorPage() {
-  const [selectedStore, setSelectedStore] = useState<typeof mockStores[0] | null>(null);
-  const [showBrands, setShowBrands] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   // Simulate loading
-  useEffect(() => {
+  useState(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
-  }, []);
+  });
 
   const filteredStores = useMemo(() => {
     return mockStores.filter(store => {
@@ -76,33 +68,13 @@ export default function PromotorPage() {
   }, [searchQuery, selectedNetwork]);
 
   const handleStoreClick = (store: typeof mockStores[0]) => {
-    setSelectedStore(store);
-    setShowBrands(true);
-  };
-
-  const handleBack = () => {
-    setSelectedStore(null);
-    setShowBrands(false);
+    localStorage.setItem("redeSelected", store.rede);
+    localStorage.setItem("lojaSelected", store.loja);
   };
 
   const handleClearFilters = () => {
     setSearchQuery("");
     setSelectedNetwork("");
-  };
-
-  const handleStartWork = () => {
-    if (!selectedStore) {
-      toast.error("Selecione uma loja primeiro");
-      return;
-    }
-
-    // Salvar no localStorage
-    localStorage.setItem("redeSelected", selectedStore.rede);
-    localStorage.setItem("lojaSelected", selectedStore.loja);
-
-    // Redirecionar para a página de estoque
-    router.push("/promotor/pdv/estoque-loja");
-    setShowBrands(false);
   };
 
   return (
@@ -121,12 +93,10 @@ export default function PromotorPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  {showBrands ? `${selectedStore?.loja} - Marcas` : "Minhas Lojas"}
+                  Minhas Lojas
                 </h1>
                 <p className="text-gray-500 text-sm">
-                  {showBrands 
-                    ? "Gerencie as marcas disponíveis nesta loja"
-                    : "Visualize e gerencie todas as suas lojas"}
+                  Visualize e gerencie todas as suas lojas
                 </p>
               </div>
             </div>
@@ -134,127 +104,98 @@ export default function PromotorPage() {
           </div>
 
           <AnimatePresence mode="wait">
-            {showBrands ? (
-              <BrandsPage
-                store={selectedStore!}
-                onBack={handleBack}
-              />
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-6"
-              >
-                {/* Filters Section */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar por loja ou endereço..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                      <SelectTrigger className="w-full md:w-[200px]">
-                        <SelectValue placeholder="Filtrar por rede" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {networks.map((network) => (
-                          <SelectItem key={network} value={network}>
-                            {network}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {(searchQuery || selectedNetwork) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleClearFilters}
-                        className="h-10 w-10"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* Filters Section */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar por loja ou endereço..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
                   </div>
+                  <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
+                    <SelectTrigger className="w-full md:w-[200px]">
+                      <SelectValue placeholder="Filtrar por rede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {networks.map((network) => (
+                        <SelectItem key={network} value={network}>
+                          {network}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(searchQuery || selectedNetwork) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleClearFilters}
+                      className="h-10 w-10"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
+              </div>
 
-                {/* Stores Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <AnimatePresence>
-                    {isLoading ? (
-                      // Loading skeletons
-                      Array.from({ length: 6 }).map((_, index) => (
-                        <motion.div
-                          key={`skeleton-${index}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="bg-white rounded-xl h-[200px] animate-pulse"
-                        />
-                      ))
-                    ) : filteredStores.length > 0 ? (
-                      // Store cards
-                      filteredStores.map((store) => (
-                        <StoreCard
-                          key={store.id}
-                          store={store}
-                          onClick={() => handleStoreClick(store)}
-                        />
-                      ))
-                    ) : (
-                      // Empty state
+              {/* Stores Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <AnimatePresence>
+                  {isLoading ? (
+                    // Loading skeletons
+                    Array.from({ length: 6 }).map((_, index) => (
                       <motion.div
+                        key={`skeleton-${index}`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="col-span-full flex flex-col items-center justify-center py-12 text-center"
+                        exit={{ opacity: 0 }}
+                        className="bg-white rounded-xl h-[200px] animate-pulse"
+                      />
+                    ))
+                  ) : filteredStores.length > 0 ? (
+                    // Store cards
+                    filteredStores.map((store) => (
+                      <StoreCard
+                        key={store.id}
+                        store={store}
+                        onClick={() => handleStoreClick(store)}
+                      />
+                    ))
+                  ) : (
+                    // Empty state
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="col-span-full flex flex-col items-center justify-center py-12 text-center"
+                    >
+                      <Building2 className="h-12 w-12 text-gray-400 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Nenhuma loja encontrada
+                      </h3>
+                      <p className="text-gray-500 mt-1">
+                        Tente ajustar seus filtros de busca
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={handleClearFilters}
+                        className="mt-4"
                       >
-                        <Building2 className="h-12 w-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Nenhuma loja encontrada
-                        </h3>
-                        <p className="text-gray-500 mt-1">
-                          Tente ajustar seus filtros de busca
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={handleClearFilters}
-                          className="mt-4"
-                        >
-                          Limpar filtros
-                        </Button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
+                        Limpar filtros
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
           </AnimatePresence>
-          {showBrands && selectedStore && (
-            <Dialog open={showBrands} onOpenChange={setShowBrands}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Iniciar os Trabalhos</DialogTitle>
-                  <DialogDescription>
-                    Rede: {selectedStore.rede}<br />
-                    Loja: {selectedStore.loja}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => setShowBrands(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleStartWork}>
-                    Começar
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
         </div>
       </div>
     </motion.div>

@@ -41,14 +41,10 @@ interface StoreCardProps {
 
 export function StoreCard({ store, onClick }: StoreCardProps) {
   const router = useRouter();
-  const [showModal, setShowModal] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   const handleCardClick = () => {
-    setShowModal(true);
-  };
-
-  const handleStartWork = () => {
+    onClick(); // Salva no localStorage
     router.push("/promotor/pdv/estoque-loja");
   };
 
@@ -140,23 +136,6 @@ export function StoreCard({ store, onClick }: StoreCardProps) {
             className="absolute inset-0 bg-rose-50/5 rounded-xl"
           />
         </motion.div>
-
-        {/* Modal de Início de Trabalhos */}
-        <Dialog open={showModal} onOpenChange={setShowModal}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Iniciar os Trabalhos</DialogTitle>
-              <DialogDescription>
-                Você está prestes a iniciar os trabalhos na loja {store.loja} da rede {store.rede}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mt-6 flex justify-end">
-              <Button onClick={handleStartWork} className="bg-rose-600 hover:bg-rose-700 text-white">
-                Começar
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </motion.div>
     </TooltipProvider>
   );
