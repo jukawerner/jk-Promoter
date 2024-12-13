@@ -19,10 +19,11 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Pencil, Trash2, Store, Package2, PackageCheck } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { Toaster, toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 
 interface EstoqueItem {
   id: number;
@@ -52,10 +53,24 @@ export default function EstoqueLoja() {
       return;
     }
 
+    // Validate if estoque and estoqueVirtual are valid numbers
+    const estoqueNum = parseFloat(estoque);
+    const estoqueVirtualNum = parseFloat(estoqueVirtual);
+
+    if (isNaN(estoqueNum) || isNaN(estoqueVirtualNum)) {
+      toast.error("Os valores de estoque devem ser números válidos");
+      return;
+    }
+
+    if (estoqueNum < 0 || estoqueVirtualNum < 0) {
+      toast.error("Os valores de estoque não podem ser negativos");
+      return;
+    }
+
     if (editingItem) {
       setItems(items.map(item => 
         item.id === editingItem.id 
-          ? { ...item, marca, produto, estoque, estoqueVirtual }
+          ? { ...item, marca, produto, estoque: estoqueNum.toString(), estoqueVirtual: estoqueVirtualNum.toString() }
           : item
       ));
       setEditingItem(null);
@@ -64,8 +79,8 @@ export default function EstoqueLoja() {
         id: Date.now(),
         marca,
         produto,
-        estoque,
-        estoqueVirtual,
+        estoque: estoqueNum.toString(),
+        estoqueVirtual: estoqueVirtualNum.toString(),
       };
       setItems([...items, newItem]);
     }
@@ -93,12 +108,42 @@ export default function EstoqueLoja() {
     toast.success("Item excluído com sucesso!");
   };
 
-  const handleGravar = () => {
+  const handleGravar = async () => {
     if (items.length === 0) {
       toast.error("Adicione pelo menos um item antes de gravar");
       return;
     }
-    router.push("/promotor/pdv/avaliacao");
+
+    try {
+      // Save each item to Supabase
+      for (const item of items) {
+        const { error } = await supabase
+          .from('estoque')
+          .insert({
+            marca: item.marca,
+            produto: item.produto,
+            estoque_fisico: parseFloat(item.estoque),
+            estoque_virtual: parseFloat(item.estoqueVirtual)
+          });
+          
+        if (error) throw error;
+      }
+
+      // Mostra a mensagem de sucesso
+      toast("Estoque gravado com sucesso!", {
+        duration: 3000,
+        style: { background: 'green', color: 'white' }
+      });
+      
+      // Limpa o formulário e volta para a tabela
+      setItems([]);
+      setShowForm(false);
+    } catch (error) {
+      console.error("Erro ao salvar estoque:", error);
+      toast("Erro ao salvar o estoque. Por favor, tente novamente.", {
+        style: { background: 'red', color: 'white' }
+      });
+    }
   };
 
   return (
@@ -107,6 +152,7 @@ export default function EstoqueLoja() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-gray-50"
     >
+      <Toaster richColors position="top-center" />
       <div className="container mx-auto p-6 max-w-[800px]">
         <div className="flex justify-end mb-4">
           <WhatsappButton />

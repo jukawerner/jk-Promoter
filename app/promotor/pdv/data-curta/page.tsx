@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -9,28 +9,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Clock, AlertTriangle, ArrowLeft, Pencil, Trash2, CalendarClock, Package2 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Clock, AlertTriangle, Package2, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { WhatsappButton } from "@/components/whatsapp-button";
+import { toast, Toaster } from "sonner";
+import { supabase } from "@/lib/supabase";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface DataCurtaItem {
-  id: number;
-  marca: string;
-  produto: string;
-  estoque: string;
-  dataValidade: string;
-}
+const marcas = ["Marca 1", "Marca 2", "Marca 3"]; // Substitua com suas marcas
+const produtos = ["Produto 1", "Produto 2", "Produto 3"]; // Substitua com seus produtos
 
 export default function DataCurtaPage() {
   const router = useRouter();
@@ -38,59 +35,124 @@ export default function DataCurtaPage() {
   const [produto, setProduto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [dataValidade, setDataValidade] = useState("");
-  const [items, setItems] = useState<DataCurtaItem[]>([]);
-  const [editingItem, setEditingItem] = useState<DataCurtaItem | null>(null);
+  const [items, setItems] = useState([]);
+  const [editingItem, setEditingItem] = useState(null);
   const [showForm, setShowForm] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  // Dados mockados para exemplo
-  const marcas = ["Marca A", "Marca B", "Marca C"];
-  const produtos = ["Produto 1", "Produto 2", "Produto 3"];
-
-  const handleConfirm = () => {
+  const handleSubmit = async () => {
+    // Validação dos campos
     if (!marca || !produto || !estoque || !dataValidade) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
 
-    if (editingItem) {
-      setItems(items.map(item => 
-        item.id === editingItem.id 
-          ? { ...item, marca, produto, estoque, dataValidade }
-          : item
-      ));
-      setEditingItem(null);
-    } else {
-      const newItem: DataCurtaItem = {
+    try {
+      // Inserir no Supabase
+      const { error } = await supabase
+        .from("data_curta")
+        .insert({
+          marca,
+          produto,
+          quantidade: parseFloat(estoque),
+          data_validade: dataValidade
+        });
+
+      if (error) throw error;
+
+      // Redirecionar para a página de lista
+      router.push("/promotor/pdv/data-curta/lista");
+      
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao salvar os dados. Por favor, tente novamente.");
+    }
+  };
+
+  const handleConfirm = async () => {
+    try {
+      // Inserir no Supabase
+      const { error } = await supabase
+        .from("data_curta")
+        .insert({
+          marca,
+          produto,
+          quantidade: parseFloat(estoque),
+          data_validade: dataValidade
+        });
+
+      if (error) throw error;
+
+      toast.success("Produto registrado com sucesso!");
+      
+      // Limpar formulário
+      setMarca("");
+      setProduto("");
+      setEstoque("");
+      setDataValidade("");
+      setShowConfirmDialog(false);
+      
+      // Adicionar item à lista
+      setItems([...items, {
         id: Date.now(),
         marca,
         produto,
-        estoque,
-        dataValidade,
-      };
-      setItems([...items, newItem]);
+        quantidade: estoque,
+        data_validade: dataValidade
+      }]);
+      
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao salvar os dados. Por favor, tente novamente.");
+      setShowConfirmDialog(false);
     }
-
-    // Limpar formulário
-    setMarca("");
-    setProduto("");
-    setEstoque("");
-    setDataValidade("");
-    setShowForm(false);
-    toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
   };
 
-  const handleEdit = (item: DataCurtaItem) => {
-    setMarca(item.marca);
-    setProduto(item.produto);
-    setEstoque(item.estoque);
-    setDataValidade(item.dataValidade);
-    setEditingItem(item);
-    setShowForm(true);
+  const handleEdit = async (item) => {
+    try {
+      // Atualizar no Supabase
+      const { error } = await supabase
+        .from("data_curta")
+        .update({
+          marca: item.marca,
+          produto: item.produto,
+          quantidade: parseFloat(item.estoque),
+          data_validade: item.dataValidade
+        })
+        .eq("id", item.id);
+
+      if (error) throw error;
+
+      toast.success("Produto atualizado com sucesso!");
+      
+      // Atualizar item na lista
+      setItems(items.map(i => i.id === item.id ? item : i));
+      
+    } catch (error) {
+      console.error("Erro ao atualizar:", error);
+      toast.error("Erro ao atualizar os dados. Por favor, tente novamente.");
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setItems(items.filter(item => item.id !== id));
-    toast.success("Item excluído com sucesso!");
+  const handleDelete = async (id) => {
+    try {
+      // Deletar no Supabase
+      const { error } = await supabase
+        .from("data_curta")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Produto excluído com sucesso!");
+      
+      // Remover item da lista
+      setItems(items.filter(item => item.id !== id));
+      
+    } catch (error) {
+      console.error("Erro ao excluir:", error);
+      toast.error("Erro ao excluir os dados. Por favor, tente novamente.");
+    }
   };
 
   const handleGravar = () => {
@@ -109,7 +171,14 @@ export default function DataCurtaPage() {
     >
       <div className="container mx-auto p-6 max-w-[800px]">
         <div className="flex justify-end mb-4">
-          <WhatsappButton />
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </Button>
         </div>
 
         {/* Header com ícone e título */}
@@ -121,7 +190,7 @@ export default function DataCurtaPage() {
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
           >
             <div className="bg-rose-100 p-4 rounded-full">
-              <CalendarClock className="w-12 h-12 text-rose-600" />
+              <Clock className="w-12 h-12 text-rose-600" />
             </div>
             <div className="absolute -right-2 -bottom-2 bg-amber-100 rounded-full p-2 shadow-sm border-2 border-white">
               <AlertTriangle className="w-6 h-6 text-amber-600" />
@@ -187,6 +256,7 @@ export default function DataCurtaPage() {
                       <div className="relative">
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
+                          type="number"
                           placeholder="Quantidade (un/kg)"
                           value={estoque}
                           onChange={(e) => setEstoque(e.target.value)}
@@ -227,10 +297,10 @@ export default function DataCurtaPage() {
                     Voltar
                   </Button>
                   <Button
-                    onClick={handleConfirm}
+                    onClick={handleSubmit}
                     className="bg-rose-500 hover:bg-rose-600 text-white px-8"
                   >
-                    {editingItem ? "Atualizar" : "Adicionar"}
+                    Adicionar
                   </Button>
                 </div>
               </motion.div>
@@ -260,29 +330,36 @@ export default function DataCurtaPage() {
                 </div>
                 
                 <div className="border rounded-lg overflow-hidden bg-white">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead>Marca</TableHead>
-                        <TableHead>Produto</TableHead>
-                        <TableHead>Estoque</TableHead>
-                        <TableHead>Data de Validade</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th>Marca</th>
+                        <th>Produto</th>
+                        <th>Estoque</th>
+                        <th>Data de Validade</th>
+                        <th className="text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {items.map((item) => (
-                        <TableRow key={item.id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium">{item.marca}</TableCell>
-                          <TableCell>{item.produto}</TableCell>
-                          <TableCell>{item.estoque}</TableCell>
-                          <TableCell>{new Date(item.dataValidade).toLocaleDateString()}</TableCell>
-                          <TableCell>
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="font-medium">{item.marca}</td>
+                          <td>{item.produto}</td>
+                          <td>{item.quantidade}</td>
+                          <td>{new Date(item.data_validade).toLocaleDateString()}</td>
+                          <td>
                             <div className="flex items-center justify-end gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleEdit(item)}
+                                onClick={() => {
+                                  setMarca(item.marca);
+                                  setProduto(item.produto);
+                                  setEstoque(item.quantidade);
+                                  setDataValidade(item.data_validade);
+                                  setEditingItem(item);
+                                  setShowForm(true);
+                                }}
                                 className="hover:bg-rose-50 hover:text-rose-600"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -296,24 +373,74 @@ export default function DataCurtaPage() {
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
                       {items.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                        <tr>
+                          <td colSpan={5} className="text-center py-8 text-gray-500">
                             Nenhum item adicionado
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       )}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* Modal de Confirmação */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Produto</DialogTitle>
+            <DialogDescription>
+              Verifique se os dados estão corretos antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Marca</p>
+                <p className="text-lg font-semibold">{marca}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Produto</p>
+                <p className="text-lg font-semibold">{produto}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Estoque</p>
+                <p className="text-lg font-semibold">{estoque} un/kg</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Data de Validade</p>
+                <p className="text-lg font-semibold">
+                  {dataValidade && format(new Date(dataValidade), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={handleConfirm}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
