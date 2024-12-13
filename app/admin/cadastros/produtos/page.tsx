@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductForm } from "@/components/admin/products/product-form";
 import { ProductCard } from "@/components/admin/products/product-card";
 import { ProductFilter } from "@/components/admin/products/product-filter";
+import { ExcelUpload } from "@/components/admin/products/excel-upload";
 
 interface Product {
   id: number;
@@ -93,6 +94,28 @@ export default function CadastroProdutos() {
     setShowForm(true);
   };
 
+  const handleDeleteProduct = (id: number) => {
+    setProducts(products.filter(p => p.id !== id));
+  };
+
+  const handleImportProducts = (importedProducts: Omit<Product, "id">[]) => {
+    const newProducts = importedProducts.map(product => ({
+      ...product,
+      id: Date.now() + Math.random()
+    }));
+    
+    // Adiciona os produtos e garante que a visualização esteja em cards
+    setProducts(prev => [...prev, ...newProducts]);
+    setShowForm(false);
+    
+    // Limpa os filtros para mostrar todos os produtos, incluindo os novos
+    setFilters({
+      nome: "",
+      familia: "",
+      marca: "",
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -104,16 +127,19 @@ export default function CadastroProdutos() {
           <h1 className="text-3xl font-bold text-gray-900">Cadastro de Produtos</h1>
           <p className="text-gray-600 mt-2">Gerencie os produtos do sistema</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingProduct(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Produto
-        </Button>
+        <div className="flex items-center gap-4">
+          <ExcelUpload onProductsImported={handleImportProducts} />
+          <Button
+            onClick={() => {
+              setEditingProduct(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Produto
+          </Button>
+        </div>
       </div>
 
       {!showForm && (
@@ -123,35 +149,57 @@ export default function CadastroProdutos() {
         />
       )}
 
-      {showForm ? (
-        <ProductForm
-          onSave={handleSaveProduct}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingProduct(null);
-          }}
-          initialData={editingProduct}
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onEdit={() => handleEditProduct(product)}
+      <AnimatePresence mode="wait">
+        {showForm ? (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <ProductForm
+              onSave={handleSaveProduct}
+              onCancel={() => {
+                setShowForm(false);
+                setEditingProduct(null);
+              }}
+              initialData={editingProduct}
             />
-          ))}
-          {filteredProducts.length === 0 && (
-            <div className="col-span-full text-center py-12">
-              <p className="text-gray-500">
-                {products.length === 0
-                  ? "Nenhum produto cadastrado. Clique em \"Adicionar Produto\" para começar."
-                  : "Nenhum produto encontrado com os filtros aplicados."}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="cards"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {filteredProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ProductCard
+                  product={product}
+                  onEdit={handleEditProduct}
+                  onDelete={handleDeleteProduct}
+                />
+              </motion.div>
+            ))}
+            {filteredProducts.length === 0 && (
+              <div className="col-span-full text-center py-12">
+                <p className="text-gray-500">
+                  {products.length === 0
+                    ? "Nenhum produto cadastrado. Clique em \"Adicionar Produto\" para começar."
+                    : "Nenhum produto encontrado com os filtros aplicados."}
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

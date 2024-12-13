@@ -13,31 +13,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useEffect } from "react";
 
 const productSchema = z.object({
-  name: z.string()
+  nome: z.string()
     .min(2, "O nome deve ter pelo menos 2 caracteres")
     .max(50, "O nome deve ter no máximo 50 caracteres"),
-  family: z.string()
+  familia: z.string()
     .min(2, "A família deve ter pelo menos 2 caracteres")
     .max(50, "A família deve ter no máximo 50 caracteres"),
-  unit: z.enum(["UN", "KG"], {
+  unidade: z.enum(["UN", "KG"], {
     required_error: "Selecione uma unidade",
   }),
-  weight: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-    message: "Peso deve ser um número válido maior que 0",
-  }),
-  validity: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-    message: "Validade deve ser um número válido maior que 0",
-  }),
-  brand: z.string({
+  peso: z.number().min(0, "Peso deve ser maior que 0"),
+  validade: z.number().min(0, "Validade deve ser maior que 0"),
+  marca: z.string({
     required_error: "Selecione uma marca",
   }),
 });
 
 interface ProductFormProps {
-  onSubmit: (data: z.infer<typeof productSchema>) => void;
+  onSave: (data: z.infer<typeof productSchema>) => void;
   onCancel: () => void;
+  initialData?: z.infer<typeof productSchema> | null;
 }
 
 // Mock de marcas para teste
@@ -47,7 +45,7 @@ const MOCK_BRANDS = [
   { id: '3', nome: 'Marca C' },
 ];
 
-export function ProductForm({ onSubmit, onCancel }: ProductFormProps) {
+export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps) {
   const {
     register,
     handleSubmit,
@@ -56,10 +54,19 @@ export function ProductForm({ onSubmit, onCancel }: ProductFormProps) {
     setValue,
   } = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
+    defaultValues: initialData || {}
   });
 
+  useEffect(() => {
+    if (initialData) {
+      Object.entries(initialData).forEach(([key, value]) => {
+        setValue(key as keyof z.infer<typeof productSchema>, value);
+      });
+    }
+  }, [initialData, setValue]);
+
   const onSubmitForm = async (data: z.infer<typeof productSchema>) => {
-    onSubmit(data);
+    onSave(data);
     reset();
   };
 
@@ -67,35 +74,35 @@ export function ProductForm({ onSubmit, onCancel }: ProductFormProps) {
     <form onSubmit={handleSubmit(onSubmitForm)} className="bg-white p-6 rounded-lg shadow-md">
       <div className="space-y-4">
         <div>
-          <Label htmlFor="name">Nome do Produto</Label>
+          <Label htmlFor="nome">Nome do Produto</Label>
           <Input
-            id="name"
-            {...register("name")}
+            id="nome"
+            {...register("nome")}
             placeholder="Digite o nome do produto"
-            className={errors.name ? "border-red-500" : ""}
+            className={errors.nome ? "border-red-500" : ""}
           />
-          {errors.name && (
-            <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+          {errors.nome && (
+            <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="family">Família de Produto</Label>
+          <Label htmlFor="familia">Família de Produto</Label>
           <Input
-            id="family"
-            {...register("family")}
+            id="familia"
+            {...register("familia")}
             placeholder="Digite a família do produto"
-            className={errors.family ? "border-red-500" : ""}
+            className={errors.familia ? "border-red-500" : ""}
           />
-          {errors.family && (
-            <p className="text-red-500 text-sm mt-1">{errors.family.message}</p>
+          {errors.familia && (
+            <p className="text-red-500 text-sm mt-1">{errors.familia.message}</p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="unit">Unidade</Label>
-          <Select onValueChange={(value) => setValue("unit", value as "UN" | "KG")}>
-            <SelectTrigger className={errors.unit ? "border-red-500" : ""}>
+          <Label htmlFor="unidade">Unidade</Label>
+          <Select onValueChange={(value) => setValue("unidade", value as "UN" | "KG")} defaultValue={initialData?.unidade}>
+            <SelectTrigger className={errors.unidade ? "border-red-500" : ""}>
               <SelectValue placeholder="Selecione a unidade" />
             </SelectTrigger>
             <SelectContent>
@@ -103,44 +110,44 @@ export function ProductForm({ onSubmit, onCancel }: ProductFormProps) {
               <SelectItem value="KG">KG</SelectItem>
             </SelectContent>
           </Select>
-          {errors.unit && (
-            <p className="text-red-500 text-sm mt-1">{errors.unit.message}</p>
+          {errors.unidade && (
+            <p className="text-red-500 text-sm mt-1">{errors.unidade.message}</p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="weight">Peso do Produto</Label>
+          <Label htmlFor="peso">Peso do Produto</Label>
           <Input
-            id="weight"
+            id="peso"
             type="number"
             step="0.01"
-            {...register("weight")}
+            {...register("peso", { valueAsNumber: true })}
             placeholder="Digite o peso"
-            className={errors.weight ? "border-red-500" : ""}
+            className={errors.peso ? "border-red-500" : ""}
           />
-          {errors.weight && (
-            <p className="text-red-500 text-sm mt-1">{errors.weight.message}</p>
+          {errors.peso && (
+            <p className="text-red-500 text-sm mt-1">{errors.peso.message}</p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="validity">Validade do Produto (dias)</Label>
+          <Label htmlFor="validade">Validade do Produto (dias)</Label>
           <Input
-            id="validity"
+            id="validade"
             type="number"
-            {...register("validity")}
+            {...register("validade", { valueAsNumber: true })}
             placeholder="Digite a validade em dias"
-            className={errors.validity ? "border-red-500" : ""}
+            className={errors.validade ? "border-red-500" : ""}
           />
-          {errors.validity && (
-            <p className="text-red-500 text-sm mt-1">{errors.validity.message}</p>
+          {errors.validade && (
+            <p className="text-red-500 text-sm mt-1">{errors.validade.message}</p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="brand">Marca</Label>
-          <Select onValueChange={(value) => setValue("brand", value)}>
-            <SelectTrigger className={errors.brand ? "border-red-500" : ""}>
+          <Label htmlFor="marca">Marca</Label>
+          <Select onValueChange={(value) => setValue("marca", value)} defaultValue={initialData?.marca}>
+            <SelectTrigger className={errors.marca ? "border-red-500" : ""}>
               <SelectValue placeholder="Selecione a marca" />
             </SelectTrigger>
             <SelectContent>
@@ -151,8 +158,8 @@ export function ProductForm({ onSubmit, onCancel }: ProductFormProps) {
               ))}
             </SelectContent>
           </Select>
-          {errors.brand && (
-            <p className="text-red-500 text-sm mt-1">{errors.brand.message}</p>
+          {errors.marca && (
+            <p className="text-red-500 text-sm mt-1">{errors.marca.message}</p>
           )}
         </div>
 

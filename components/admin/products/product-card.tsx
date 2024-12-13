@@ -1,6 +1,6 @@
 "use client";
 
-import { Package2, Edit } from "lucide-react";
+import { Package2, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -16,10 +16,11 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  onEdit: () => void;
+  onEdit: (product: Product) => void;
+  onDelete: (id: number) => void;
 }
 
-export function ProductCard({ product, onEdit }: ProductCardProps) {
+export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
@@ -31,14 +32,24 @@ export function ProductCard({ product, onEdit }: ProductCardProps) {
               <p className="text-gray-600">{product.familia}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onEdit}
-            className="h-8 w-8"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(product)}
+              className="h-8 w-8"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(product.id)}
+              className="h-8 w-8 text-red-500 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="mt-4 space-y-2">
           <div className="flex items-center text-sm text-gray-600">
