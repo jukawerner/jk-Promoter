@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,21 +9,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Clock, AlertTriangle, Package2, Plus, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Pencil, Trash2, ImageIcon, Camera, Store, Plus, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { toast, Toaster } from "sonner";
+import { WhatsappButton } from "@/components/whatsapp-button";
 import { supabase } from "@/lib/supabase";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { motion, AnimatePresence } from "framer-motion";
+import { Clock, AlertTriangle, Package2 } from "lucide-react";
 
 const marcas = ["Marca 1", "Marca 2", "Marca 3"]; // Substitua com suas marcas
 const produtos = ["Produto 1", "Produto 2", "Produto 3"]; // Substitua com seus produtos
@@ -39,6 +37,25 @@ export default function DataCurtaPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [showForm, setShowForm] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [rede, setRede] = useState("");
+  const [loja, setLoja] = useState("");
+
+  // Carregar rede e loja do localStorage quando o componente montar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const redeSelected = localStorage.getItem("redeSelected") || "";
+      const lojaSelected = localStorage.getItem("lojaSelected") || "";
+      
+      if (!redeSelected || !lojaSelected) {
+        toast.error("Selecione uma rede e loja primeiro");
+        router.push("/promotor/pdv/ponto-de-venda");
+        return;
+      }
+      
+      setRede(redeSelected);
+      setLoja(lojaSelected);
+    }
+  }, [router]);
 
   const handleSubmit = async () => {
     // Validação dos campos
@@ -55,7 +72,9 @@ export default function DataCurtaPage() {
           marca,
           produto,
           quantidade: parseFloat(estoque),
-          data_validade: dataValidade
+          data_validade: dataValidade,
+          rede,
+          loja
         });
 
       if (error) throw error;
@@ -78,7 +97,9 @@ export default function DataCurtaPage() {
           marca,
           produto,
           quantidade: parseFloat(estoque),
-          data_validade: dataValidade
+          data_validade: dataValidade,
+          rede,
+          loja
         });
 
       if (error) throw error;
@@ -98,7 +119,9 @@ export default function DataCurtaPage() {
         marca,
         produto,
         quantidade: estoque,
-        data_validade: dataValidade
+        data_validade: dataValidade,
+        rede,
+        loja
       }]);
       
     } catch (error) {
@@ -117,7 +140,9 @@ export default function DataCurtaPage() {
           marca: item.marca,
           produto: item.produto,
           quantidade: parseFloat(item.estoque),
-          data_validade: item.dataValidade
+          data_validade: item.dataValidade,
+          rede: item.rede,
+          loja: item.loja
         })
         .eq("id", item.id);
 
@@ -218,36 +243,58 @@ export default function DataCurtaPage() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Marca</label>
-                    <Select value={marca} onValueChange={setMarca}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecione a marca" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {marcas.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Rede</label>
+                      <Input
+                        value={rede}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Loja</label>
+                      <Input
+                        value={loja}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Produto</label>
-                    <Select value={produto} onValueChange={setProduto}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecione o produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {produtos.map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Marca</label>
+                      <Select value={marca} onValueChange={setMarca}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a marca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {marcas.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Produto</label>
+                      <Select value={produto} onValueChange={setProduto}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {produtos.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -337,6 +384,8 @@ export default function DataCurtaPage() {
                         <th>Produto</th>
                         <th>Estoque</th>
                         <th>Data de Validade</th>
+                        <th>Rede</th>
+                        <th>Loja</th>
                         <th className="text-right">Ações</th>
                       </tr>
                     </thead>
@@ -347,6 +396,8 @@ export default function DataCurtaPage() {
                           <td>{item.produto}</td>
                           <td>{item.quantidade}</td>
                           <td>{new Date(item.data_validade).toLocaleDateString()}</td>
+                          <td>{item.rede}</td>
+                          <td>{item.loja}</td>
                           <td>
                             <div className="flex items-center justify-end gap-2">
                               <Button
@@ -357,6 +408,8 @@ export default function DataCurtaPage() {
                                   setProduto(item.produto);
                                   setEstoque(item.quantidade);
                                   setDataValidade(item.data_validade);
+                                  setRede(item.rede);
+                                  setLoja(item.loja);
                                   setEditingItem(item);
                                   setShowForm(true);
                                 }}
@@ -378,7 +431,7 @@ export default function DataCurtaPage() {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-gray-500">
+                          <td colSpan={8} className="text-center py-8 text-gray-500">
                             Nenhum item adicionado
                           </td>
                         </tr>
@@ -421,6 +474,14 @@ export default function DataCurtaPage() {
                 <p className="text-lg font-semibold">
                   {dataValidade && format(new Date(dataValidade), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                 </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Rede</p>
+                <p className="text-lg font-semibold">{rede}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Loja</p>
+                <p className="text-lg font-semibold">{loja}</p>
               </div>
             </div>
           </div>

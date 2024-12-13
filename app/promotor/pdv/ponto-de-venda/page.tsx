@@ -271,20 +271,40 @@ export default function PontoVenda() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="marca">Marca</Label>
-                    <Select value={marca} onValueChange={setMarca}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a marca" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {marcas.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Marca e Ponto Extra lado a lado */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="marca">Marca</Label>
+                      <Select value={marca} onValueChange={setMarca}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a marca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {marcas.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="h-6" /> {/* Espaçador para alinhar com o label da Marca */}
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="pontoExtra"
+                          checked={pontoExtra}
+                          onCheckedChange={(checked) => setPontoExtra(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="pontoExtra"
+                          className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                        >
+                          Ponto Extra conquistado
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Área de upload de imagens */}
@@ -359,20 +379,6 @@ export default function PontoVenda() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2">
-                    <Checkbox
-                      id="pontoExtra"
-                      checked={pontoExtra}
-                      onCheckedChange={(checked) => setPontoExtra(checked as boolean)}
-                    />
-                    <label
-                      htmlFor="pontoExtra"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                    >
-                      Ponto Extra conquistado
-                    </label>
                   </div>
 
                   {/* Botões de ação */}
