@@ -1,13 +1,11 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
-import { WhatsappButton } from "@/components/whatsapp-button";
-import { StoreCard } from "@/components/promoter/store-card";
-import { BrandsPage } from "@/components/promoter/brands-page";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Store, Building2, X } from "lucide-react";
+import { Search, Store } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,6 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { WhatsappButton } from "@/components/whatsapp-button";
+import { StoreCard } from "@/components/promoter/store-card";
+import { BrandsPage } from "@/components/promoter/brands-page";
+import { MapPin, Building2, X } from "lucide-react";
 
 // Dados mockados para exemplo
 const mockStores = [
@@ -52,12 +57,13 @@ export default function PromotorPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   // Simulate loading
-  useState(() => {
+  useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
-  });
+  }, []);
 
   const filteredStores = useMemo(() => {
     return mockStores.filter(store => {
@@ -82,6 +88,21 @@ export default function PromotorPage() {
   const handleClearFilters = () => {
     setSearchQuery("");
     setSelectedNetwork("");
+  };
+
+  const handleStartWork = () => {
+    if (!selectedStore) {
+      toast.error("Selecione uma loja primeiro");
+      return;
+    }
+
+    // Salvar no localStorage
+    localStorage.setItem("redeSelected", selectedStore.rede);
+    localStorage.setItem("lojaSelected", selectedStore.loja);
+
+    // Redirecionar para a página de estoque
+    router.push("/promotor/pdv/estoque-loja");
+    setShowBrands(false);
   };
 
   return (
@@ -213,6 +234,27 @@ export default function PromotorPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          {showBrands && selectedStore && (
+            <Dialog open={showBrands} onOpenChange={setShowBrands}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Iniciar os Trabalhos</DialogTitle>
+                  <DialogDescription>
+                    Rede: {selectedStore.rede}<br />
+                    Loja: {selectedStore.loja}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => setShowBrands(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleStartWork}>
+                    Começar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
     </motion.div>

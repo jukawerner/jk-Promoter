@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Pencil, Trash2, Store, Package2, PackageCheck, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
@@ -31,24 +31,43 @@ interface EstoqueItem {
   produto: string;
   estoque: string;
   estoqueVirtual: string;
+  rede: string;
+  loja: string;
 }
 
 export default function EstoqueLoja() {
-  const router = useRouter();
   const [marca, setMarca] = useState("");
   const [produto, setProduto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [estoqueVirtual, setEstoqueVirtual] = useState("");
+  const [rede, setRede] = useState("");
+  const [loja, setLoja] = useState("");
   const [items, setItems] = useState<EstoqueItem[]>([]);
   const [editingItem, setEditingItem] = useState<EstoqueItem | null>(null);
   const [showForm, setShowForm] = useState(true);
+  const router = useRouter();
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
   const produtos = ["Produto 1", "Produto 2", "Produto 3"];
 
+  // Carregar rede e loja do localStorage quando o componente montar
+  useEffect(() => {
+    const redeSelected = localStorage.getItem("redeSelected");
+    const lojaSelected = localStorage.getItem("lojaSelected");
+    
+    if (!redeSelected || !lojaSelected) {
+      toast.error("Selecione uma rede e loja primeiro");
+      router.push("/promotor");
+      return;
+    }
+    
+    setRede(redeSelected);
+    setLoja(lojaSelected);
+  }, []);
+
   const handleConfirm = () => {
-    if (!marca || !produto || !estoque || !estoqueVirtual) {
+    if (!marca || !produto || !estoque || !estoqueVirtual || !rede || !loja) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
@@ -70,7 +89,7 @@ export default function EstoqueLoja() {
     if (editingItem) {
       setItems(items.map(item => 
         item.id === editingItem.id 
-          ? { ...item, marca, produto, estoque: estoqueNum.toString(), estoqueVirtual: estoqueVirtualNum.toString() }
+          ? { ...item, marca, produto, estoque: estoqueNum.toString(), estoqueVirtual: estoqueVirtualNum.toString(), rede, loja }
           : item
       ));
       setEditingItem(null);
@@ -81,6 +100,8 @@ export default function EstoqueLoja() {
         produto,
         estoque: estoqueNum.toString(),
         estoqueVirtual: estoqueVirtualNum.toString(),
+        rede,
+        loja,
       };
       setItems([...items, newItem]);
     }
@@ -90,6 +111,8 @@ export default function EstoqueLoja() {
     setProduto("");
     setEstoque("");
     setEstoqueVirtual("");
+    setRede("");
+    setLoja("");
     setShowForm(false);
     toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
   };
@@ -99,6 +122,8 @@ export default function EstoqueLoja() {
     setProduto(item.produto);
     setEstoque(item.estoque);
     setEstoqueVirtual(item.estoqueVirtual);
+    setRede(item.rede);
+    setLoja(item.loja);
     setEditingItem(item);
     setShowForm(true);
   };
@@ -109,40 +134,30 @@ export default function EstoqueLoja() {
   };
 
   const handleGravar = async () => {
-    if (items.length === 0) {
-      toast.error("Adicione pelo menos um item antes de gravar");
-      return;
-    }
-
     try {
-      // Save each item to Supabase
       for (const item of items) {
         const { error } = await supabase
-          .from('estoque')
-          .insert({
-            marca: item.marca,
-            produto: item.produto,
-            estoque_fisico: parseFloat(item.estoque),
-            estoque_virtual: parseFloat(item.estoqueVirtual)
-          });
+          .from("estoque")
+          .insert([
+            {
+              marca: item.marca,
+              produto: item.produto,
+              estoque_fisico: parseFloat(item.estoque),
+              estoque_virtual: parseFloat(item.estoqueVirtual),
+              rede: item.rede,
+              loja: item.loja
+            }
+          ]);
           
         if (error) throw error;
       }
 
-      // Mostra a mensagem de sucesso
-      toast("Estoque gravado com sucesso!", {
-        duration: 3000,
-        style: { background: 'green', color: 'white' }
-      });
-      
-      // Limpa o formulário e volta para a tabela
+      toast.success("Estoque salvo com sucesso!");
       setItems([]);
-      setShowForm(false);
-    } catch (error) {
-      console.error("Erro ao salvar estoque:", error);
-      toast("Erro ao salvar o estoque. Por favor, tente novamente.", {
-        style: { background: 'red', color: 'white' }
-      });
+      router.push("/promotor/pdv/ponto-de-venda");
+    } catch (error: any) {
+      console.log("Erro ao salvar estoque:", error);
+      toast.error("Erro ao salvar estoque");
     }
   };
 
@@ -203,6 +218,25 @@ export default function EstoqueLoja() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="grid gap-4">
+                  {/* Campos Rede e Loja preenchidos automaticamente */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Rede</label>
+                    <Input
+                      value={rede}
+                      disabled
+                      className="bg-gray-100"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Loja</label>
+                    <Input
+                      value={loja}
+                      disabled
+                      className="bg-gray-100"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Marca</label>
                     <Select value={marca} onValueChange={setMarca}>
@@ -307,6 +341,8 @@ export default function EstoqueLoja() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50">
+                        <TableHead>Rede</TableHead>
+                        <TableHead>Loja</TableHead>
                         <TableHead>Marca</TableHead>
                         <TableHead>Produto</TableHead>
                         <TableHead>Estoque</TableHead>
@@ -317,6 +353,8 @@ export default function EstoqueLoja() {
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id} className="hover:bg-gray-50">
+                          <TableCell>{item.rede}</TableCell>
+                          <TableCell>{item.loja}</TableCell>
                           <TableCell className="font-medium">{item.marca}</TableCell>
                           <TableCell>{item.produto}</TableCell>
                           <TableCell>{item.estoque}</TableCell>
@@ -345,7 +383,7 @@ export default function EstoqueLoja() {
                       ))}
                       {items.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                             Nenhum item adicionado
                           </TableCell>
                         </TableRow>
