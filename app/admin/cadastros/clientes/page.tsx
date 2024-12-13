@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientForm } from "@/components/admin/clients/client-form";
 import { ClientCard } from "@/components/admin/clients/client-card";
+import { ClientFilter } from "@/components/admin/clients/client-filter";
 
 interface Client {
   id: number;
@@ -15,13 +16,73 @@ interface Client {
   bairro: string;
   cidade: string;
   cep: string;
+  uf: string;
   marcas: number[];
 }
 
+// Dados de exemplo para teste
+const INITIAL_CLIENTS: Client[] = [
+  {
+    id: 1,
+    rede: "Supermercado ABC",
+    loja: "Filial Centro",
+    endereco: "Rua das Flores, 123",
+    bairro: "Centro",
+    cidade: "São Paulo",
+    cep: "01234-567",
+    uf: "SP",
+    marcas: [1, 2]
+  },
+  {
+    id: 2,
+    rede: "Mercado XYZ",
+    loja: "Unidade Jardins",
+    endereco: "Av. Paulista, 1000",
+    bairro: "Jardins",
+    cidade: "São Paulo",
+    cep: "04567-890",
+    uf: "SP",
+    marcas: [1, 3]
+  },
+  {
+    id: 3,
+    rede: "Supermercado ABC",
+    loja: "Filial Campinas",
+    endereco: "Av. Brasil, 500",
+    bairro: "Centro",
+    cidade: "Campinas",
+    cep: "13024-851",
+    uf: "SP",
+    marcas: [2, 3]
+  }
+];
+
 export default function CadastroClientes() {
   const [showForm, setShowForm] = useState(false);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS); // Inicializando com dados de exemplo
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [filters, setFilters] = useState({
+    rede: "",
+    loja: "",
+    cidade: "",
+  });
+
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const filteredClients = useMemo(() => {
+    return clients.filter(client => {
+      const redeMatch = client.rede.toLowerCase().includes(filters.rede.toLowerCase());
+      const lojaMatch = client.loja.toLowerCase().includes(filters.loja.toLowerCase());
+      const cidadeMatch = client.cidade.toLowerCase().includes(filters.cidade.toLowerCase());
+      
+      return redeMatch && lojaMatch && cidadeMatch;
+    });
+  }, [clients, filters]);
 
   const handleSaveClient = (client: Omit<Client, "id">) => {
     if (editingClient) {
@@ -63,6 +124,13 @@ export default function CadastroClientes() {
         </Button>
       </div>
 
+      {!showForm && (
+        <ClientFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
+      )}
+
       {showForm ? (
         <ClientForm
           onSave={handleSaveClient}
@@ -74,17 +142,19 @@ export default function CadastroClientes() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clients.map((client) => (
+          {filteredClients.map((client) => (
             <ClientCard
               key={client.id}
               client={client}
               onEdit={() => handleEditClient(client)}
             />
           ))}
-          {clients.length === 0 && (
+          {filteredClients.length === 0 && (
             <div className="col-span-full text-center py-12">
               <p className="text-gray-500">
-                Nenhum cliente cadastrado. Clique em "Adicionar Cliente" para começar.
+                {clients.length === 0
+                  ? "Nenhum cliente cadastrado. Clique em \"Adicionar Cliente\" para começar."
+                  : "Nenhum cliente encontrado com os filtros aplicados."}
               </p>
             </div>
           )}

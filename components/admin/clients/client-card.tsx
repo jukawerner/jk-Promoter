@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Edit2 } from "lucide-react";
+import { Edit2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ClientCardProps {
@@ -9,6 +9,11 @@ interface ClientCardProps {
     id: number;
     rede: string;
     loja: string;
+    endereco: string;
+    bairro: string;
+    cidade: string;
+    cep: string;
+    uf: string;
   };
   onEdit: () => void;
 }
@@ -20,10 +25,21 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
       animate={{ opacity: 1, scale: 1 }}
       className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
     >
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900">{client.rede}</h3>
-          <p className="text-gray-600">{client.loja}</p>
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">{client.rede}</h3>
+            <p className="text-gray-600">{client.loja}</p>
+          </div>
+          <div className="flex items-start gap-2 text-gray-500">
+            <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+            <div className="text-sm">
+              <p>{client.endereco}</p>
+              <p>{client.bairro}</p>
+              <p>{client.cidade} - {client.uf}</p>
+              <p>CEP: {client.cep}</p>
+            </div>
+          </div>
         </div>
         <Button
           variant="ghost"

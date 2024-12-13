@@ -7,11 +7,24 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { BrandsCard } from "./brands-card";
 
 const Map = dynamic(() => import("./map"), { ssr: false });
+
+const ESTADOS = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
 
 const clientSchema = z.object({
   rede: z.string().min(2, "A rede deve ter pelo menos 2 caracteres"),
@@ -20,6 +33,7 @@ const clientSchema = z.object({
   bairro: z.string().min(2, "O bairro deve ter pelo menos 2 caracteres"),
   cidade: z.string().min(2, "A cidade deve ter pelo menos 2 caracteres"),
   cep: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido"),
+  uf: z.string().length(2, "Selecione um estado"),
 });
 
 interface ClientFormProps {
@@ -42,6 +56,7 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
     handleSubmit,
     watch,
     formState: { errors },
+    setValue,
   } = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: initialData,
@@ -168,17 +183,38 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cep">CEP</Label>
-              <Input
-                id="cep"
-                {...register("cep")}
-                placeholder="00000-000"
-                className={errors.cep ? "border-red-500" : ""}
-              />
-              {errors.cep && (
-                <p className="text-red-500 text-sm">{errors.cep.message}</p>
-              )}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <Input
+                  id="cep"
+                  {...register("cep")}
+                  placeholder="00000-000"
+                  className={errors.cep ? "border-red-500" : ""}
+                />
+                {errors.cep && (
+                  <p className="text-red-500 text-sm">{errors.cep.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="uf">UF</Label>
+                <Select onValueChange={(value) => setValue("uf", value)}>
+                  <SelectTrigger className={errors.uf ? "border-red-500" : ""}>
+                    <SelectValue placeholder="UF" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS.map((estado) => (
+                      <SelectItem key={estado} value={estado}>
+                        {estado}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.uf && (
+                  <p className="text-red-500 text-sm">{errors.uf.message}</p>
+                )}
+              </div>
             </div>
           </div>
 
