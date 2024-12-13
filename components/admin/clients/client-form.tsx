@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { BrandsCard } from "./brands-card";
 
 const Map = dynamic(() => import("./map"), { ssr: false });
 
@@ -28,8 +27,10 @@ const ESTADOS = [
 
 const clientSchema = z.object({
   rede: z.string().min(2, "A rede deve ter pelo menos 2 caracteres"),
+  cnpj: z.string().regex(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, "CNPJ inválido. Use o formato: XX.XXX.XXX/XXXX-XX"),
   loja: z.string().min(2, "A loja deve ter pelo menos 2 caracteres"),
   endereco: z.string().min(5, "O endereço deve ter pelo menos 5 caracteres"),
+  numero: z.string().min(1, "Informe o número"),
   bairro: z.string().min(2, "O bairro deve ter pelo menos 2 caracteres"),
   cidade: z.string().min(2, "A cidade deve ter pelo menos 2 caracteres"),
   cep: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido"),
@@ -44,91 +45,140 @@ interface ClientFormProps {
 
 export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
   const [location, setLocation] = useState<[number, number] | null>(null);
-  const [availableBrands] = useState([
-    { id: 1, name: "Marca A" },
-    { id: 2, name: "Marca B" },
-    { id: 3, name: "Marca C" },
-  ]);
-  const [selectedBrands, setSelectedBrands] = useState<number[]>([]);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-    setValue,
-  } = useForm<z.infer<typeof clientSchema>>({
+  const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
-    defaultValues: initialData,
+    defaultValues: {
+      ...initialData,
+      uf: initialData?.uf || "",
+    },
   });
 
-  const endereco = watch("endereco");
-  const cidade = watch("cidade");
+  const endereco = form.watch("endereco");
+  const cidade = form.watch("cidade");
+  const uf = form.watch("uf");
 
-  useEffect(() => {
-    const updateLocation = async () => {
-      if (endereco && cidade) {
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-              `${endereco}, ${cidade}`
-            )}`
-          );
-          const data = await response.json();
-          if (data && data[0]) {
-            setLocation([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
-          }
-        } catch (error) {
-          console.error("Erro ao buscar localização:", error);
-        }
+  const handleLocationChange = async (lat: number, lng: number) => {
+    setIsUpdatingAddress(true);
+    setLocation([lat, lng]);
+    
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      if (data.address) {
+        const {
+          road,
+          house_number,
+          suburb,
+          city,
+          town,
+          postcode,
+          state,
+        } = data.address;
+
+        form.setValue("endereco", road || "");
+        form.setValue("numero", house_number || "");
+        form.setValue("bairro", suburb || "");
+        form.setValue("cidade", city || town || "");
+        form.setValue("cep", postcode || "");
+        form.setValue("uf", state || "");
       }
-    };
-
-    const timer = setTimeout(updateLocation, 1000);
-    return () => clearTimeout(timer);
-  }, [endereco, cidade]);
-
-  const handleBrandToggle = (brandId: number, checked: boolean) => {
-    setSelectedBrands(prev =>
-      checked
-        ? [...prev, brandId]
-        : prev.filter(id => id !== brandId)
-    );
+    } catch (error) {
+      console.error("Erro ao atualizar endereço:", error);
+    } finally {
+      setIsUpdatingAddress(false);
+    }
   };
 
-  const onSubmit = (data: z.infer<typeof clientSchema>) => {
-    if (selectedBrands.length === 0) {
-      toast.error("Selecione pelo menos uma marca");
-      return;
-    }
+  const handleAddressChange = async () => {
+    const endereco = form.getValues("endereco");
+    const numero = form.getValues("numero");
+    const bairro = form.getValues("bairro");
+    const cidade = form.getValues("cidade");
+    const uf = form.getValues("uf");
 
-    if (!location) {
-      toast.error("Não foi possível determinar a localização");
-      return;
-    }
+    if (!endereco || !cidade || !uf) return;
 
-    onSave({
-      ...data,
-      marcas: selectedBrands,
-      location,
-    });
+    setIsLoadingLocation(true);
+    try {
+      const query = `${endereco}, ${numero || ""}, ${cidade}, ${uf}, Brasil`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}&limit=1`
+      );
+      const data = await response.json();
+
+      if (data && data[0]) {
+        const { lat, lon } = data[0];
+        setLocation([parseFloat(lat), parseFloat(lon)]);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar localização:", error);
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(handleAddressChange, 1000);
+    return () => clearTimeout(timer);
+  }, [endereco, cidade, uf]);
+
+  const onSubmit = async (data: z.infer<typeof clientSchema>) => {
+    try {
+      if (!location) {
+        toast.error("Não foi possível determinar a localização do endereço");
+        return;
+      }
+
+      // Ensure UF is in uppercase
+      const formData = {
+        ...data,
+        uf: data.uf.toUpperCase(),
+        location,
+      };
+
+      await onSave(formData);
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao salvar o cliente. Por favor, tente novamente.");
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-lg shadow-md space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="rede">Rede</Label>
+              <Input
+                id="rede"
+                {...form.register("rede")}
+                className={form.formState.errors.rede ? "border-red-500" : ""}
+              />
+              {form.formState.errors.rede && (
+                <p className="text-red-500 text-sm">{form.formState.errors.rede.message}</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="rede">Rede</Label>
+                <Label htmlFor="cnpj">CNPJ</Label>
                 <Input
-                  id="rede"
-                  {...register("rede")}
-                  className={errors.rede ? "border-red-500" : ""}
+                  id="cnpj"
+                  {...form.register("cnpj")}
+                  placeholder="XX.XXX.XXX/XXXX-XX"
+                  className={form.formState.errors.cnpj ? "border-red-500" : ""}
                 />
-                {errors.rede && (
-                  <p className="text-red-500 text-sm">{errors.rede.message}</p>
+                {form.formState.errors.cnpj && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.cnpj.message}</p>
                 )}
               </div>
 
@@ -136,25 +186,41 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
                 <Label htmlFor="loja">Loja</Label>
                 <Input
                   id="loja"
-                  {...register("loja")}
-                  className={errors.loja ? "border-red-500" : ""}
+                  {...form.register("loja")}
+                  className={form.formState.errors.loja ? "border-red-500" : ""}
                 />
-                {errors.loja && (
-                  <p className="text-red-500 text-sm">{errors.loja.message}</p>
+                {form.formState.errors.loja && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.loja.message}</p>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="endereco">Endereço</Label>
-              <Input
-                id="endereco"
-                {...register("endereco")}
-                className={errors.endereco ? "border-red-500" : ""}
-              />
-              {errors.endereco && (
-                <p className="text-red-500 text-sm">{errors.endereco.message}</p>
-              )}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="col-span-3">
+                  <Input
+                    id="endereco"
+                    {...form.register("endereco")}
+                    placeholder="Nome da rua"
+                    className={form.formState.errors.endereco ? "border-red-500" : ""}
+                  />
+                  {form.formState.errors.endereco && (
+                    <p className="text-red-500 text-sm">{form.formState.errors.endereco.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Input
+                    id="numero"
+                    {...form.register("numero")}
+                    placeholder="Número"
+                    className={form.formState.errors.numero ? "border-red-500" : ""}
+                  />
+                  {form.formState.errors.numero && (
+                    <p className="text-red-500 text-sm">{form.formState.errors.numero.message}</p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -162,11 +228,11 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
                 <Label htmlFor="bairro">Bairro</Label>
                 <Input
                   id="bairro"
-                  {...register("bairro")}
-                  className={errors.bairro ? "border-red-500" : ""}
+                  {...form.register("bairro")}
+                  className={form.formState.errors.bairro ? "border-red-500" : ""}
                 />
-                {errors.bairro && (
-                  <p className="text-red-500 text-sm">{errors.bairro.message}</p>
+                {form.formState.errors.bairro && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.bairro.message}</p>
                 )}
               </div>
 
@@ -174,34 +240,43 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
                 <Label htmlFor="cidade">Cidade</Label>
                 <Input
                   id="cidade"
-                  {...register("cidade")}
-                  className={errors.cidade ? "border-red-500" : ""}
+                  {...form.register("cidade")}
+                  className={form.formState.errors.cidade ? "border-red-500" : ""}
                 />
-                {errors.cidade && (
-                  <p className="text-red-500 text-sm">{errors.cidade.message}</p>
+                {form.formState.errors.cidade && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.cidade.message}</p>
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2 space-y-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="cep">CEP</Label>
                 <Input
                   id="cep"
-                  {...register("cep")}
+                  {...form.register("cep")}
                   placeholder="00000-000"
-                  className={errors.cep ? "border-red-500" : ""}
+                  className={form.formState.errors.cep ? "border-red-500" : ""}
                 />
-                {errors.cep && (
-                  <p className="text-red-500 text-sm">{errors.cep.message}</p>
+                {form.formState.errors.cep && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.cep.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="uf">UF</Label>
-                <Select onValueChange={(value) => setValue("uf", value)}>
-                  <SelectTrigger className={errors.uf ? "border-red-500" : ""}>
-                    <SelectValue placeholder="UF" />
+                <Select
+                  onValueChange={(value) => {
+                    form.setValue("uf", value);
+                    form.trigger("uf");
+                  }}
+                  value={form.getValues("uf")}
+                  defaultValue={initialData?.uf || ""}
+                >
+                  <SelectTrigger
+                    className={form.formState.errors.uf ? "border-red-500" : ""}
+                  >
+                    <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
                     {ESTADOS.map((estado) => (
@@ -211,45 +286,56 @@ export function ClientForm({ onSave, onCancel, initialData }: ClientFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.uf && (
-                  <p className="text-red-500 text-sm">{errors.uf.message}</p>
+                {form.formState.errors.uf && (
+                  <p className="text-red-500 text-sm">{form.formState.errors.uf.message}</p>
                 )}
               </div>
             </div>
-          </div>
 
-          <BrandsCard
-            availableBrands={availableBrands}
-            selectedBrands={selectedBrands}
-            onBrandToggle={handleBrandToggle}
-          />
+            <div className="flex gap-4 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Salvar
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="space-y-4">
-            <Label>Localização do Cliente</Label>
-            <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200">
+          <div className="h-[600px] relative">
+            {(isLoadingLocation || isUpdatingAddress) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                <p className="text-gray-500">
+                  {isLoadingLocation ? "Carregando localização..." : "Atualizando endereço..."}
+                </p>
+              </div>
+            )}
+            <div className="h-full w-full">
               {location ? (
-                <Map location={location} />
+                <div className="h-full w-full" key={`map-${location[0]}-${location[1]}`}>
+                  <Map 
+                    location={location} 
+                    onLocationChange={handleLocationChange}
+                  />
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="h-full flex items-center justify-center bg-gray-100 rounded-lg">
                   <p className="text-gray-500">
-                    Digite o endereço completo para visualizar no mapa
+                    Preencha o endereço completo para visualizar no mapa
+                    <br />
+                    ou clique no mapa para selecionar uma localização
                   </p>
                 </div>
               )}
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          Salvar Cliente
-        </Button>
       </div>
     </form>
   );

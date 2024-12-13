@@ -122,13 +122,12 @@ export default function CadastroProdutos() {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-7xl mx-auto"
     >
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-start mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Cadastro de Produtos</h1>
           <p className="text-gray-600 mt-2">Gerencie os produtos do sistema</p>
         </div>
-        <div className="flex items-center gap-4">
-          <ExcelUpload onProductsImported={handleImportProducts} />
+        <div className="flex flex-col gap-2">
           <Button
             onClick={() => {
               setEditingProduct(null);
@@ -139,6 +138,7 @@ export default function CadastroProdutos() {
             <Plus className="h-4 w-4" />
             Adicionar Produto
           </Button>
+          <ExcelUpload onProductsImported={handleImportProducts} />
         </div>
       </div>
 

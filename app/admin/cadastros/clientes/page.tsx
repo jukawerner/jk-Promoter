@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { ClientForm } from "@/components/admin/clients/client-form";
 import { ClientCard } from "@/components/admin/clients/client-card";
 import { ClientFilter } from "@/components/admin/clients/client-filter";
+import { ExcelUpload } from "@/components/admin/clients/excel-upload";
 
 interface Client {
   id: number;
   rede: string;
+  cnpj: string;
   loja: string;
   endereco: string;
   bairro: string;
@@ -25,6 +27,7 @@ const INITIAL_CLIENTS: Client[] = [
   {
     id: 1,
     rede: "Supermercado ABC",
+    cnpj: "12.345.678/0001-90",
     loja: "Filial Centro",
     endereco: "Rua das Flores, 123",
     bairro: "Centro",
@@ -36,6 +39,7 @@ const INITIAL_CLIENTS: Client[] = [
   {
     id: 2,
     rede: "Mercado XYZ",
+    cnpj: "98.765.432/0001-21",
     loja: "Unidade Jardins",
     endereco: "Av. Paulista, 1000",
     bairro: "Jardins",
@@ -47,6 +51,7 @@ const INITIAL_CLIENTS: Client[] = [
   {
     id: 3,
     rede: "Supermercado ABC",
+    cnpj: "12.345.678/0002-71",
     loja: "Filial Campinas",
     endereco: "Av. Brasil, 500",
     bairro: "Centro",
@@ -112,16 +117,28 @@ export default function CadastroClientes() {
           <h1 className="text-3xl font-bold text-gray-900">Cadastro de Clientes</h1>
           <p className="text-gray-600 mt-2">Gerencie os clientes do sistema</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingClient(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Cliente
-        </Button>
+        <div className="flex gap-2">
+          <ExcelUpload
+            onClientsImported={(importedClients) => {
+              const newClients = importedClients.map((client) => ({
+                ...client,
+                id: Date.now() + Math.random(),
+                marcas: [],
+              }));
+              setClients((prevClients) => [...prevClients, ...newClients]);
+            }}
+          />
+          <Button
+            onClick={() => {
+              setEditingClient(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Cliente
+          </Button>
+        </div>
       </div>
 
       {!showForm && (
