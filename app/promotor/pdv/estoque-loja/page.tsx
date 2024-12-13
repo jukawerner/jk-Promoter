@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Store, Package2, PackageCheck } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Store, Package2, PackageCheck, Plus } from "lucide-react";
 import { useState } from "react";
 import { Toaster, toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -146,6 +146,14 @@ export default function EstoqueLoja() {
     }
   };
 
+  const handleVoltar = () => {
+    router.push("/promotor");
+  };
+
+  const handleProximo = () => {
+    router.push("/promotor/pdv/ponto-de-venda");
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -256,28 +264,25 @@ export default function EstoqueLoja() {
                   </div>
                 </div>
 
-                {/* Botões do formulário */}
-                <div className="flex justify-between items-center pt-6">
+                {/* Botões */}
+                <div className="flex justify-between items-center pt-6 border-t">
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      if (items.length > 0) {
-                        setShowForm(false);
-                      } else {
-                        router.back();
-                      }
-                    }}
+                    onClick={handleVoltar}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Voltar
                   </Button>
-                  <Button
-                    onClick={handleConfirm}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-8"
-                  >
-                    {editingItem ? "Atualizar" : "Adicionar"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleConfirm}
+                      className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {editingItem ? "Atualizar" : "Adicionar"}
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             ) : (
@@ -295,13 +300,6 @@ export default function EstoqueLoja() {
                   >
                     <Package2 className="w-4 h-4" />
                     Adicionar Item
-                  </Button>
-                  <Button
-                    onClick={handleGravar}
-                    className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
-                  >
-                    <PackageCheck className="w-4 h-4" />
-                    Gravar
                   </Button>
                 </div>
                 
@@ -354,6 +352,32 @@ export default function EstoqueLoja() {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+
+                {/* Botões da tabela */}
+                <div className="flex justify-between items-center pt-6">
+                  <Button
+                    variant="ghost"
+                    onClick={handleVoltar}
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Voltar
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleGravar}
+                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      Gravar
+                    </Button>
+                    <Button
+                      onClick={handleProximo}
+                      className="bg-gray-900 hover:bg-gray-800 text-white"
+                    >
+                      Próximo
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             )}

@@ -95,31 +95,22 @@ export default function PesquisaPreco() {
     router.push("/promotor/pdv/mensagem-sucesso");
   };
 
+  const handleAdicionar = () => {
+    setShowForm(true);
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-[800px]">
-      <WhatsappButton />
-      <div className="space-y-8">
-        {/* Header com ícone e título */}
-        <div className="flex flex-col items-center text-center space-y-3">
-          <motion.div 
-            className="relative"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          >
-            <div className="bg-rose-100 p-4 rounded-full">
-              <Tag className="w-12 h-12 text-rose-600" />
-              <div className="absolute -bottom-1 -right-1 bg-rose-200 rounded-full p-2">
-                <DollarSign className="w-6 h-6 text-rose-600" />
-              </div>
-            </div>
-          </motion.div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Pesquisa de Preço</h2>
-            <p className="text-gray-500 mt-1">Registre os preços dos produtos no PDV</p>
-          </div>
+      <div className="flex flex-col items-center justify-center mb-8">
+        <div className="bg-rose-100 p-4 rounded-full mb-4">
+          <Tag className="w-8 h-8 text-rose-600" />
         </div>
-
+        <h1 className="text-2xl font-bold text-center mb-2">Pesquisa de Preço</h1>
+        <p className="text-gray-600 text-center">
+          Registre os preços dos produtos no PDV
+        </p>
+      </div>
+      <div className="space-y-8">
         <AnimatePresence mode="wait">
           {showForm ? (
             <motion.div 
@@ -201,17 +192,11 @@ export default function PesquisaPreco() {
               <div className="flex justify-between items-center pt-6 border-t">
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    if (items.length > 0) {
-                      setShowForm(false);
-                    } else {
-                      router.back();
-                    }
-                  }}
-                  className="flex items-center gap-2"
+                  onClick={() => router.push("/promotor/pdv/data-curta")}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  {items.length > 0 ? "Voltar" : "Cancelar"}
+                  Voltar
                 </Button>
                 <Button
                   onClick={handleConfirm}
@@ -304,26 +289,21 @@ export default function PesquisaPreco() {
                 </Table>
               </div>
 
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mt-4">
                 <Button
-                  variant="outline"
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2"
+                  variant="ghost"
+                  onClick={() => router.push("/promotor/pdv/ponto-de-venda")}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
-                  <Plus className="w-4 h-4" />
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar
+                </Button>
+                <Button
+                  onClick={handleAdicionar}
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                >
                   Adicionar Item
                 </Button>
-                <div className="space-x-3">
-                  <Button variant="ghost" onClick={() => router.back()}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleGravar}
-                    className="bg-rose-600 hover:bg-rose-700 text-white"
-                  >
-                    Gravar
-                  </Button>
-                </div>
               </div>
             </motion.div>
           )}

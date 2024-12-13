@@ -173,7 +173,7 @@ export default function DataCurtaPage() {
         <div className="flex justify-end mb-4">
           <Button
             variant="ghost"
-            onClick={() => router.back()}
+            onClick={() => router.push("/promotor/pdv/ponto-de-venda")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -288,7 +288,7 @@ export default function DataCurtaPage() {
                       if (items.length > 0) {
                         setShowForm(false);
                       } else {
-                        router.back();
+                        router.push("/promotor/pdv/ponto-de-venda");
                       }
                     }}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"

@@ -169,6 +169,10 @@ export default function PontoVenda() {
     }
   };
 
+  const handleProximo = () => {
+    router.push("/promotor/pdv/data-curta");
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <Toaster richColors />
@@ -317,7 +321,7 @@ export default function PontoVenda() {
                     if (items.length > 0) {
                       setShowForm(false);
                     } else {
-                      router.back();
+                      router.push("/promotor/pdv/estoque-loja");
                     }
                   }}
                   className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
@@ -394,21 +398,29 @@ export default function PontoVenda() {
                 </Table>
               </div>
 
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center mt-4">
                 <Button
-                  variant="outline"
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2"
+                  variant="ghost"
+                  onClick={() => router.push("/promotor/pdv/estoque-loja")}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
-                  <Plus className="w-4 h-4" />
-                  Adicionar Novo
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar
                 </Button>
-                <Button
-                  onClick={handleGravar}
-                  className="bg-rose-600 hover:bg-rose-700 text-white"
-                >
-                  Gravar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleGravar}
+                    className="bg-rose-600 hover:bg-rose-700 text-white"
+                  >
+                    Gravar
+                  </Button>
+                  <Button
+                    onClick={handleProximo}
+                    className="bg-gray-900 hover:bg-gray-800 text-white"
+                  >
+                    Próximo
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
