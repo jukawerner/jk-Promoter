@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StoreForm } from "@/components/admin/stores/store-form";
 import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreFilter } from "@/components/admin/stores/store-filter";
 import { ExcelUpload } from "@/components/admin/stores/excel-upload";
+import { supabase } from "@/lib/supabase";
 
 interface Store {
   id: number;
@@ -20,57 +22,62 @@ interface Store {
   cep: string;
   uf: string;
   marcas: number[];
+  promotor_id: string | null;
+  usuario?: {
+    id: string;
+    nome: string;
+  } | null;
 }
-
-// Dados de exemplo para teste
-const INITIAL_STORES: Store[] = [
-  {
-    id: 1,
-    rede: "Supermercado ABC",
-    cnpj: "12.345.678/0001-90",
-    loja: "Filial Centro",
-    endereco: "Rua das Flores, 123",
-    bairro: "Centro",
-    cidade: "São Paulo",
-    cep: "01234-567",
-    uf: "SP",
-    marcas: [1, 2]
-  },
-  {
-    id: 2,
-    rede: "Mercado XYZ",
-    cnpj: "98.765.432/0001-21",
-    loja: "Unidade Jardins",
-    endereco: "Av. Paulista, 1000",
-    bairro: "Jardins",
-    cidade: "São Paulo",
-    cep: "04567-890",
-    uf: "SP",
-    marcas: [1, 3]
-  },
-  {
-    id: 3,
-    rede: "Supermercado ABC",
-    cnpj: "12.345.678/0002-71",
-    loja: "Filial Campinas",
-    endereco: "Av. Brasil, 500",
-    bairro: "Centro",
-    cidade: "Campinas",
-    cep: "13024-851",
-    uf: "SP",
-    marcas: [2, 3]
-  }
-];
 
 export default function CadastroLojas() {
   const [showForm, setShowForm] = useState(false);
-  const [stores, setStores] = useState<Store[]>(INITIAL_STORES);
+  const [stores, setStores] = useState<Store[]>([]);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [filters, setFilters] = useState({
     rede: "",
     loja: "",
     cidade: "",
   });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadStores();
+  }, []);
+
+  const loadStores = async () => {
+    try {
+      setIsLoading(true);
+      console.log("Carregando lojas...");
+      
+      const { data, error } = await supabase
+        .from("loja")
+        .select(`
+          *,
+          usuario:promotor_id (
+            id,
+            nome
+          ),
+          rede (
+            id,
+            nome
+          )
+        `)
+        .order("rede(nome)", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar lojas:", error);
+        throw error;
+      }
+
+      console.log("Lojas carregadas:", data);
+      setStores(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar lojas:", error);
+      toast.error("Erro ao carregar lojas");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
@@ -89,16 +96,38 @@ export default function CadastroLojas() {
     });
   }, [stores, filters]);
 
-  const handleSaveStore = (store: Omit<Store, "id">) => {
-    if (editingStore) {
-      setStores(stores.map(s => 
-        s.id === editingStore.id ? { ...store, id: editingStore.id } : s
-      ));
+  const handleSaveStore = async (storeData: Omit<Store, "id">) => {
+    try {
+      if (editingStore) {
+        const { error } = await supabase
+          .from("loja")
+          .update({
+            ...storeData,
+            promotor_id: storeData.promotor_id === "null" ? null : storeData.promotor_id
+          })
+          .eq("id", editingStore.id);
+
+        if (error) throw error;
+        toast.success("Loja atualizada com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from("loja")
+          .insert([{
+            ...storeData,
+            promotor_id: storeData.promotor_id === "null" ? null : storeData.promotor_id
+          }]);
+          
+        if (error) throw error;
+        toast.success("Loja cadastrada com sucesso!");
+      }
+
+      loadStores();
+      setShowForm(false);
       setEditingStore(null);
-    } else {
-      setStores([...stores, { ...store, id: Date.now() }]);
+    } catch (error) {
+      console.error("Erro ao salvar loja:", error);
+      toast.error("Erro ao salvar loja");
     }
-    setShowForm(false);
   };
 
   const handleEditStore = (store: Store) => {
@@ -106,23 +135,47 @@ export default function CadastroLojas() {
     setShowForm(true);
   };
 
-  const handleDeleteStore = (id: number) => {
-    setStores(stores.filter(s => s.id !== id));
+  const handleDeleteStore = async (store: Store) => {
+    if (!confirm("Tem certeza que deseja excluir esta loja?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("loja")
+        .delete()
+        .eq("id", store.id);
+
+      if (error) throw error;
+      toast.success("Loja excluída com sucesso!");
+      loadStores();
+    } catch (error) {
+      console.error("Erro ao excluir loja:", error);
+      toast.error("Erro ao excluir loja");
+    }
   };
 
-  const handleImportStores = (importedStores: Omit<Store, "id">[]) => {
-    const newStores = importedStores.map(store => ({
-      ...store,
-      id: Date.now() + Math.random(),
-    }));
-    setStores([...stores, ...newStores]);
+  const handleImportStores = async (stores: Omit<Store, "id">[]) => {
+    try {
+      const { error } = await supabase
+        .from("loja")
+        .insert(stores.map(store => ({
+          ...store,
+          promotor_id: store.promotor_id === "null" ? null : store.promotor_id
+        })));
+
+      if (error) throw error;
+      toast.success("Lojas importadas com sucesso!");
+      loadStores();
+    } catch (error) {
+      console.error("Erro ao importar lojas:", error);
+      toast.error("Erro ao importar lojas");
+    }
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-7xl mx-auto"
+      className="max-w-7xl mx-auto p-6"
     >
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -163,23 +216,30 @@ export default function CadastroLojas() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStores.map((store) => (
-          <StoreCard
-            key={store.id}
-            store={store}
-            onEdit={() => handleEditStore(store)}
-            onDelete={() => handleDeleteStore(store.id)}
-          />
-        ))}
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[200px] bg-gray-100 rounded-lg animate-pulse"
+            />
+          ))
+        ) : filteredStores.length > 0 ? (
+          filteredStores.map((store) => (
+            <StoreCard
+              key={store.id}
+              store={store}
+              onEdit={() => handleEditStore(store)}
+              onDelete={() => handleDeleteStore(store)}
+            />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            {filters.rede || filters.loja || filters.cidade
+              ? "Nenhuma loja encontrada com os filtros aplicados"
+              : "Nenhuma loja cadastrada. Clique em 'Nova Loja' para começar."}
+          </div>
+        )}
       </div>
-
-      {filteredStores.length === 0 && !showForm && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            Nenhuma loja cadastrada. Clique em "Nova Loja" para começar.
-          </p>
-        </div>
-      )}
     </motion.div>
   );
 }

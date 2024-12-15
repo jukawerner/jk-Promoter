@@ -204,17 +204,17 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tipo">Tipo</Label>
-            <Select 
-              onValueChange={(value) => setValue("tipo", value)} 
-              defaultValue={initialData?.tipo}
+            <Label htmlFor="tipo">Tipo de Usuário</Label>
+            <Select
+              value={initialData?.tipo || ""}
+              onValueChange={(value) => setValue("tipo", value)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo de usuário" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Promotor">Promotor</SelectItem>
-                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Admin">Administrador</SelectItem>
               </SelectContent>
             </Select>
             {errors.tipo && (
