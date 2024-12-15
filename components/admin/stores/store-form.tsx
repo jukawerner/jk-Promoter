@@ -118,14 +118,58 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setLoading(true);
-      await onSave({
-        ...values,
-        uf: values.uf.toUpperCase(),
-        promotor_id: values.promotor_id === "none" ? null : values.promotor_id,
-      });
-      toast.success("Loja salva com sucesso!");
+      
+      // Encontrar o ID da rede baseado no nome
+      const { data: redeData, error: redeError } = await supabase
+        .from('rede')
+        .select('id')
+        .eq('nome', values.rede)
+        .single();
+
+      if (redeError) throw redeError;
+
+      // Encontrar o ID do promotor baseado no nome
+      let promotorId = null;
+      if (values.promotor_id && values.promotor_id !== "none") {
+        const { data: promotorData, error: promotorError } = await supabase
+          .from('usuario')
+          .select('id')
+          .eq('nome', values.promotor_id)
+          .single();
+
+        if (promotorError) throw promotorError;
+        promotorId = promotorData.id;
+      }
+
+      const storeData = {
+        nome: values.nome,
+        cnpj: values.cnpj,
+        endereco: values.endereco,
+        numero: values.numero,
+        bairro: values.bairro,
+        cidade: values.cidade,
+        uf: values.uf,
+        cep: values.cep,
+        rede_id: redeData.id,
+        promotor_id: promotorId
+      };
+
+      // Inserir ou atualizar a loja
+      const { error } = store?.id 
+        ? await supabase
+            .from('loja')
+            .update(storeData)
+            .eq('id', store.id)
+        : await supabase
+            .from('loja')
+            .insert([storeData]);
+
+      if (error) throw error;
+
+      toast.success(store?.id ? "Loja atualizada com sucesso!" : "Loja cadastrada com sucesso!");
+      onSave(values);
     } catch (error) {
-      console.error("Erro ao salvar loja:", error);
+      console.error('Error saving store:', error);
       toast.error("Erro ao salvar loja");
     } finally {
       setLoading(false);

@@ -13,16 +13,16 @@ import { supabase } from "@/lib/supabase";
 
 interface Store {
   id: number;
-  rede: string;
   cnpj: string;
+  rede: string;
   loja: string;
   endereco: string;
   bairro: string;
   cidade: string;
   cep: string;
   uf: string;
-  marcas: number[];
   promotor_id: string | null;
+  marcas: number[];
   usuario?: {
     id: string;
     nome: string;
