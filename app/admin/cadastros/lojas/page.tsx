@@ -13,16 +13,20 @@ import { supabase } from "@/lib/supabase";
 
 interface Store {
   id: number;
+  nome: string;
   cnpj: string;
-  rede: string;
-  loja: string;
   endereco: string;
+  numero: string;
   bairro: string;
   cidade: string;
-  cep: string;
   uf: string;
+  cep: string;
+  rede_id: number;
   promotor_id: string | null;
-  marcas: number[];
+  rede: {
+    id: number;
+    nome: string;
+  };
   usuario?: {
     id: string;
     nome: string;
@@ -57,12 +61,12 @@ export default function CadastroLojas() {
             id,
             nome
           ),
-          rede (
+          rede:rede_id (
             id,
             nome
           )
         `)
-        .order("rede(nome)", { ascending: true });
+        .order("nome");
 
       if (error) {
         console.error("Erro ao carregar lojas:", error);
@@ -88,40 +92,17 @@ export default function CadastroLojas() {
 
   const filteredStores = useMemo(() => {
     return stores.filter(store => {
-      const redeMatch = store.rede.toLowerCase().includes(filters.rede.toLowerCase());
-      const lojaMatch = store.loja.toLowerCase().includes(filters.loja.toLowerCase());
-      const cidadeMatch = store.cidade.toLowerCase().includes(filters.cidade.toLowerCase());
+      const redeMatch = store.rede?.nome?.toLowerCase().includes(filters.rede.toLowerCase());
+      const lojaMatch = store.nome?.toLowerCase().includes(filters.loja.toLowerCase());
+      const cidadeMatch = store.cidade?.toLowerCase().includes(filters.cidade.toLowerCase());
       
       return redeMatch && lojaMatch && cidadeMatch;
     });
   }, [stores, filters]);
 
-  const handleSaveStore = async (storeData: Omit<Store, "id">) => {
+  const handleSaveStore = async (storeData: any) => {
     try {
-      if (editingStore) {
-        const { error } = await supabase
-          .from("loja")
-          .update({
-            ...storeData,
-            promotor_id: storeData.promotor_id === "null" ? null : storeData.promotor_id
-          })
-          .eq("id", editingStore.id);
-
-        if (error) throw error;
-        toast.success("Loja atualizada com sucesso!");
-      } else {
-        const { error } = await supabase
-          .from("loja")
-          .insert([{
-            ...storeData,
-            promotor_id: storeData.promotor_id === "null" ? null : storeData.promotor_id
-          }]);
-          
-        if (error) throw error;
-        toast.success("Loja cadastrada com sucesso!");
-      }
-
-      loadStores();
+      await loadStores(); // Recarrega a lista após salvar
       setShowForm(false);
       setEditingStore(null);
     } catch (error) {

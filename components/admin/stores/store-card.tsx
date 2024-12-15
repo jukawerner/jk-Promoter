@@ -1,75 +1,83 @@
+"use client";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash } from "lucide-react";
 
 interface Store {
-  id: string;
+  id: number;
   nome: string;
+  cnpj: string;
+  endereco: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
   rede: {
-    id: string;
+    id: number;
     nome: string;
   };
-  usuario: {
+  usuario?: {
     id: string;
     nome: string;
   } | null;
-  endereco: string;
-  cidade: string;
-  uf: string;
-  cnpj: string;
-  ie: string;
-  telefone: string;
-  email: string;
-  promotor_id: string | null;
 }
 
 interface StoreCardProps {
   store: Store;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit: (store: Store) => void;
+  onDelete: (store: Store) => void;
 }
 
 export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
-      <div className="space-y-4">
-        <div className="flex flex-col space-y-1">
-          <p className="text-sm font-medium leading-none">{store.nome}</p>
-          <p className="text-sm text-muted-foreground">{store.rede.nome}</p>
-          <p className="text-sm text-muted-foreground">
-            {store.usuario?.nome || "Sem promotor"}
-          </p>
+    <Card className="p-6 space-y-4">
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="text-lg font-semibold">{store.nome}</h3>
+          <p className="text-sm text-gray-500">{store.cnpj}</p>
         </div>
-
-        <div className="space-y-2 text-sm text-gray-600">
-          <p>{store.endereco}</p>
-          <p>
-            {store.cidade} - {store.uf}
-          </p>
-          <p>CNPJ: {store.cnpj}</p>
-        </div>
-
-        <div className="flex justify-end gap-2">
+        <div className="flex gap-2">
           <Button
-            variant="outline"
-            size="sm"
-            onClick={onEdit}
-            className="flex items-center gap-2"
+            variant="ghost"
+            size="icon"
+            onClick={() => onEdit(store)}
           >
             <Edit className="h-4 w-4" />
-            Editar
           </Button>
           <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="flex items-center gap-2 text-red-600 hover:text-red-700"
+            variant="ghost"
+            size="icon"
+            onClick={() => onDelete(store)}
           >
-            <Trash2 className="h-4 w-4" />
-            Excluir
+            <Trash className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      <div>
+        <p className="text-sm font-medium">Rede</p>
+        <p className="text-sm text-gray-600">{store.rede.nome}</p>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium">Endereço</p>
+        <p className="text-sm text-gray-600">
+          {store.endereco}, {store.numero}
+        </p>
+        <p className="text-sm text-gray-600">
+          {store.bairro} - {store.cidade}/{store.uf}
+        </p>
+        <p className="text-sm text-gray-600">{store.cep}</p>
+      </div>
+
+      {store.usuario && (
+        <div>
+          <p className="text-sm font-medium">Promotor</p>
+          <p className="text-sm text-gray-600">{store.usuario.nome}</p>
+        </div>
+      )}
     </Card>
   );
 }

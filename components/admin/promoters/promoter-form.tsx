@@ -206,10 +206,10 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
           <div className="space-y-2">
             <Label htmlFor="tipo">Tipo de Usuário</Label>
             <Select
-              value={initialData?.tipo || ""}
+              defaultValue={initialData?.tipo}
               onValueChange={(value) => setValue("tipo", value)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={errors.tipo ? "border-red-500" : ""}>
                 <SelectValue placeholder="Selecione o tipo de usuário" />
               </SelectTrigger>
               <SelectContent>
