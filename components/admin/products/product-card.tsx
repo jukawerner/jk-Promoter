@@ -1,6 +1,6 @@
 "use client";
 
-import { Package2, Edit, Trash2 } from "lucide-react";
+import { Package2, Edit, Trash2, Barcode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -12,6 +12,7 @@ interface Product {
   peso: number;
   validade: number;
   marca: string;
+  ean: string;
 }
 
 interface ProductCardProps {
@@ -63,6 +64,11 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
           <div className="flex items-center text-sm text-gray-600">
             <span className="font-medium mr-2">Validade:</span>
             {product.validade} dias
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <Barcode className="h-4 w-4 mr-1" />
+            <span className="font-medium mr-2">EAN:</span>
+            {product.ean}
           </div>
         </div>
       </CardContent>

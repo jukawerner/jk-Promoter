@@ -1,205 +1,214 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Plus } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ProductForm } from "@/components/admin/products/product-form";
-import { ProductCard } from "@/components/admin/products/product-card";
-import { ProductFilter } from "@/components/admin/products/product-filter";
-import { ExcelUpload } from "@/components/admin/products/excel-upload";
+import { Input } from "@/components/ui/input";
+import { ProdutoForm } from "@/components/admin/produtos/produto-form";
+import { ImportModal } from "@/components/admin/produtos/import-modal";
+import { DataTable } from "@/components/ui/data-table";
+import { createProduto, getProdutos, updateProduto, deleteProduto } from "@/lib/actions/produto";
+import { toast } from "sonner";
+import { ColumnDef } from "@tanstack/react-table";
+import { Pencil, Trash2, Upload } from "lucide-react";
 
-interface Product {
+interface Produto {
   id: number;
+  codigo_ean: string;
   nome: string;
   familia: string;
   unidade: string;
   peso: number;
   validade: number;
-  marca: string;
+  marca: { nome: string };
 }
 
-// Dados de exemplo para teste
-const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: 1,
-    nome: "Chocolate ao Leite",
-    familia: "Chocolates",
-    unidade: "UN",
-    peso: 100,
-    validade: 180,
-    marca: "Cacau Show"
-  },
-  {
-    id: 2,
-    nome: "Café Premium",
-    familia: "Café",
-    unidade: "KG",
-    peso: 1000,
-    validade: 365,
-    marca: "Três Corações"
-  },
-  {
-    id: 3,
-    nome: "Biscoito Recheado",
-    familia: "Biscoitos",
-    unidade: "UN",
-    peso: 140,
-    validade: 120,
-    marca: "Nestlé"
-  }
-];
-
-export default function CadastroProdutos() {
+export default function ProdutosPage() {
+  const [produtos, setProdutos] = useState<Produto[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [filters, setFilters] = useState({
-    nome: "",
-    familia: "",
-    marca: "",
-  });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  useEffect(() => {
+    loadProdutos();
+  }, []);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const nomeMatch = product.nome.toLowerCase().includes(filters.nome.toLowerCase());
-      const familiaMatch = product.familia.toLowerCase().includes(filters.familia.toLowerCase());
-      const marcaMatch = product.marca.toLowerCase().includes(filters.marca.toLowerCase());
-      
-      return nomeMatch && familiaMatch && marcaMatch;
-    });
-  }, [products, filters]);
-
-  const handleSaveProduct = (product: Omit<Product, "id">) => {
-    if (editingProduct) {
-      setProducts(products.map(p => 
-        p.id === editingProduct.id ? { ...product, id: editingProduct.id } : p
-      ));
-      setEditingProduct(null);
-    } else {
-      setProducts([...products, { ...product, id: Date.now() }]);
+  const loadProdutos = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getProdutos();
+      setProdutos(data);
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error);
+      toast.error("Erro ao carregar produtos");
+    } finally {
+      setIsLoading(false);
     }
-    setShowForm(false);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
+  const handleSave = async (data: any) => {
+    try {
+      if (editingProduto) {
+        await updateProduto(editingProduto.id, data);
+        toast.success("Produto atualizado com sucesso!");
+      } else {
+        await createProduto(data);
+        toast.success("Produto criado com sucesso!");
+      }
+      setShowForm(false);
+      setEditingProduto(null);
+      loadProdutos();
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      toast.error("Erro ao salvar produto");
+    }
+  };
+
+  const handleEdit = (produto: Produto) => {
+    setEditingProduto(produto);
     setShowForm(true);
   };
 
-  const handleDeleteProduct = (id: number) => {
-    setProducts(products.filter(p => p.id !== id));
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Tem certeza que deseja excluir este produto?")) {
+      try {
+        await deleteProduto(id);
+        toast.success("Produto excluído com sucesso!");
+        loadProdutos();
+      } catch (error) {
+        console.error("Erro ao excluir produto:", error);
+        toast.error("Erro ao excluir produto");
+      }
+    }
   };
 
-  const handleImportProducts = (importedProducts: Omit<Product, "id">[]) => {
-    const newProducts = importedProducts.map(product => ({
-      ...product,
-      id: Date.now() + Math.random()
-    }));
-    
-    // Adiciona os produtos e garante que a visualização esteja em cards
-    setProducts(prev => [...prev, ...newProducts]);
-    setShowForm(false);
-    
-    // Limpa os filtros para mostrar todos os produtos, incluindo os novos
-    setFilters({
-      nome: "",
-      familia: "",
-      marca: "",
-    });
-  };
+  const columns: ColumnDef<Produto>[] = [
+    {
+      accessorKey: "codigo_ean",
+      header: "Código EAN",
+    },
+    {
+      accessorKey: "nome",
+      header: "Nome",
+    },
+    {
+      accessorKey: "familia",
+      header: "Família",
+    },
+    {
+      accessorKey: "unidade",
+      header: "Unidade",
+    },
+    {
+      accessorKey: "peso",
+      header: "Peso (g)",
+    },
+    {
+      accessorKey: "validade",
+      header: "Validade (dias)",
+    },
+    {
+      accessorKey: "marca.nome",
+      header: "Marca",
+    },
+    {
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => {
+        const produto = row.original;
+        return (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(produto)}
+              className="h-8 w-8 p-0"
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Editar</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDelete(produto.id)}
+              className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Excluir</span>
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const filteredProdutos = produtos.filter((produto) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      produto.nome.toLowerCase().includes(searchLower) ||
+      produto.familia.toLowerCase().includes(searchLower) ||
+      produto.marca.nome.toLowerCase().includes(searchLower)
+    );
+  });
+
+  if (showForm) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold mb-4">
+            {editingProduto ? "Editar Produto" : "Novo Produto"}
+          </h1>
+          <ProdutoForm
+            onSave={handleSave}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingProduto(null);
+            }}
+            initialData={editingProduto}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-7xl mx-auto"
-    >
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cadastro de Produtos</h1>
-          <p className="text-gray-600 mt-2">Gerencie os produtos do sistema</p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Button
-            onClick={() => {
-              setEditingProduct(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Adicionar Produto
-          </Button>
-          <ExcelUpload onProductsImported={handleImportProducts} />
+    <div className="container mx-auto py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-4">Produtos</h1>
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex-1 max-w-md">
+            <Input
+              placeholder="Pesquisar por produto, família ou marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Importar Excel
+            </Button>
+            <Button onClick={() => setShowForm(true)}>Novo Produto</Button>
+          </div>
         </div>
       </div>
 
-      {!showForm && (
-        <ProductFilter
-          filters={filters}
-          onFilterChange={handleFilterChange}
-        />
-      )}
+      <DataTable
+        columns={columns}
+        data={filteredProdutos}
+        loading={isLoading}
+      />
 
-      <AnimatePresence mode="wait">
-        {showForm ? (
-          <motion.div
-            key="form"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <ProductForm
-              onSave={handleSaveProduct}
-              onCancel={() => {
-                setShowForm(false);
-                setEditingProduct(null);
-              }}
-              initialData={editingProduct}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="cards"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {filteredProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ProductCard
-                  product={product}
-                  onEdit={handleEditProduct}
-                  onDelete={handleDeleteProduct}
-                />
-              </motion.div>
-            ))}
-            {filteredProducts.length === 0 && (
-              <div className="col-span-full text-center py-12">
-                <p className="text-gray-500">
-                  {products.length === 0
-                    ? "Nenhum produto cadastrado. Clique em \"Adicionar Produto\" para começar."
-                    : "Nenhum produto encontrado com os filtros aplicados."}
-                </p>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={loadProdutos}
+      />
+    </div>
   );
 }

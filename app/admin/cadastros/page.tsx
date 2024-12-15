@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ClipboardList, Users, Building, Package } from "lucide-react";
+import { ClipboardList, Users, Building, Package, Network } from "lucide-react";
 
 export default function CadastrosPage() {
   const menuCards = [
@@ -21,17 +21,24 @@ export default function CadastrosPage() {
       color: "bg-blue-500",
     },
     {
-      title: "Cadastro de Clientes",
+      title: "Cadastro de Redes",
+      icon: <Network className="h-8 w-8" />,
+      href: "/admin/cadastros/redes",
+      description: "Gerencie as redes de lojas do sistema",
+      color: "bg-indigo-500",
+    },
+    {
+      title: "Cadastro de Lojas",
       icon: <Building className="h-8 w-8" />,
-      href: "/admin/cadastros/clientes",
-      description: "Gerencie os clientes e suas lojas",
+      href: "/admin/cadastros/lojas",
+      description: "Gerencie as lojas e seus detalhes",
       color: "bg-green-500",
     },
     {
-      title: "Cadastro de Promotor",
+      title: "Cadastro de Usuário",
       icon: <Users className="h-8 w-8" />,
       href: "/admin/cadastros/promotores",
-      description: "Gerencie os promotores e suas atribuições",
+      description: "Gerencie os usuários do sistema",
       color: "bg-purple-500",
     },
   ];

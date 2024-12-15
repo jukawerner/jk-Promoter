@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,62 +9,59 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const brandSchema = z.object({
-  name: z.string()
-    .min(2, "O nome deve ter pelo menos 2 caracteres")
-    .max(50, "O nome deve ter no máximo 50 caracteres"),
+  nome: z.string().min(1, "O nome da marca é obrigatório"),
 });
 
 interface BrandFormProps {
-  onSubmit: (name: string) => void;
+  onSubmit: (nome: string) => void;
   onCancel: () => void;
+  initialData?: string;
 }
 
-export function BrandForm({ onSubmit, onCancel }: BrandFormProps) {
+export function BrandForm({ onSubmit, onCancel, initialData }: BrandFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
     reset,
+    formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof brandSchema>>({
     resolver: zodResolver(brandSchema),
+    defaultValues: {
+      nome: initialData || "",
+    },
   });
 
   const onSubmitForm = async (data: z.infer<typeof brandSchema>) => {
-    onSubmit(data.name);
+    onSubmit(data.nome);
     reset();
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmitForm)} className="bg-white p-6 rounded-lg shadow-md">
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="name">Nome da Marca</Label>
-          <Input
-            id="name"
-            {...register("name")}
-            placeholder="Digite o nome da marca"
-            className={errors.name ? "border-red-500" : ""}
-          />
-          {errors.name && (
-            <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
-          )}
-        </div>
+    <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 p-4 bg-white rounded-lg shadow-sm">
+      <div className="space-y-2">
+        <Label htmlFor="nome">Nome da Marca</Label>
+        <Input
+          id="nome"
+          placeholder="Digite o nome da marca"
+          {...register("nome")}
+        />
+        {errors.nome && (
+          <p className="text-sm text-red-500">{errors.nome.message}</p>
+        )}
+      </div>
 
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-          >
-            Salvar
-          </Button>
-        </div>
+      <div className="flex justify-end gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Salvando..." : initialData ? "Atualizar" : "Salvar"}
+        </Button>
       </div>
     </form>
   );

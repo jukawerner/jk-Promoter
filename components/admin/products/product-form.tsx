@@ -16,6 +16,10 @@ import {
 import { useEffect } from "react";
 
 const productSchema = z.object({
+  ean: z.string()
+    .min(8, "O código EAN deve ter pelo menos 8 dígitos")
+    .max(14, "O código EAN deve ter no máximo 14 dígitos")
+    .regex(/^\d+$/, "O código EAN deve conter apenas números"),
   nome: z.string()
     .min(2, "O nome deve ter pelo menos 2 caracteres")
     .max(50, "O nome deve ter no máximo 50 caracteres"),
@@ -74,6 +78,19 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
     <form onSubmit={handleSubmit(onSubmitForm)} className="bg-white p-6 rounded-lg shadow-md">
       <div className="space-y-4">
         <div>
+          <Label htmlFor="ean">Código EAN</Label>
+          <Input
+            id="ean"
+            {...register("ean")}
+            placeholder="Digite o código EAN do produto"
+            className={errors.ean ? "border-red-500" : ""}
+          />
+          {errors.ean && (
+            <p className="text-red-500 text-sm mt-1">{errors.ean.message}</p>
+          )}
+        </div>
+
+        <div>
           <Label htmlFor="nome">Nome do Produto</Label>
           <Input
             id="nome"
@@ -101,13 +118,13 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
 
         <div>
           <Label htmlFor="unidade">Unidade</Label>
-          <Select onValueChange={(value) => setValue("unidade", value as "UN" | "KG")} defaultValue={initialData?.unidade}>
+          <Select onValueChange={(value) => setValue("unidade", value)} defaultValue={initialData?.unidade}>
             <SelectTrigger className={errors.unidade ? "border-red-500" : ""}>
               <SelectValue placeholder="Selecione a unidade" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="UN">UN</SelectItem>
-              <SelectItem value="KG">KG</SelectItem>
+              <SelectItem value="UN">Unidade (UN)</SelectItem>
+              <SelectItem value="KG">Quilograma (KG)</SelectItem>
             </SelectContent>
           </Select>
           {errors.unidade && (
@@ -116,13 +133,12 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
         </div>
 
         <div>
-          <Label htmlFor="peso">Peso do Produto</Label>
+          <Label htmlFor="peso">Peso (em gramas)</Label>
           <Input
             id="peso"
             type="number"
-            step="0.01"
             {...register("peso", { valueAsNumber: true })}
-            placeholder="Digite o peso"
+            placeholder="Digite o peso em gramas"
             className={errors.peso ? "border-red-500" : ""}
           />
           {errors.peso && (
@@ -131,7 +147,7 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
         </div>
 
         <div>
-          <Label htmlFor="validade">Validade do Produto (dias)</Label>
+          <Label htmlFor="validade">Validade (em dias)</Label>
           <Input
             id="validade"
             type="number"
