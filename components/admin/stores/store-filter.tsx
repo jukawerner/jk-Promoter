@@ -1,39 +1,28 @@
-import { Input } from "@/components/ui/input";
+"use client";
 
-interface StoreFilterProps {
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+
+interface FilterProps {
   filters: {
-    rede: string;
-    loja: string;
-    cidade: string;
+    search: string;
   };
-  onFilterChange: (field: string, value: string) => void;
+  onFilterChange: (filters: any) => void;
 }
 
-export function StoreFilter({ filters, onFilterChange }: StoreFilterProps) {
+export function StoreFilter({ filters, onFilterChange }: FilterProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <div>
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold mb-4">Lojas</h2>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
         <Input
-          placeholder="Filtrar por rede..."
-          value={filters.rede}
-          onChange={(e) => onFilterChange("rede", e.target.value)}
-          className="w-full"
-        />
-      </div>
-      <div>
-        <Input
-          placeholder="Filtrar por loja..."
-          value={filters.loja}
-          onChange={(e) => onFilterChange("loja", e.target.value)}
-          className="w-full"
-        />
-      </div>
-      <div>
-        <Input
-          placeholder="Filtrar por cidade..."
-          value={filters.cidade}
-          onChange={(e) => onFilterChange("cidade", e.target.value)}
-          className="w-full"
+          className="pl-10 w-full bg-white"
+          placeholder="Pesquisar por rede, loja ou promotor..."
+          value={filters.search}
+          onChange={(e) =>
+            onFilterChange({ ...filters, search: e.target.value })
+          }
         />
       </div>
     </div>

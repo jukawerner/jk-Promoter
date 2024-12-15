@@ -63,7 +63,7 @@ const formSchema = z.object({
 
 interface StoreFormProps {
   store: Store | null;
-  onSave: (store: Omit<Store, "id">) => void;
+  onSave: (data: any) => void;
   onCancel: () => void;
 }
 
@@ -87,6 +87,23 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       promotor_id: store?.promotor_id || "none",
     },
   });
+
+  useEffect(() => {
+    if (store) {
+      form.reset({
+        nome: store.nome,
+        cnpj: store.cnpj,
+        endereco: store.endereco,
+        numero: store.numero,
+        bairro: store.bairro,
+        cidade: store.cidade,
+        uf: store.uf,
+        cep: store.cep,
+        rede: store.rede,
+        promotor_id: store.promotor_id || "none",
+      });
+    }
+  }, [store, form]);
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = form;
 

@@ -3,6 +3,8 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { User } from "lucide-react";
 
 interface Store {
   id: number;
@@ -21,6 +23,7 @@ interface Store {
   usuario?: {
     id: string;
     nome: string;
+    avatar_url?: string;
   } | null;
 }
 
@@ -35,8 +38,8 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
     <Card className="p-6 space-y-4">
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="text-lg font-semibold">{store.nome}</h3>
-          <p className="text-sm text-gray-500">{store.cnpj}</p>
+          <p className="text-sm text-gray-500 mb-1">{store.rede.nome}</p>
+          <h3 className="text-xl font-semibold">{store.nome}</h3>
         </div>
         <div className="flex gap-2">
           <Button
@@ -57,11 +60,6 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
       </div>
 
       <div>
-        <p className="text-sm font-medium">Rede</p>
-        <p className="text-sm text-gray-600">{store.rede.nome}</p>
-      </div>
-
-      <div>
         <p className="text-sm font-medium">Endereço</p>
         <p className="text-sm text-gray-600">
           {store.endereco}, {store.numero}
@@ -73,9 +71,20 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
       </div>
 
       {store.usuario && (
-        <div>
-          <p className="text-sm font-medium">Promotor</p>
-          <p className="text-sm text-gray-600">{store.usuario.nome}</p>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            {store.usuario.avatar_url ? (
+              <AvatarImage src={store.usuario.avatar_url} alt={store.usuario.nome} />
+            ) : (
+              <AvatarFallback>
+                <User className="h-4 w-4" />
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div>
+            <p className="text-sm font-medium">Promotor</p>
+            <p className="text-sm text-gray-600">{store.usuario.nome}</p>
+          </div>
         </div>
       )}
     </Card>

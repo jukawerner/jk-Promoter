@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { StoreForm } from "@/components/admin/stores/store-form";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 import { StoreCard } from "@/components/admin/stores/store-card";
+import { StoreForm } from "@/components/admin/stores/store-form";
 import { StoreFilter } from "@/components/admin/stores/store-filter";
 import { ExcelUpload } from "@/components/admin/stores/excel-upload";
-import { supabase } from "@/lib/supabase";
+import { Plus, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Store {
   id: number;
@@ -30,6 +36,7 @@ interface Store {
   usuario?: {
     id: string;
     nome: string;
+    avatar_url: string;
   } | null;
 }
 
@@ -38,11 +45,11 @@ export default function CadastroLojas() {
   const [stores, setStores] = useState<Store[]>([]);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [filters, setFilters] = useState({
-    rede: "",
-    loja: "",
-    cidade: "",
+    search: "",
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     loadStores();
@@ -59,7 +66,8 @@ export default function CadastroLojas() {
           *,
           usuario:promotor_id (
             id,
-            nome
+            nome,
+            avatar_url
           ),
           rede:rede_id (
             id,
@@ -83,20 +91,20 @@ export default function CadastroLojas() {
     }
   };
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
   };
 
   const filteredStores = useMemo(() => {
+    if (!filters.search) return stores;
+    
+    const searchTerm = filters.search.toLowerCase();
     return stores.filter(store => {
-      const redeMatch = store.rede?.nome?.toLowerCase().includes(filters.rede.toLowerCase());
-      const lojaMatch = store.nome?.toLowerCase().includes(filters.loja.toLowerCase());
-      const cidadeMatch = store.cidade?.toLowerCase().includes(filters.cidade.toLowerCase());
-      
-      return redeMatch && lojaMatch && cidadeMatch;
+      return (
+        store.rede?.nome?.toLowerCase().includes(searchTerm) ||
+        store.nome?.toLowerCase().includes(searchTerm) ||
+        store.usuario?.nome?.toLowerCase().includes(searchTerm)
+      );
     });
   }, [stores, filters]);
 
@@ -105,6 +113,7 @@ export default function CadastroLojas() {
       await loadStores(); // Recarrega a lista após salvar
       setShowForm(false);
       setEditingStore(null);
+      setIsDialogOpen(false);
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
       toast.error("Erro ao salvar loja");
@@ -112,8 +121,9 @@ export default function CadastroLojas() {
   };
 
   const handleEditStore = (store: Store) => {
-    setEditingStore(store);
-    setShowForm(true);
+    console.log("Editando loja:", store);
+    setSelectedStore(store);
+    setIsDialogOpen(true);
   };
 
   const handleDeleteStore = async (store: Store) => {
@@ -167,8 +177,8 @@ export default function CadastroLojas() {
           <ExcelUpload onImport={handleImportStores} />
           <Button
             onClick={() => {
-              setEditingStore(null);
-              setShowForm(true);
+              setSelectedStore(null);
+              setIsDialogOpen(true);
             }}
             className="flex items-center gap-2"
           >
@@ -183,44 +193,37 @@ export default function CadastroLojas() {
         onFilterChange={handleFilterChange}
       />
 
-      {showForm && (
-        <div className="mb-8">
-          <StoreForm
-            onSave={handleSaveStore}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingStore(null);
-            }}
-            initialData={editingStore}
-          />
+      {isLoading ? (
+        <div className="flex justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-[200px] bg-gray-100 rounded-lg animate-pulse"
-            />
-          ))
-        ) : filteredStores.length > 0 ? (
-          filteredStores.map((store) => (
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredStores.map((store) => (
             <StoreCard
               key={store.id}
               store={store}
-              onEdit={() => handleEditStore(store)}
-              onDelete={() => handleDeleteStore(store)}
+              onEdit={handleEditStore}
+              onDelete={handleDeleteStore}
             />
-          ))
-        ) : (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            {filters.rede || filters.loja || filters.cidade
-              ? "Nenhuma loja encontrada com os filtros aplicados"
-              : "Nenhuma loja cadastrada. Clique em 'Nova Loja' para começar."}
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedStore ? "Editar Loja" : "Nova Loja"}
+            </DialogTitle>
+          </DialogHeader>
+          <StoreForm
+            store={selectedStore}
+            onSave={handleSaveStore}
+            onCancel={() => setIsDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
