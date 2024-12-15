@@ -123,11 +123,8 @@ export function ProdutoForm({ onSave, onCancel, initialData }: ProdutoFormProps)
                 <SelectValue placeholder="Selecione a unidade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="UN">Unidade</SelectItem>
-                <SelectItem value="CX">Caixa</SelectItem>
-                <SelectItem value="PCT">Pacote</SelectItem>
-                <SelectItem value="KG">Quilograma</SelectItem>
-                <SelectItem value="L">Litro</SelectItem>
+                <SelectItem value="unidade">Unidade</SelectItem>
+                <SelectItem value="quilograma">Quilograma</SelectItem>
               </SelectContent>
             </Select>
             {errors.unidade && (

@@ -97,17 +97,28 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
             // Tenta diferentes variações dos nomes das colunas
             const nome = row['Nome'] || row['NOME'] || row['nome'] || '';
             const familia = row['Família'] || row['Familia'] || row['FAMILIA'] || row['FAMÍLIA'] || '';
-            const unidade = row['Unidade'] || row['UNIDADE'] || '';
+            const unidadeExcel = (row['Unidade'] || row['UNIDADE'] || '').toString().toLowerCase();
             const peso = row['Peso'] || row['PESO'] || row['Peso (g)'] || row['PESO (G)'] || '0';
             const validade = row['Validade'] || row['VALIDADE'] || row['Validade (dias)'] || row['VALIDADE (DIAS)'] || '0';
             const codigo_ean = row['Código EAN'] || row['Codigo EAN'] || row['CODIGO EAN'] || row['EAN'] || '';
             const marca = row['Marca'] || row['MARCA'] || '';
 
+            // Padroniza a unidade
+            let unidade = "unidade";
+            if (unidadeExcel.includes('kg') || 
+                unidadeExcel.includes('kilo') || 
+                unidadeExcel.includes('quilo') || 
+                unidadeExcel === 'k' || 
+                unidadeExcel === 'kilogram' || 
+                unidadeExcel === 'quilograma') {
+              unidade = "quilograma";
+            }
+
             const produto = {
               codigo_ean: String(codigo_ean),
               nome: String(nome),
               familia: String(familia),
-              unidade: String(unidade),
+              unidade,
               peso: Number(peso) || 0,
               validade: Number(validade) || 0,
               marca: String(marca)
