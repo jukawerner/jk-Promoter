@@ -17,10 +17,13 @@ export interface Store {
   usuario?: {
     id: string;
     nome: string;
+    apelido: string;
     avatar_url: string;
   } | null;
 }
 
 export type StoreFormData = Omit<Store, 'id' | 'rede' | 'usuario'>;
 
-export type StoreImportData = StoreFormData;
+export interface StoreImportData extends StoreFormData {
+  promotor_apelido?: string | null;
+}

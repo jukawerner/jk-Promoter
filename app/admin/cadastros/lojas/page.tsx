@@ -42,6 +42,7 @@ export default function CadastroLojas() {
           usuario:promotor_id (
             id,
             nome,
+            apelido,
             avatar_url
           ),
           rede:rede_id (
@@ -74,7 +75,7 @@ export default function CadastroLojas() {
       return (
         store.rede?.nome?.toLowerCase().includes(searchTerm) ||
         store.nome?.toLowerCase().includes(searchTerm) ||
-        store.usuario?.nome?.toLowerCase().includes(searchTerm)
+        store.usuario?.apelido?.toLowerCase().includes(searchTerm)
       );
     });
   }, [stores, filters]);

@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Store, StoreImportData } from "@/types/store";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -57,6 +58,33 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
     return data.id;
   };
 
+  const getPromotorIdByNome = async (nome: string): Promise<{ id: string; apelido: string } | null> => {
+    const { data, error } = await supabase
+      .from("usuario")
+      .select("id, apelido")
+      .ilike("apelido", nome)
+      .single();
+
+    if (error || !data) {
+      console.error(`Promotor não encontrado: ${nome}`, error);
+      return null;
+    }
+
+    return { id: data.id, apelido: data.apelido };
+  };
+
+  const formatCNPJ = (cnpj: string) => {
+    if (!cnpj) return '';
+    cnpj = cnpj.replace(/\D/g, '');
+    return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  };
+
+  const formatCEP = (cep: string) => {
+    if (!cep) return '';
+    cep = cep.replace(/\D/g, '');
+    return cep.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setIsLoading(true);
@@ -78,41 +106,72 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
           console.log('Dados brutos do Excel:', jsonData);
 
-          const lojas: StoreImportData[] = await Promise.all(jsonData.map(async (row: any) => {
-            console.log('Processando linha:', row);
-            
-            const nome = row['Nome'] || row['NOME'] || row['nome'] || '';
-            const rede = row['Rede'] || row['REDE'] || row['rede'] || '';
-            const cnpj = row['CNPJ'] || row['cnpj'] || '';
-            const endereco = row['Endereço'] || row['ENDERECO'] || row['endereco'] || '';
-            const numero = row['Número'] || row['NUMERO'] || row['numero'] || '';
-            const bairro = row['Bairro'] || row['BAIRRO'] || row['bairro'] || '';
-            const cidade = row['Cidade'] || row['CIDADE'] || row['cidade'] || '';
-            const uf = row['UF'] || row['uf'] || '';
-            const cep = row['CEP'] || row['cep'] || '';
-            const promotor_id = row['Promotor ID'] || row['PROMOTOR_ID'] || row['promotor_id'] || null;
+          const lojas: StoreImportData[] = [];
+          const erros: ImportError[] = [];
 
-            // Busca o ID da rede
-            const rede_id = await getRedeIdByNome(rede);
-            if (!rede_id) {
-              throw new Error(`Rede não encontrada: ${rede}`);
+          for (let i = 0; i < jsonData.length; i++) {
+            const row: any = jsonData[i];
+            try {
+              const nome = row['Nome'] || row['NOME'] || row['nome'] || '';
+              const rede = row['Rede'] || row['REDE'] || row['rede'] || '';
+              const cnpj = row['CNPJ'] || row['cnpj'] || '';
+              const endereco = row['Endereço'] || row['ENDERECO'] || row['endereco'] || '';
+              const numero = row['Número'] || row['NUMERO'] || row['numero'] || '';
+              const bairro = row['Bairro'] || row['BAIRRO'] || row['bairro'] || '';
+              const cidade = row['Cidade'] || row['CIDADE'] || row['cidade'] || '';
+              const uf = row['UF'] || row['uf'] || '';
+              const cep = row['CEP'] || row['cep'] || '';
+              const promotorNome = row['Promotor'] || row['PROMOTOR'] || row['promotor'] || '';
+
+              if (!nome || !rede || !endereco || !cidade || !uf) {
+                throw new Error('Campos obrigatórios não preenchidos');
+              }
+
+              // Busca o ID da rede
+              const rede_id = await getRedeIdByNome(rede);
+              if (!rede_id) {
+                throw new Error(`Rede não encontrada: ${rede}`);
+              }
+
+              // Busca o ID do promotor se fornecido
+              let promotor_id = null;
+              let promotor_apelido = null;
+              if (promotorNome) {
+                const promotor = await getPromotorIdByNome(promotorNome);
+                if (!promotor) {
+                  throw new Error(`Promotor não encontrado: ${promotorNome}`);
+                }
+                promotor_id = promotor.id;
+                promotor_apelido = promotor.apelido;
+              }
+
+              lojas.push({
+                nome: String(nome).toUpperCase(),
+                cnpj: formatCNPJ(String(cnpj)),
+                endereco: String(endereco).toUpperCase(),
+                numero: String(numero),
+                bairro: String(bairro).toUpperCase(),
+                cidade: String(cidade).toUpperCase(),
+                uf: String(uf).toUpperCase(),
+                cep: formatCEP(String(cep)),
+                rede_id,
+                promotor_id,
+                promotor_apelido,
+              });
+            } catch (error) {
+              erros.push({
+                linha: i + 2,
+                loja: row['Nome'] || `Linha ${i + 2}`,
+                erro: error instanceof Error ? error.message : 'Erro desconhecido',
+              });
             }
+          }
 
-            return {
-              nome: String(nome),
-              cnpj: String(cnpj),
-              endereco: String(endereco),
-              numero: String(numero),
-              bairro: String(bairro),
-              cidade: String(cidade),
-              uf: String(uf),
-              cep: String(cep),
-              rede_id,
-              promotor_id: promotor_id ? String(promotor_id) : null,
-            };
-          }));
-
-          console.log('Todas as lojas:', lojas);
+          if (erros.length > 0) {
+            setErrosImportacao(erros);
+            setStep('error');
+            return;
+          }
 
           if (lojas.length > 0) {
             setLojasParaImportar(lojas);
@@ -142,14 +201,12 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const handleImport = async () => {
     try {
       setStep('importing');
-      let successCount = 0;
-      let errorCount = 0;
-      const erros: ImportError[] = [];
-
-      const { data: result, error } = await supabase
+      // Remove o campo promotor_apelido antes de inserir no banco
+      const lojasParaInserir = lojasParaImportar.map(({ promotor_apelido, ...loja }) => loja);
+      
+      const { error } = await supabase
         .from("loja")
-        .insert(lojasParaImportar)
-        .select();
+        .insert(lojasParaInserir);
 
       if (error) {
         console.error("Erro ao importar lojas:", error);
@@ -162,8 +219,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
         return;
       }
 
-      successCount = result?.length || 0;
-      toast.success(`${successCount} lojas importadas com sucesso!`);
+      toast.success(`${lojasParaImportar.length} lojas importadas com sucesso!`);
       onSuccess();
       onClose();
       setStep('upload');
@@ -230,16 +286,19 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
             <DialogHeader>
               <DialogTitle>Confirmar Importação</DialogTitle>
             </DialogHeader>
-            <div className="max-h-[500px] overflow-y-auto">
+            <ScrollArea className="mt-4 h-[500px]">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>CNPJ</TableHead>
                     <TableHead>Endereço</TableHead>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Bairro</TableHead>
                     <TableHead>Cidade</TableHead>
                     <TableHead>UF</TableHead>
-                    <TableHead>Rede ID</TableHead>
+                    <TableHead>CEP</TableHead>
+                    <TableHead>Promotor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -247,15 +306,18 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                     <TableRow key={index}>
                       <TableCell>{loja.nome}</TableCell>
                       <TableCell>{loja.cnpj}</TableCell>
-                      <TableCell>{`${loja.endereco}, ${loja.numero}`}</TableCell>
+                      <TableCell>{loja.endereco}</TableCell>
+                      <TableCell>{loja.numero}</TableCell>
+                      <TableCell>{loja.bairro}</TableCell>
                       <TableCell>{loja.cidade}</TableCell>
                       <TableCell>{loja.uf}</TableCell>
-                      <TableCell>{loja.rede_id}</TableCell>
+                      <TableCell>{loja.cep}</TableCell>
+                      <TableCell>{loja.promotor_apelido || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </ScrollArea>
             <DialogFooter className="mt-4">
               <Button
                 variant="outline"
@@ -291,16 +353,16 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                   Faça o upload de um arquivo Excel (.xlsx) com as seguintes colunas:
                 </p>
                 <ul className="text-sm text-gray-500 list-disc list-inside">
-                  <li>Nome</li>
-                  <li>Rede (nome da rede cadastrada no sistema)</li>
+                  <li>Nome (obrigatório)</li>
+                  <li>Rede (obrigatório - nome da rede cadastrada)</li>
                   <li>CNPJ</li>
-                  <li>Endereço</li>
+                  <li>Endereço (obrigatório)</li>
                   <li>Número</li>
                   <li>Bairro</li>
-                  <li>Cidade</li>
-                  <li>UF</li>
+                  <li>Cidade (obrigatório)</li>
+                  <li>UF (obrigatório - 2 caracteres)</li>
                   <li>CEP</li>
-                  <li>Promotor ID (opcional)</li>
+                  <li>Promotor (opcional - apelido do promotor cadastrado)</li>
                 </ul>
               </div>
               <div className="flex justify-center">
@@ -332,7 +394,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-7xl">
         {renderContent()}
       </DialogContent>
     </Dialog>

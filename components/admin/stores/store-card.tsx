@@ -2,7 +2,8 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Edit, Trash, User } from "lucide-react";
 import { Store } from "@/types/store";
 
 interface StoreCardProps {
@@ -58,9 +59,15 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
           <span className="font-medium">CEP:</span> {store.cep}
         </p>
         {store.usuario && (
-          <p>
-            <span className="font-medium">Promotor:</span> {store.usuario.nome}
-          </p>
+          <div className="flex items-center gap-2 mt-4">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={store.usuario.avatar_url} alt={store.usuario.apelido} />
+              <AvatarFallback>
+                <User className="h-4 w-4" />
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm text-gray-600">{store.usuario.apelido}</span>
+          </div>
         )}
       </div>
     </Card>

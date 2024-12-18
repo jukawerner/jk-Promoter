@@ -44,6 +44,7 @@ interface Rede {
 interface Promotor {
   id: string;
   nome: string;
+  apelido: string;
 }
 
 export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
@@ -51,10 +52,13 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  console.log('Store data:', { store, promotor_id: store?.promotor_id });
+
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,8 +71,8 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       cidade: store?.cidade || "",
       uf: store?.uf || "",
       cep: store?.cep || "",
-      rede_id: store?.rede_id || undefined,
-      promotor_id: store?.promotor_id || null,
+      rede_id: store?.rede_id || 0,
+      promotor_id: store?.promotor_id === undefined ? null : store?.promotor_id,
     },
   });
 
@@ -76,6 +80,21 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
     loadRedes();
     loadPromotores();
   }, []);
+
+  useEffect(() => {
+    if (store) {
+      setValue("nome", store.nome || "");
+      setValue("cnpj", store.cnpj || "");
+      setValue("endereco", store.endereco || "");
+      setValue("numero", store.numero || "");
+      setValue("bairro", store.bairro || "");
+      setValue("cidade", store.cidade || "");
+      setValue("uf", store.uf || "");
+      setValue("cep", store.cep || "");
+      setValue("rede_id", store.rede_id || 0);
+      setValue("promotor_id", store.promotor_id === undefined ? null : store.promotor_id);
+    }
+  }, [store, setValue]);
 
   const loadRedes = async () => {
     try {
@@ -94,24 +113,38 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const loadPromotores = async () => {
     try {
       const { data, error } = await supabase
-        .from("usuario")
+        .from('usuario')
         .select("*")
-        .eq("tipo", "promotor")
-        .order("nome");
+        .order("apelido");
 
       if (error) throw error;
-      setPromotores(data || []);
+
+      if (data) {
+        const promotoresFormatted = data.map(promotor => ({
+          id: promotor.id,
+          nome: promotor.nome,
+          apelido: promotor.apelido
+        }));
+        console.log('Promotores formatados:', promotoresFormatted);
+        setPromotores(promotoresFormatted);
+      } else {
+        setPromotores([]);
+      }
+
     } catch (error) {
       console.error("Erro ao carregar promotores:", error);
+      setPromotores([]);
     }
   };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
+      console.log('Form data:', data);
       onSave({
         ...data,
         cnpj: data.cnpj || "",
+        promotor_id: data.promotor_id === "null" ? null : data.promotor_id,
       });
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
@@ -224,7 +257,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <Label htmlFor="rede_id">Rede</Label>
           <Select
             onValueChange={(value) => setValue("rede_id", Number(value))}
-            defaultValue={store?.rede_id?.toString()}
+            value={watch("rede_id")?.toString()}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione uma rede" />
@@ -246,20 +279,22 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <Label htmlFor="promotor_id">Promotor</Label>
           <Select
             onValueChange={(value) => setValue("promotor_id", value)}
-            defaultValue={store?.promotor_id || undefined}
+            value={watch("promotor_id") || undefined}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um promotor" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Nenhum</SelectItem>
               {promotores.map((promotor) => (
                 <SelectItem key={promotor.id} value={promotor.id}>
-                  {promotor.nome}
+                  {promotor.apelido}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {errors.promotor_id && (
+            <p className="text-red-500 text-sm">{errors.promotor_id.message}</p>
+          )}
         </div>
       </div>
 
