@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Dialog,
   DialogContent,
@@ -15,24 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface Store {
-  rede: string;
-  cnpj: string;
-  loja: string;
-  endereco: string;
-  bairro: string;
-  cidade: string;
-  cep: string;
-  uf: string;
-  marcas: number[];
-}
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Store } from "@/types/store";
 
 interface ImportConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  data: Store[];
+  data: Omit<Store, 'id' | 'rede' | 'usuario'>[];
 }
 
 export function ImportConfirmationModal({
@@ -43,7 +35,7 @@ export function ImportConfirmationModal({
 }: ImportConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Confirmar Importação</DialogTitle>
           <DialogDescription>
@@ -52,37 +44,36 @@ export function ImportConfirmationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rede</TableHead>
-                <TableHead>Loja</TableHead>
-                <TableHead>CNPJ</TableHead>
-                <TableHead>Cidade</TableHead>
-                <TableHead>UF</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.slice(0, 5).map((store, index) => (
-                <TableRow key={index}>
-                  <TableCell>{store.rede}</TableCell>
-                  <TableCell>{store.loja}</TableCell>
-                  <TableCell>{store.cnpj}</TableCell>
-                  <TableCell>{store.cidade}</TableCell>
-                  <TableCell>{store.uf}</TableCell>
+        <ScrollArea className="h-[400px] rounded-md border">
+          <div className="p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Nome</TableHead>
+                  <TableHead className="w-[150px]">CNPJ</TableHead>
+                  <TableHead className="w-[200px]">Endereço</TableHead>
+                  <TableHead className="w-[150px]">Cidade</TableHead>
+                  <TableHead className="w-[80px]">UF</TableHead>
+                  <TableHead className="w-[100px]">Rede ID</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {data.length > 5 && (
-            <p className="text-sm text-gray-500 mt-2">
-              ... e mais {data.length - 5} lojas
-            </p>
-          )}
-        </div>
+              </TableHeader>
+              <TableBody>
+                {data.map((store, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{store.nome}</TableCell>
+                    <TableCell>{store.cnpj}</TableCell>
+                    <TableCell>{`${store.endereco}, ${store.numero}`}</TableCell>
+                    <TableCell>{store.cidade}</TableCell>
+                    <TableCell>{store.uf}</TableCell>
+                    <TableCell>{store.rede_id}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>

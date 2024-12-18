@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,64 +14,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Store, StoreFormData } from "@/types/store";
 import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-
-interface Store {
-  id: number;
-  nome: string;
-  rede: string;
-  cnpj: string;
-  endereco: string;
-  numero: string;
-  bairro: string;
-  cidade: string;
-  uf: string;
-  cep: string;
-  promotor_id: string | null;
-}
-
-interface Promoter {
-  id: string;
-  nome: string;
-}
-
-interface Network {
-  id: string;
-  nome: string;
-}
 
 const formSchema = z.object({
-  nome: z.string().min(2, "O nome deve ter pelo menos 2 caracteres"),
-  cnpj: z.string()
-    .min(18, "CNPJ inválido")
-    .regex(/^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$/, "Formato: XX.XXX.XXX/XXXX-XX"),
-  endereco: z.string().min(5, "O endereço deve ter pelo menos 5 caracteres"),
+  nome: z.string().min(1, "Nome é obrigatório"),
+  cnpj: z.string(),
+  endereco: z.string().min(1, "Endereço é obrigatório"),
   numero: z.string().min(1, "Número é obrigatório"),
-  bairro: z.string().min(2, "Bairro deve ter pelo menos 2 caracteres"),
-  cidade: z.string().min(2, "A cidade deve ter pelo menos 2 caracteres"),
-  cep: z.string()
-    .min(9, "CEP inválido")
-    .regex(/^\d{5}-\d{3}$/, "Formato: XXXXX-XXX"),
-  uf: z.string()
-    .length(2, "UF deve ter 2 caracteres")
-    .toUpperCase(),
-  rede: z.string().min(1, "Selecione uma rede"),
-  promotor_id: z.string().optional(),
+  bairro: z.string().min(1, "Bairro é obrigatório"),
+  cidade: z.string().min(1, "Cidade é obrigatória"),
+  uf: z.string().length(2, "UF deve ter 2 caracteres"),
+  cep: z.string().min(1, "CEP é obrigatório"),
+  rede_id: z.number().min(1, "Rede é obrigatória"),
+  promotor_id: z.string().nullable(),
 });
 
 interface StoreFormProps {
   store: Store | null;
-  onSave: (data: any) => void;
+  onSave: (data: StoreFormData) => void;
   onCancel: () => void;
 }
 
-export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [networks, setNetworks] = useState<Network[]>([]);
-  const [promoters, setPromoters] = useState<Promoter[]>([]);
+interface Rede {
+  id: number;
+  nome: string;
+}
 
-  const form = useForm<z.infer<typeof formSchema>>({
+interface Promotor {
+  id: string;
+  nome: string;
+}
+
+export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
+  const [redes, setRedes] = useState<Rede[]>([]);
+  const [promotores, setPromotores] = useState<Promotor[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nome: store?.nome || "",
@@ -81,295 +65,212 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       numero: store?.numero || "",
       bairro: store?.bairro || "",
       cidade: store?.cidade || "",
-      cep: store?.cep || "",
       uf: store?.uf || "",
-      rede: store?.rede || "",
-      promotor_id: store?.promotor_id || "none",
+      cep: store?.cep || "",
+      rede_id: store?.rede_id || undefined,
+      promotor_id: store?.promotor_id || null,
     },
   });
 
   useEffect(() => {
-    if (store) {
-      form.reset({
-        nome: store.nome,
-        cnpj: store.cnpj,
-        endereco: store.endereco,
-        numero: store.numero,
-        bairro: store.bairro,
-        cidade: store.cidade,
-        uf: store.uf,
-        cep: store.cep,
-        rede: store.rede,
-        promotor_id: store.promotor_id || "none",
-      });
-    }
-  }, [store, form]);
+    loadRedes();
+    loadPromotores();
+  }, []);
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = form;
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [networksResponse, promotersResponse] = await Promise.all([
-          supabase.from("rede").select("*").order("nome"),
-          supabase.from("usuario").select("*").order("nome")
-        ]);
-
-        if (networksResponse.error) throw networksResponse.error;
-        if (promotersResponse.error) throw promotersResponse.error;
-
-        console.log('Networks:', networksResponse.data);
-        console.log('Store Rede:', store?.rede);
-        
-        setNetworks(networksResponse.data || []);
-        setPromoters(promotersResponse.data || []);
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        toast.error("Erro ao carregar dados do formulário");
-      }
-    }
-    
-    loadData();
-  }, [store]);
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const loadRedes = async () => {
     try {
-      setLoading(true);
-      
-      // Encontrar o ID da rede baseado no nome
-      const { data: redeData, error: redeError } = await supabase
-        .from('rede')
-        .select('id')
-        .eq('nome', values.rede)
-        .single();
-
-      if (redeError) throw redeError;
-
-      // Encontrar o ID do promotor baseado no nome
-      let promotorId = null;
-      if (values.promotor_id && values.promotor_id !== "none") {
-        const { data: promotorData, error: promotorError } = await supabase
-          .from('usuario')
-          .select('id')
-          .eq('nome', values.promotor_id)
-          .single();
-
-        if (promotorError) throw promotorError;
-        promotorId = promotorData.id;
-      }
-
-      const storeData = {
-        nome: values.nome,
-        cnpj: values.cnpj,
-        endereco: values.endereco,
-        numero: values.numero,
-        bairro: values.bairro,
-        cidade: values.cidade,
-        uf: values.uf,
-        cep: values.cep,
-        rede_id: redeData.id,
-        promotor_id: promotorId
-      };
-
-      // Inserir ou atualizar a loja
-      const { error } = store?.id 
-        ? await supabase
-            .from('loja')
-            .update(storeData)
-            .eq('id', store.id)
-        : await supabase
-            .from('loja')
-            .insert([storeData]);
+      const { data, error } = await supabase
+        .from("rede")
+        .select("*")
+        .order("nome");
 
       if (error) throw error;
-
-      toast.success(store?.id ? "Loja atualizada com sucesso!" : "Loja cadastrada com sucesso!");
-      onSave(values);
+      setRedes(data || []);
     } catch (error) {
-      console.error('Error saving store:', error);
-      toast.error("Erro ao salvar loja");
+      console.error("Erro ao carregar redes:", error);
+    }
+  };
+
+  const loadPromotores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("usuario")
+        .select("*")
+        .eq("tipo", "promotor")
+        .order("nome");
+
+      if (error) throw error;
+      setPromotores(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar promotores:", error);
+    }
+  };
+
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    try {
+      onSave({
+        ...data,
+        cnpj: data.cnpj || "",
+      });
+    } catch (error) {
+      console.error("Erro ao salvar loja:", error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="nome">Nome da Loja</Label>
-            <Input
-              id="nome"
-              {...register("nome")}
-              placeholder="Nome da loja"
-              className={errors.nome ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.nome && (
-              <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="cnpj">CNPJ</Label>
-            <Input
-              id="cnpj"
-              {...register("cnpj")}
-              placeholder="XX.XXX.XXX/XXXX-XX"
-              className={errors.cnpj ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.cnpj && (
-              <p className="text-red-500 text-sm mt-1">{errors.cnpj.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="endereco">Endereço</Label>
-            <Input
-              id="endereco"
-              {...register("endereco")}
-              placeholder="Rua, Avenida, etc"
-              className={errors.endereco ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.endereco && (
-              <p className="text-red-500 text-sm mt-1">{errors.endereco.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="numero">Número</Label>
-            <Input
-              id="numero"
-              {...register("numero")}
-              placeholder="Número"
-              className={errors.numero ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.numero && (
-              <p className="text-red-500 text-sm mt-1">{errors.numero.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="bairro">Bairro</Label>
-            <Input
-              id="bairro"
-              {...register("bairro")}
-              placeholder="Bairro"
-              className={errors.bairro ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.bairro && (
-              <p className="text-red-500 text-sm mt-1">{errors.bairro.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="cidade">Cidade</Label>
-            <Input
-              id="cidade"
-              {...register("cidade")}
-              placeholder="Cidade"
-              className={errors.cidade ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.cidade && (
-              <p className="text-red-500 text-sm mt-1">{errors.cidade.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="cep">CEP</Label>
-            <Input
-              id="cep"
-              {...register("cep")}
-              placeholder="XXXXX-XXX"
-              className={errors.cep ? "border-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.cep && (
-              <p className="text-red-500 text-sm mt-1">{errors.cep.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="uf">UF</Label>
-            <Input
-              id="uf"
-              {...register("uf")}
-              placeholder="UF"
-              maxLength={2}
-              className={errors.uf ? "border-red-500" : ""}
-              disabled={isSubmitting}
-              style={{ textTransform: 'uppercase' }}
-            />
-            {errors.uf && (
-              <p className="text-red-500 text-sm mt-1">{errors.uf.message}</p>
-            )}
-          </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label htmlFor="nome">Nome da Loja</Label>
+          <Input
+            id="nome"
+            {...register("nome")}
+            className={errors.nome ? "border-red-500" : ""}
+          />
+          {errors.nome && (
+            <p className="text-red-500 text-sm">{errors.nome.message}</p>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="rede">Rede</Label>
-            <Select onValueChange={(value) => setValue("rede", value)} defaultValue={store?.rede}>
-              <SelectTrigger className={errors.rede ? "border-red-500" : ""}>
-                <SelectValue placeholder="Selecione a rede" />
-              </SelectTrigger>
-              <SelectContent>
-                {networks.map((network) => (
-                  <SelectItem key={network.id} value={network.nome}>
-                    {network.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.rede && (
-              <p className="text-red-500 text-sm mt-1">{errors.rede.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="promotor">Promotor</Label>
-            <Select onValueChange={(value) => setValue("promotor_id", value)} defaultValue={store?.promotor_id}>
-              <SelectTrigger className={errors.promotor_id ? "border-red-500" : ""}>
-                <SelectValue placeholder="Selecione o promotor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem promotor</SelectItem>
-                {promoters.map((promoter) => (
-                  <SelectItem key={promoter.id} value={promoter.nome}>
-                    {promoter.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.promotor_id && (
-              <p className="text-red-500 text-sm mt-1">{errors.promotor_id.message}</p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="cnpj">CNPJ</Label>
+          <Input
+            id="cnpj"
+            {...register("cnpj")}
+            className={errors.cnpj ? "border-red-500" : ""}
+          />
+          {errors.cnpj && (
+            <p className="text-red-500 text-sm">{errors.cnpj.message}</p>
+          )}
         </div>
 
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
+        <div className="space-y-2">
+          <Label htmlFor="endereco">Endereço</Label>
+          <Input
+            id="endereco"
+            {...register("endereco")}
+            className={errors.endereco ? "border-red-500" : ""}
+          />
+          {errors.endereco && (
+            <p className="text-red-500 text-sm">{errors.endereco.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="numero">Número</Label>
+          <Input
+            id="numero"
+            {...register("numero")}
+            className={errors.numero ? "border-red-500" : ""}
+          />
+          {errors.numero && (
+            <p className="text-red-500 text-sm">{errors.numero.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bairro">Bairro</Label>
+          <Input
+            id="bairro"
+            {...register("bairro")}
+            className={errors.bairro ? "border-red-500" : ""}
+          />
+          {errors.bairro && (
+            <p className="text-red-500 text-sm">{errors.bairro.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cidade">Cidade</Label>
+          <Input
+            id="cidade"
+            {...register("cidade")}
+            className={errors.cidade ? "border-red-500" : ""}
+          />
+          {errors.cidade && (
+            <p className="text-red-500 text-sm">{errors.cidade.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="uf">UF</Label>
+          <Input
+            id="uf"
+            {...register("uf")}
+            maxLength={2}
+            className={errors.uf ? "border-red-500" : ""}
+          />
+          {errors.uf && (
+            <p className="text-red-500 text-sm">{errors.uf.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cep">CEP</Label>
+          <Input
+            id="cep"
+            {...register("cep")}
+            className={errors.cep ? "border-red-500" : ""}
+          />
+          {errors.cep && (
+            <p className="text-red-500 text-sm">{errors.cep.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="rede_id">Rede</Label>
+          <Select
+            onValueChange={(value) => setValue("rede_id", Number(value))}
+            defaultValue={store?.rede_id?.toString()}
           >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Salvando..." : store ? "Atualizar" : "Cadastrar"}
-          </Button>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma rede" />
+            </SelectTrigger>
+            <SelectContent>
+              {redes.map((rede) => (
+                <SelectItem key={rede.id} value={rede.id.toString()}>
+                  {rede.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.rede_id && (
+            <p className="text-red-500 text-sm">{errors.rede_id.message}</p>
+          )}
         </div>
-      </form>
-    </Card>
+
+        <div className="space-y-2">
+          <Label htmlFor="promotor_id">Promotor</Label>
+          <Select
+            onValueChange={(value) => setValue("promotor_id", value)}
+            defaultValue={store?.promotor_id || undefined}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um promotor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nenhum</SelectItem>
+              {promotores.map((promotor) => (
+                <SelectItem key={promotor.id} value={promotor.id}>
+                  {promotor.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Salvando..." : "Salvar"}
+        </Button>
+      </div>
+    </form>
   );
 }

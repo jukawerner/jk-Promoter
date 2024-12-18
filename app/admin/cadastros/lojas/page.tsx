@@ -8,48 +8,25 @@ import { supabase } from "@/lib/supabase";
 import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreForm } from "@/components/admin/stores/store-form";
 import { StoreFilter } from "@/components/admin/stores/store-filter";
-import { ExcelUpload } from "@/components/admin/stores/excel-upload";
-import { Plus, Loader2 } from "lucide-react";
+import { ImportModal } from "@/components/admin/stores/import-modal";
+import { Plus, Upload, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-interface Store {
-  id: number;
-  nome: string;
-  cnpj: string;
-  endereco: string;
-  numero: string;
-  bairro: string;
-  cidade: string;
-  uf: string;
-  cep: string;
-  rede_id: number;
-  promotor_id: string | null;
-  rede: {
-    id: number;
-    nome: string;
-  };
-  usuario?: {
-    id: string;
-    nome: string;
-    avatar_url: string;
-  } | null;
-}
+import { Store } from "@/types/store";
 
 export default function CadastroLojas() {
-  const [showForm, setShowForm] = useState(false);
   const [stores, setStores] = useState<Store[]>([]);
-  const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [filters, setFilters] = useState({
     search: "",
   });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadStores();
@@ -58,8 +35,6 @@ export default function CadastroLojas() {
   const loadStores = async () => {
     try {
       setIsLoading(true);
-      console.log("Carregando lojas...");
-      
       const { data, error } = await supabase
         .from("loja")
         .select(`
@@ -76,12 +51,8 @@ export default function CadastroLojas() {
         `)
         .order("nome");
 
-      if (error) {
-        console.error("Erro ao carregar lojas:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("Lojas carregadas:", data);
       setStores(data || []);
     } catch (error) {
       console.error("Erro ao carregar lojas:", error);
@@ -108,12 +79,21 @@ export default function CadastroLojas() {
     });
   }, [stores, filters]);
 
-  const handleSaveStore = async (storeData: any) => {
+  const handleSaveStore = async (storeData: Omit<Store, 'id' | 'rede' | 'usuario'>) => {
     try {
-      await loadStores(); // Recarrega a lista após salvar
-      setShowForm(false);
-      setEditingStore(null);
+      const { error } = await supabase
+        .from("loja")
+        .upsert({
+          ...storeData,
+          id: selectedStore?.id,
+        });
+
+      if (error) throw error;
+
+      toast.success(selectedStore ? "Loja atualizada com sucesso!" : "Loja criada com sucesso!");
+      await loadStores();
       setIsDialogOpen(false);
+      setSelectedStore(null);
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
       toast.error("Erro ao salvar loja");
@@ -121,7 +101,6 @@ export default function CadastroLojas() {
   };
 
   const handleEditStore = (store: Store) => {
-    console.log("Editando loja:", store);
     setSelectedStore(store);
     setIsDialogOpen(true);
   };
@@ -136,29 +115,12 @@ export default function CadastroLojas() {
         .eq("id", store.id);
 
       if (error) throw error;
+      
       toast.success("Loja excluída com sucesso!");
-      loadStores();
+      await loadStores();
     } catch (error) {
       console.error("Erro ao excluir loja:", error);
       toast.error("Erro ao excluir loja");
-    }
-  };
-
-  const handleImportStores = async (stores: Omit<Store, "id">[]) => {
-    try {
-      const { error } = await supabase
-        .from("loja")
-        .insert(stores.map(store => ({
-          ...store,
-          promotor_id: store.promotor_id === "null" ? null : store.promotor_id
-        })));
-
-      if (error) throw error;
-      toast.success("Lojas importadas com sucesso!");
-      loadStores();
-    } catch (error) {
-      console.error("Erro ao importar lojas:", error);
-      toast.error("Erro ao importar lojas");
     }
   };
 
@@ -174,7 +136,14 @@ export default function CadastroLojas() {
           <p className="text-gray-600 mt-2">Gerencie as lojas do sistema</p>
         </div>
         <div className="flex gap-4">
-          <ExcelUpload onImport={handleImportStores} />
+          <Button
+            variant="outline"
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Importar Excel
+          </Button>
           <Button
             onClick={() => {
               setSelectedStore(null);
@@ -194,8 +163,8 @@ export default function CadastroLojas() {
       />
 
       {isLoading ? (
-        <div className="flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -207,6 +176,11 @@ export default function CadastroLojas() {
               onDelete={handleDeleteStore}
             />
           ))}
+          {filteredStores.length === 0 && (
+            <div className="col-span-full text-center py-8 text-gray-500">
+              Nenhuma loja encontrada
+            </div>
+          )}
         </div>
       )}
 
@@ -224,6 +198,12 @@ export default function CadastroLojas() {
           />
         </DialogContent>
       </Dialog>
+
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={loadStores}
+      />
     </motion.div>
   );
 }

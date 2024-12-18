@@ -16,14 +16,16 @@ const formSchema = z.object({
   password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
 });
 
+type FormData = z.infer<typeof formSchema>;
+
 export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(formSchema),
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     
     // Simulação de autenticação para teste
@@ -58,11 +60,12 @@ export default function LoginForm() {
             id="email"
             type="email"
             placeholder="seu@email.com"
+            autoComplete="username"
             {...register("email")}
             className={errors.email ? "border-red-500" : ""}
           />
           {errors.email && (
-            <p className="text-red-500 text-sm">{errors.email.message}</p>
+            <p className="text-red-500 text-sm">{errors.email.message as string}</p>
           )}
         </div>
 
@@ -71,11 +74,12 @@ export default function LoginForm() {
           <Input
             id="password"
             type="password"
+            autoComplete="current-password"
             {...register("password")}
             className={errors.password ? "border-red-500" : ""}
           />
           {errors.password && (
-            <p className="text-red-500 text-sm">{errors.password.message}</p>
+            <p className="text-red-500 text-sm">{errors.password.message as string}</p>
           )}
         </div>
 
