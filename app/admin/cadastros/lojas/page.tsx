@@ -54,6 +54,8 @@ export default function CadastroLojas() {
 
       if (error) throw error;
 
+      console.log(data); // Adicionado para verificar os dados carregados
+
       setStores(data || []);
     } catch (error) {
       console.error("Erro ao carregar lojas:", error);
@@ -82,6 +84,11 @@ export default function CadastroLojas() {
 
   const handleSaveStore = async (storeData: Omit<Store, 'id' | 'rede' | 'usuario'>) => {
     try {
+      console.log('Dados da loja a serem salvos:', {
+        ...storeData,
+        usuario: selectedStore?.usuario
+      });
+
       const { error } = await supabase
         .from("loja")
         .upsert({

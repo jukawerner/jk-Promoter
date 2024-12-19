@@ -53,6 +53,10 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   console.log('Store data:', { store, promotor_id: store?.promotor_id });
+  console.log('Promotor ID selecionado:', store?.promotor_id);
+  console.log('Promotores carregados:', promotores); // Verifica se os promotores estão carregados corretamente
+  console.log('Promotor ID no formulário:', store?.promotor_id);
+  console.log('Promotores carregados:', promotores); // Verifica se os promotores estão carregados corretamente
 
   const {
     register,
@@ -119,13 +123,15 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
 
       if (error) throw error;
 
+      console.log('Dados dos promotores carregados:', data); // Log dos dados carregados
+
       if (data) {
         const promotoresFormatted = data.map(promotor => ({
           id: promotor.id,
           nome: promotor.nome,
           apelido: promotor.apelido
         }));
-        console.log('Promotores formatados:', promotoresFormatted);
+        console.log('Promotores formatados:', promotoresFormatted); // Log dos promotores formatados
         setPromotores(promotoresFormatted);
       } else {
         setPromotores([]);
@@ -135,12 +141,14 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       console.error("Erro ao carregar promotores:", error);
       setPromotores([]);
     }
+    console.log('Promotores após carregamento:', promotores); // Verifica o estado dos promotores após o carregamento
   };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
       console.log('Form data:', data);
+      console.log('Dados do formulário ao salvar:', data);
       onSave({
         ...data,
         cnpj: data.cnpj || "",
@@ -278,7 +286,10 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         <div className="space-y-2">
           <Label htmlFor="promotor_id">Promotor</Label>
           <Select
-            onValueChange={(value) => setValue("promotor_id", value)}
+            onValueChange={(value) => {
+              setValue("promotor_id", value);
+              console.log('Promotor selecionado:', value); // Log para verificar o valor selecionado
+            }}
             value={watch("promotor_id") || undefined}
           >
             <SelectTrigger>

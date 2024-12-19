@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase"; // Import supabase
 
 const formSchema = z.object({
-  email: z.string().email("Email inválido"),
-  password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+  phone: z.string().min(10, "Número de telefone é obrigatório").regex(/^\d{10,11}$/, "Número de telefone inválido"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -21,18 +21,38 @@ type FormData = z.infer<typeof formSchema>;
 export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<FormData>({
     resolver: zodResolver(formSchema),
   });
+
+  const checkUserType = async (phone: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('usuario')
+        .select('tipo')
+        .eq('telefone', phone)
+        .single();
+
+      if (error) throw error;
+      return data?.tipo;
+    } catch (error) {
+      console.error('Erro ao verificar tipo de usuário:', error);
+      return null;
+    }
+  };
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     
+    const { phone } = data;
+
     // Simulação de autenticação para teste
-    if (data.email === "admin@jk.com" && data.password === "admin123") {
+    const userType = await checkUserType(phone); // Função que verifica o tipo de usuário
+
+    if (userType === 'admin') {
       toast.success("Login realizado com sucesso!");
       router.push("/admin");
-    } else if (data.email === "promotor@jk.com" && data.password === "promotor123") {
+    } else if (userType === 'promotor') {
       toast.success("Login realizado com sucesso!");
       router.push("/promotor");
     } else {
@@ -40,6 +60,11 @@ export default function LoginForm() {
     }
     
     setIsLoading(false);
+  };
+
+  const formatPhone = (phone: string) => {
+    // Função para formatar o número de telefone
+    return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   };
 
   return (
@@ -55,31 +80,20 @@ export default function LoginForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="phone">Número de Telefone</Label>
           <Input
-            id="email"
-            type="email"
-            placeholder="seu@email.com"
-            autoComplete="username"
-            {...register("email")}
-            className={errors.email ? "border-red-500" : ""}
+            id="phone"
+            type="text"
+            placeholder="(XX) XXXXX-XXXX"
+            {...register("phone")}
+            onChange={(e) => {
+              const formattedPhone = formatPhone(e.target.value);
+              setValue("phone", formattedPhone);
+            }}
+            className={errors.phone ? "border-red-500" : ""}
           />
-          {errors.email && (
-            <p className="text-red-500 text-sm">{errors.email.message as string}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">Senha</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            {...register("password")}
-            className={errors.password ? "border-red-500" : ""}
-          />
-          {errors.password && (
-            <p className="text-red-500 text-sm">{errors.password.message as string}</p>
+          {errors.phone && (
+            <p className="text-red-500 text-sm">{errors.phone.message}</p>
           )}
         </div>
 
