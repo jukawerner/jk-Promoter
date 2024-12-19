@@ -52,8 +52,6 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  console.log('Store data:', { store, promotor_id: store?.promotor_id });
-
   const {
     register,
     handleSubmit,
@@ -125,12 +123,10 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           nome: promotor.nome,
           apelido: promotor.apelido
         }));
-        console.log('Promotores formatados:', promotoresFormatted);
         setPromotores(promotoresFormatted);
       } else {
         setPromotores([]);
       }
-
     } catch (error) {
       console.error("Erro ao carregar promotores:", error);
       setPromotores([]);
@@ -140,7 +136,6 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      console.log('Form data:', data);
       onSave({
         ...data,
         cnpj: data.cnpj || "",
@@ -257,7 +252,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <Label htmlFor="rede_id">Rede</Label>
           <Select
             onValueChange={(value) => setValue("rede_id", Number(value))}
-            value={watch("rede_id")?.toString()}
+            value={watch("rede_id")?.toString() || ""}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione uma rede" />
@@ -279,14 +274,14 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <Label htmlFor="promotor_id">Promotor</Label>
           <Select
             onValueChange={(value) => setValue("promotor_id", value)}
-            value={watch("promotor_id") || undefined}
+            value={watch("promotor_id")?.toString() || ""}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um promotor" />
             </SelectTrigger>
             <SelectContent>
               {promotores.map((promotor) => (
-                <SelectItem key={promotor.id} value={promotor.id}>
+                <SelectItem key={promotor.id} value={promotor.id.toString()}>
                   {promotor.apelido}
                 </SelectItem>
               ))}
