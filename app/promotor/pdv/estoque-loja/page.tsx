@@ -10,6 +10,15 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ArrowLeft, Plus, Pencil, Trash2, Store, Package2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -28,6 +37,17 @@ interface EstoqueItem {
   loja: string;
 }
 
+interface Marca {
+  id: string;
+  nome: string;
+}
+
+interface Produto {
+  id: string;
+  nome: string;
+  marca: string;
+}
+
 export default function EstoqueLoja() {
   const [marca, setMarca] = useState("");
   const [produto, setProduto] = useState("");
@@ -38,11 +58,10 @@ export default function EstoqueLoja() {
   const [items, setItems] = useState<EstoqueItem[]>([]);
   const [editingItem, setEditingItem] = useState<EstoqueItem | null>(null);
   const [showForm, setShowForm] = useState(true);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [marcaSelecionada, setMarcaSelecionada] = useState("");
   const router = useRouter();
-
-  // Lista de marcas e produtos para os selects
-  const marcas = ["Marca A", "Marca B", "Marca C"];
-  const produtos = ["Produto 1", "Produto 2", "Produto 3"];
 
   // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
@@ -61,50 +80,101 @@ export default function EstoqueLoja() {
     }
   }, [router]);
 
-  const handleConfirm = () => {
+  // Carregar marcas do Supabase
+  useEffect(() => {
+    const fetchMarcas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('marca')
+          .select('*')
+          .order('nome');
+
+        if (error) throw error;
+        setMarcas(data || []);
+      } catch (error) {
+        console.error('Erro ao carregar marcas:', error);
+        toast.error('Erro ao carregar marcas');
+      }
+    };
+
+    fetchMarcas();
+  }, []);
+
+  // Carregar produtos quando uma marca é selecionada
+  const carregarProdutos = async (marcaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('produto')
+        .select('*')
+        .eq('marca_id', marcaId)
+        .order('nome');
+
+      if (error) {
+        throw error;
+      }
+
+      setProdutos(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      toast.error('Erro ao carregar produtos');
+    }
+  };
+
+  // Efeito para carregar produtos quando a marca muda
+  useEffect(() => {
+    if (marcaSelecionada) {
+      carregarProdutos(marcaSelecionada);
+    } else {
+      setProdutos([]);
+    }
+  }, [marcaSelecionada]);
+
+  const handleConfirm = async () => {
     if (!marca || !produto || !estoque || !estoqueVirtual || !rede || !loja) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
 
-    const estoqueNum = parseFloat(estoque);
-    const estoqueVirtualNum = parseFloat(estoqueVirtual);
+    try {
+      const estoqueNum = parseFloat(estoque);
+      const estoqueVirtualNum = parseFloat(estoqueVirtual);
 
-    if (isNaN(estoqueNum) || isNaN(estoqueVirtualNum)) {
-      toast.error("Por favor, insira números válidos para os estoques");
-      return;
-    }
+      if (isNaN(estoqueNum) || isNaN(estoqueVirtualNum)) {
+        toast.error("Por favor, insira valores numéricos válidos para os estoques");
+        return;
+      }
 
-    if (editingItem) {
-      setItems(items.map(item => 
-        item.id === editingItem.id 
-          ? { ...item, marca, produto, estoque: estoqueNum.toString(), estoqueVirtual: estoqueVirtualNum.toString(), rede, loja }
-          : item
-      ));
+      // Criar novo item
+      const { error } = await supabase
+        .from('estoque')
+        .insert([{
+          marca: marca,
+          produto: produto,
+          estoque_fisico: estoqueNum,
+          estoque_virtual: estoqueVirtualNum,
+          rede,
+          loja,
+        }]);
+
+      if (error) throw error;
+      
+      toast.success("Estoque cadastrado com sucesso!");
+
+      // Limpar formulário
+      setMarca("");
+      setProduto("");
+      setEstoque("");
+      setEstoqueVirtual("");
       setEditingItem(null);
-    } else {
-      const newItem: EstoqueItem = {
-        id: Math.random().toString(),
-        marca,
-        produto,
-        estoque: estoqueNum.toString(),
-        estoqueVirtual: estoqueVirtualNum.toString(),
-        rede,
-        loja,
-      };
-      setItems([...items, newItem]);
+    } catch (error) {
+      console.error('Erro ao salvar estoque:', error);
+      toast.error("Erro ao salvar estoque");
     }
-
-    setMarca("");
-    setProduto("");
-    setEstoque("");
-    setEstoqueVirtual("");
-    setShowForm(false);
-    toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
   };
 
   const handleEdit = (item: EstoqueItem) => {
     setMarca(item.marca);
+    setMarcaSelecionada(item.marca);
     setProduto(item.produto);
     setEstoque(item.estoque);
     setEstoqueVirtual(item.estoqueVirtual);
@@ -222,14 +292,20 @@ export default function EstoqueLoja() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="marca">Marca</Label>
-                      <Select value={marca} onValueChange={setMarca}>
+                      <Select
+                        value={marca}
+                        onValueChange={(value) => {
+                          setMarca(value);
+                          setMarcaSelecionada(value);
+                        }}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a marca" />
                         </SelectTrigger>
                         <SelectContent>
-                          {marcas.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
+                          {marcas.map((marca) => (
+                            <SelectItem key={marca.id} value={marca.id}>
+                              {marca.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -238,14 +314,17 @@ export default function EstoqueLoja() {
 
                     <div className="space-y-2">
                       <Label htmlFor="produto">Produto</Label>
-                      <Select value={produto} onValueChange={setProduto}>
+                      <Select
+                        value={produto}
+                        onValueChange={setProduto}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
-                          {produtos.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p}
+                          {produtos.map((produto) => (
+                            <SelectItem key={produto.id} value={produto.id}>
+                              {produto.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -334,49 +413,40 @@ export default function EstoqueLoja() {
                         <TableHead>Loja</TableHead>
                         <TableHead>Marca</TableHead>
                         <TableHead>Produto</TableHead>
-                        <TableHead>Estoque</TableHead>
+                        <TableHead>Estoque Físico</TableHead>
                         <TableHead>Estoque Virtual</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
-                        <TableRow key={item.id} className="hover:bg-gray-50">
+                        <TableRow key={item.id}>
                           <TableCell>{item.rede}</TableCell>
                           <TableCell>{item.loja}</TableCell>
-                          <TableCell className="font-medium">{item.marca}</TableCell>
+                          <TableCell>{item.marca}</TableCell>
                           <TableCell>{item.produto}</TableCell>
                           <TableCell>{item.estoque}</TableCell>
                           <TableCell>{item.estoqueVirtual}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-2">
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(item)}
-                                className="hover:bg-blue-50 hover:text-blue-600"
                               >
-                                <Pencil className="w-4 h-4" />
+                                <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => item.id && handleDelete(item.id)}
-                                className="hover:bg-red-50 hover:text-red-600"
+                                onClick={() => handleDelete(item.id!)}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
-                      {items.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                            Nenhum item adicionado
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </TableBody>
                   </Table>
                 </div>

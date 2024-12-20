@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ClipboardList, Users, Building, Package, Network } from "lucide-react";
+import { ClipboardList, Users, Building, Package, Network, MapPin } from "lucide-react";
 
 export default function CadastrosPage() {
   const menuCards = [
@@ -40,6 +40,13 @@ export default function CadastrosPage() {
       href: "/admin/cadastros/promotores",
       description: "Gerencie os usuários do sistema",
       color: "bg-purple-500",
+    },
+    {
+      title: "Cadastro de Roteiro",
+      icon: <MapPin className="h-8 w-8" />,
+      href: "/admin/cadastros/roteiro",
+      description: "Gerencie e otimize roteiros de visitas",
+      color: "bg-teal-500",
     },
   ];
 

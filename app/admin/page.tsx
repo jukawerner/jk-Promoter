@@ -20,6 +20,15 @@ export default function AdminPage() {
             Bem-vindo ao painel administrativo do JK-Promoter.
           </p>
         </div>
+        
+        <a href="/admin/cadastro-roteiro" className="block">
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <h2 className="text-xl font-semibold mb-4">Cadastros de Roteiro</h2>
+            <p className="text-gray-600">
+              Gerencie e otimize roteiros de visitas com mapa interativo.
+            </p>
+          </div>
+        </a>
       </div>
     </motion.div>
   );

@@ -22,7 +22,7 @@ import { supabase } from "@/lib/supabase";
 
 interface PontoVendaItem {
   id: number;
-  marca: string;
+  marca_nome: string;
   imagens: File[];
   pontoExtra: boolean;
   rede: string;
@@ -32,6 +32,7 @@ interface PontoVendaItem {
 export default function PontoVenda() {
   const router = useRouter();
   const [marca, setMarca] = useState("");
+  const [marcas, setMarcas] = useState<any[]>([]);
   const [imagens, setImagens] = useState<File[]>([]);
   const [pontoExtra, setPontoExtra] = useState(false);
   const [items, setItems] = useState<PontoVendaItem[]>([]);
@@ -41,8 +42,25 @@ export default function PontoVenda() {
   const [loja, setLoja] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dados mockados para exemplo
-  const marcas = ["Marca A", "Marca B", "Marca C"];
+  // Carregar marcas do Supabase
+  useEffect(() => {
+    const fetchMarcas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('marca')
+          .select('*')
+          .order('nome');
+
+        if (error) throw error;
+        setMarcas(data || []);
+      } catch (error) {
+        console.error('Erro ao carregar marcas:', error);
+        toast.error('Erro ao carregar marcas');
+      }
+    };
+
+    fetchMarcas();
+  }, []);
 
   // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
@@ -61,37 +79,57 @@ export default function PontoVenda() {
     }
   }, [router]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!marca || imagens.length === 0 || !rede || !loja) {
       toast.error("Por favor, preencha todos os campos e adicione pelo menos uma imagem");
       return;
     }
 
-    if (editingItem) {
-      setItems(items.map(item => 
-        item.id === editingItem.id 
-          ? { ...item, marca, imagens, pontoExtra, rede, loja }
-          : item
-      ));
-      setEditingItem(null);
-    } else {
-      const newItem: PontoVendaItem = {
-        id: Date.now(),
-        marca,
-        imagens,
-        pontoExtra,
-        rede,
-        loja
-      };
-      setItems([...items, newItem]);
-    }
+    try {
+      // Buscar o nome da marca selecionada
+      const marcaSelecionada = marcas.find(m => m.id === marca);
 
-    // Limpar formulário
-    setMarca("");
-    setImagens([]);
-    setPontoExtra(false);
-    setShowForm(false);
-    toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
+      if (!marcaSelecionada) {
+        toast.error("Marca não encontrada");
+        return;
+      }
+
+      if (editingItem) {
+        setItems(items.map(item => 
+          item.id === editingItem.id 
+            ? { 
+                ...item,
+                marca_nome: marcaSelecionada.nome,
+                imagens, 
+                pontoExtra, 
+                rede, 
+                loja 
+              }
+            : item
+        ));
+        setEditingItem(null);
+      } else {
+        const newItem: PontoVendaItem = {
+          id: Date.now(),
+          marca_nome: marcaSelecionada.nome,
+          imagens,
+          pontoExtra,
+          rede,
+          loja
+        };
+        setItems([...items, newItem]);
+      }
+
+      // Limpar formulário
+      setMarca("");
+      setImagens([]);
+      setPontoExtra(false);
+      setShowForm(false);
+      toast.success(editingItem ? "Item atualizado com sucesso!" : "Item adicionado com sucesso!");
+    } catch (error) {
+      console.error('Erro ao salvar ponto de venda:', error);
+      toast.error("Erro ao salvar ponto de venda");
+    }
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,7 +166,7 @@ export default function PontoVenda() {
   };
 
   const handleEdit = (item: PontoVendaItem) => {
-    setMarca(item.marca);
+    setMarca(item.marca_nome);
     setImagens(item.imagens);
     setPontoExtra(item.pontoExtra);
     setEditingItem(item);
@@ -140,59 +178,91 @@ export default function PontoVenda() {
     toast.success("Item excluído com sucesso!");
   };
 
-  const handleGravar = async () => {
-    if (items.length === 0) {
-      toast.error("Adicione pelo menos um item antes de gravar");
-      return;
-    }
-
+  const handleSave = async () => {
     try {
+      if (items.length === 0) {
+        toast.error("Adicione pelo menos um item antes de gravar");
+        return;
+      }
+
+      // Para cada item, precisamos primeiro fazer upload das imagens
       for (const item of items) {
         const uploadedUrls = [];
         
-        // Upload das imagens
+        // Upload de cada imagem
         for (const image of item.imagens) {
-          const fileExt = image.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+          try {
+            // Limpar o nome do arquivo
+            const cleanFileName = image.name.replace(/[^a-zA-Z0-9.]/g, '_');
+            const fileName = `${Date.now()}_${cleanFileName}`;
 
-          // Upload do arquivo
-          const { error: uploadError } = await supabase.storage
-            .from('pdv-photos')
-            .upload(fileName, image, {
-              cacheControl: '3600',
-              contentType: image.type
-            });
+            // Verificar o tamanho do arquivo (limite de 2MB)
+            if (image.size > 2 * 1024 * 1024) {
+              toast.error(`Imagem ${image.name} muito grande. Máximo 2MB.`);
+              continue;
+            }
 
-          if (uploadError) throw uploadError;
+            // Upload da imagem
+            const { error: uploadError } = await supabase.storage
+              .from('pdv-photos')
+              .upload(fileName, image, {
+                cacheControl: '3600',
+                upsert: false
+              });
 
-          // Pegar a URL pública
-          const { data: { publicUrl } } = supabase.storage
-            .from('pdv-photos')
-            .getPublicUrl(fileName);
+            if (uploadError) {
+              console.error('Erro ao fazer upload da imagem:', uploadError);
+              toast.error(`Erro ao enviar imagem ${image.name}`);
+              continue;
+            }
 
-          uploadedUrls.push(publicUrl);
+            // Obter URL pública da imagem
+            const { data: { publicUrl } } = supabase.storage
+              .from('pdv-photos')
+              .getPublicUrl(fileName);
+
+            uploadedUrls.push(publicUrl);
+          } catch (imageError) {
+            console.error('Erro ao processar imagem:', imageError);
+            toast.error(`Erro ao processar imagem ${image.name}`);
+          }
         }
 
-        // Salvar no banco
-        const { error: insertError } = await supabase
-          .from('pdv')
-          .insert({
-            marca: item.marca,
-            ponto_extra_conquistado: item.pontoExtra,
-            fotos: uploadedUrls,
-            rede: item.rede,
-            loja: item.loja
-          });
+        if (uploadedUrls.length === 0) {
+          toast.error("Nenhuma imagem foi enviada com sucesso");
+          return;
+        }
 
-        if (insertError) throw insertError;
+        try {
+          // Salvar no banco de dados
+          const { error: insertError } = await supabase
+            .from('pdv')
+            .insert({
+              marca: item.marca_nome,
+              ponto_extra_conquistado: item.pontoExtra,
+              fotos: uploadedUrls,
+              rede: item.rede,
+              loja: item.loja
+            });
+
+          if (insertError) {
+            console.error('Erro ao salvar no banco:', insertError);
+            toast.error("Erro ao salvar os dados no banco");
+            return;
+          }
+
+          toast.success("Dados salvos com sucesso!");
+          setItems([]); // Limpar a lista de items após salvar
+          router.back(); // Voltar para a página anterior
+        } catch (dbError) {
+          console.error('Erro ao salvar no banco:', dbError);
+          toast.error("Erro ao salvar os dados no banco");
+          return;
+        }
       }
-
-      toast.success("PDV gravado com sucesso!");
-      setItems([]); // Limpa a lista após gravar
-      setShowForm(true); // Volta para o formulário
     } catch (error) {
-      console.error("Erro ao gravar PDV:", error);
-      toast.error("Erro ao gravar PDV. Por favor, tente novamente.");
+      console.error('Erro ao salvar dados:', error);
+      toast.error("Erro ao salvar os dados. Tente novamente.");
     }
   };
 
@@ -275,14 +345,17 @@ export default function PontoVenda() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="marca">Marca</Label>
-                      <Select value={marca} onValueChange={setMarca}>
+                      <Select
+                        value={marca}
+                        onValueChange={setMarca}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a marca" />
                         </SelectTrigger>
                         <SelectContent>
-                          {marcas.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
+                          {marcas.map((marca) => (
+                            <SelectItem key={marca.id} value={marca.id}>
+                              {marca.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -431,7 +504,7 @@ export default function PontoVenda() {
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.marca}</TableCell>
+                          <TableCell className="font-medium">{item.marca_nome}</TableCell>
                           <TableCell>{item.imagens.length} imagem(ns)</TableCell>
                           <TableCell>
                             {item.pontoExtra ? (
@@ -472,29 +545,21 @@ export default function PontoVenda() {
                   </Table>
                 </div>
 
-                <div className="flex justify-between items-center mt-4">
+                <div className="flex justify-between mt-8">
                   <Button
-                    variant="ghost"
-                    onClick={() => router.push("/promotor/pdv/estoque-loja")}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                    variant="outline"
+                    onClick={() => router.back()}
+                    className="flex items-center gap-2"
                   >
-                    <ArrowLeft className="w-4 h-4" />
-                    Voltar
+                    <ArrowLeft className="w-4 h-4" /> Voltar
                   </Button>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleGravar}
-                      className="bg-rose-600 hover:bg-rose-700 text-white"
-                    >
-                      Gravar
-                    </Button>
-                    <Button
-                      onClick={handleProximo}
-                      className="bg-gray-900 hover:bg-gray-800 text-white"
-                    >
-                      Próximo
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleSave}
+                    className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2"
+                    disabled={items.length === 0}
+                  >
+                    Gravar
+                  </Button>
                 </div>
               </motion.div>
             )}

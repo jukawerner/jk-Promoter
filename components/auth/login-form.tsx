@@ -10,10 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase"; // Import supabase
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
-  phone: z.string().min(10, "Número de telefone é obrigatório").regex(/^\d{10,11}$/, "Número de telefone inválido"),
+  phone: z
+    .string()
+    .min(14, "Número de telefone é obrigatório")
+    .regex(/^\(\d{2}\) \d{5}-\d{4}$/, "Formato inválido. Use (XX) XXXXX-XXXX"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -27,10 +30,13 @@ export default function LoginForm() {
 
   const checkUserType = async (phone: string) => {
     try {
+      // Remove todos os caracteres não numéricos do telefone
+      const cleanPhone = phone.replace(/\D/g, '');
+      
       const { data, error } = await supabase
         .from('usuario')
         .select('tipo')
-        .eq('telefone', phone)
+        .eq('telefone', cleanPhone)
         .single();
 
       if (error) throw error;
@@ -42,29 +48,50 @@ export default function LoginForm() {
   };
 
   const onSubmit = async (data: FormData) => {
-    setIsLoading(true);
-    
-    const { phone } = data;
+    try {
+      setIsLoading(true);
+      
+      const { phone } = data;
+      const userType = await checkUserType(phone);
 
-    // Simulação de autenticação para teste
-    const userType = await checkUserType(phone); // Função que verifica o tipo de usuário
+      if (!userType) {
+        toast.error("Telefone não encontrado no sistema");
+        return;
+      }
 
-    if (userType === 'admin') {
-      toast.success("Login realizado com sucesso!");
-      router.push("/admin");
-    } else if (userType === 'promotor') {
-      toast.success("Login realizado com sucesso!");
-      router.push("/promotor");
-    } else {
-      toast.error("Credenciais inválidas");
+      if (userType?.toUpperCase() === 'ADMIN') {
+        toast.success("Login realizado com sucesso! Redirecionando...");
+        router.push("/admin");
+      } else if (userType?.toUpperCase() === 'PROMOTOR') {
+        toast.success("Login realizado com sucesso! Redirecionando...");
+        router.push("/promotor");
+      } else {
+        toast.error("Tipo de usuário não reconhecido");
+      }
+    } catch (error) {
+      console.error('Erro ao fazer login:', error);
+      toast.error("Erro ao fazer login. Tente novamente.");
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
-  const formatPhone = (phone: string) => {
-    // Função para formatar o número de telefone
-    return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  const formatPhone = (value: string) => {
+    // Remove todos os caracteres não numéricos
+    const numbers = value.replace(/\D/g, '');
+    
+    // Aplica a máscara (XX) XXXXX-XXXX
+    if (numbers.length <= 11) {
+      return numbers.replace(/(\d{2})?(\d{5})?(\d{4})?/, function(_, ddd, prefix, suffix) {
+        let formatted = '';
+        if (ddd) formatted += `(${ddd}`;
+        if (prefix) formatted += `) ${prefix}`;
+        if (suffix) formatted += `-${suffix}`;
+        return formatted;
+      });
+    }
+    // Se tiver mais de 11 dígitos, mantém apenas os primeiros 11
+    return numbers.slice(0, 11).replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   };
 
   return (
@@ -85,10 +112,12 @@ export default function LoginForm() {
             id="phone"
             type="text"
             placeholder="(XX) XXXXX-XXXX"
+            maxLength={15}
             {...register("phone")}
             onChange={(e) => {
-              const formattedPhone = formatPhone(e.target.value);
-              setValue("phone", formattedPhone);
+              const formatted = formatPhone(e.target.value);
+              setValue("phone", formatted);
+              e.target.value = formatted;
             }}
             className={errors.phone ? "border-red-500" : ""}
           />

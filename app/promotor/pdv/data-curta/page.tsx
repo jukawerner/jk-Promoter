@@ -24,8 +24,19 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Clock, AlertTriangle, Package2 } from "lucide-react";
 
-const marcas = ["Marca 1", "Marca 2", "Marca 3"]; // Substitua com suas marcas
-const produtos = ["Produto 1", "Produto 2", "Produto 3"]; // Substitua com seus produtos
+interface Marca {
+  id: string;
+  nome: string;
+}
+
+interface Produto {
+  id: string;
+  nome: string;
+  marca_id: string;
+}
+
+const marcas = [] as Marca[];
+const produtos = [] as Produto[];
 
 export default function DataCurtaPage() {
   const router = useRouter();
@@ -39,6 +50,8 @@ export default function DataCurtaPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [rede, setRede] = useState("");
   const [loja, setLoja] = useState("");
+  const [marcaSelecionada, setMarcaSelecionada] = useState<string>("");
+  const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
 
   // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
@@ -57,34 +70,153 @@ export default function DataCurtaPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    carregarMarcas();
+  }, []);
+
+  useEffect(() => {
+    if (marcaSelecionada) {
+      carregarProdutos(marcaSelecionada);
+    } else {
+      setProdutosState([]);
+    }
+  }, [marcaSelecionada]);
+
+  useEffect(() => {
+    const verificarTabela = async () => {
+      const { data, error } = await supabase
+        .from('data_curta')
+        .select()
+        .limit(1);
+
+      if (error) {
+        console.error('Erro ao verificar tabela:', error);
+      } else {
+        // Isso vai mostrar as colunas da tabela
+        if (data && data.length > 0) {
+          console.log('Colunas da tabela:', Object.keys(data[0]));
+        }
+      }
+    };
+
+    verificarTabela();
+  }, []);
+
+  const [marcasState, setMarcasState] = useState<Marca[]>([]);
+  const [produtosState, setProdutosState] = useState<Produto[]>([]);
+
+  const carregarMarcas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('marca')
+        .select('*')
+        .order('nome');
+
+      if (error) {
+        throw error;
+      }
+
+      setMarcasState(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar marcas:', error);
+      toast.error('Erro ao carregar marcas');
+    }
+  };
+
+  const carregarProdutos = async (marcaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('produto')
+        .select('*')
+        .eq('marca_id', marcaId)
+        .order('nome');
+
+      if (error) {
+        throw error;
+      }
+
+      setProdutosState(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      toast.error('Erro ao carregar produtos');
+    }
+  };
+
   const handleSubmit = async () => {
-    // Validação dos campos
-    if (!marca || !produto || !estoque || !dataValidade) {
+    if (!marcaSelecionada || !produtoSelecionado || !estoque || !dataValidade) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
 
     try {
-      // Inserir no Supabase
-      const { error } = await supabase
+      // Primeiro vamos verificar a estrutura da tabela
+      const { data: estrutura, error: erroBusca } = await supabase
+        .from('data_curta')
+        .select()
+        .limit(1);
+
+      if (erroBusca) {
+        console.error('Erro ao verificar tabela:', erroBusca);
+      } else {
+        console.log('Estrutura atual:', estrutura);
+      }
+
+      const dadosParaSalvar = {
+        produto: parseInt(produtoSelecionado), // Nome correto da coluna
+        marca: parseInt(marcaSelecionada), // Nome correto da coluna
+        quantidade: parseFloat(estoque),
+        data_validade: dataValidade,
+        rede,
+        loja,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('Tentando salvar:', dadosParaSalvar);
+
+      const { data, error } = await supabase
         .from("data_curta")
-        .insert({
-          marca,
-          produto,
-          quantidade: parseFloat(estoque),
-          data_validade: dataValidade,
-          rede,
-          loja
+        .insert(dadosParaSalvar)
+        .select();
+
+      if (error) {
+        console.error('Erro ao salvar:', error);
+        console.error('Detalhes do erro:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
         });
+        throw error;
+      }
 
-      if (error) throw error;
-
-      // Redirecionar para a página de lista
-      router.push("/promotor/pdv/data-curta/lista");
+      console.log('Dados salvos com sucesso:', data);
+      toast.success("Produto registrado com sucesso!");
       
+      // Limpar formulário
+      setMarcaSelecionada("");
+      setProdutoSelecionado("");
+      setEstoque("");
+      setDataValidade("");
+      setShowConfirmDialog(false);
+
+      // Adicionar item à lista
+      const marcaObj = marcasState.find(m => m.id === marcaSelecionada);
+      const produtoObj = produtosState.find(p => p.id === produtoSelecionado);
+
+      setItems([...items, {
+        id: Date.now(),
+        marca_id: parseInt(marcaSelecionada),
+        marca_nome: marcaObj?.nome || '',
+        produto_id: parseInt(produtoSelecionado),
+        produto_nome: produtoObj?.nome || '',
+        quantidade: estoque,
+        data_validade: dataValidade,
+        rede,
+        loja
+      }]);
     } catch (error) {
       console.error("Erro ao salvar:", error);
-      toast.error("Erro ao salvar os dados. Por favor, tente novamente.");
+      toast.error("Erro ao salvar o produto");
     }
   };
 
@@ -94,8 +226,8 @@ export default function DataCurtaPage() {
       const { error } = await supabase
         .from("data_curta")
         .insert({
-          marca,
-          produto,
+          marca_id: marcaSelecionada,
+          produto_id: produtoSelecionado,
           quantidade: parseFloat(estoque),
           data_validade: dataValidade,
           rede,
@@ -107,17 +239,22 @@ export default function DataCurtaPage() {
       toast.success("Produto registrado com sucesso!");
       
       // Limpar formulário
-      setMarca("");
-      setProduto("");
+      setMarcaSelecionada("");
+      setProdutoSelecionado("");
       setEstoque("");
       setDataValidade("");
       setShowConfirmDialog(false);
       
       // Adicionar item à lista
+      const marcaObj = marcasState.find(m => m.id === marcaSelecionada);
+      const produtoObj = produtosState.find(p => p.id === produtoSelecionado);
+
       setItems([...items, {
         id: Date.now(),
-        marca,
-        produto,
+        marca_id: marcaSelecionada,
+        marca_nome: marcaObj?.nome || '',
+        produto_id: produtoSelecionado,
+        produto_nome: produtoObj?.nome || '',
         quantidade: estoque,
         data_validade: dataValidade,
         rede,
@@ -137,10 +274,10 @@ export default function DataCurtaPage() {
       const { error } = await supabase
         .from("data_curta")
         .update({
-          marca: item.marca,
-          produto: item.produto,
-          quantidade: parseFloat(item.estoque),
-          data_validade: item.dataValidade,
+          marca_id: item.marca_id,
+          produto_id: item.produto_id,
+          quantidade: parseFloat(item.quantidade),
+          data_validade: item.data_validade,
           rede: item.rede,
           loja: item.loja
         })
@@ -266,14 +403,14 @@ export default function DataCurtaPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Marca</label>
-                      <Select value={marca} onValueChange={setMarca}>
+                      <Select value={marcaSelecionada} onValueChange={setMarcaSelecionada}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a marca" />
                         </SelectTrigger>
                         <SelectContent>
-                          {marcas.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
+                          {marcasState.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -282,14 +419,14 @@ export default function DataCurtaPage() {
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Produto</label>
-                      <Select value={produto} onValueChange={setProduto}>
+                      <Select value={produtoSelecionado} onValueChange={setProdutoSelecionado} disabled={!marcaSelecionada}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
-                          {produtos.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p}
+                          {produtosState.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -299,7 +436,7 @@ export default function DataCurtaPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Estoque</label>
+                      <label className="text-sm font-medium text-gray-700">Quantidade</label>
                       <div className="relative">
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
@@ -382,7 +519,7 @@ export default function DataCurtaPage() {
                       <tr>
                         <th>Marca</th>
                         <th>Produto</th>
-                        <th>Estoque</th>
+                        <th>Quantidade</th>
                         <th>Data de Validade</th>
                         <th>Rede</th>
                         <th>Loja</th>
@@ -392,8 +529,8 @@ export default function DataCurtaPage() {
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="font-medium">{item.marca}</td>
-                          <td>{item.produto}</td>
+                          <td className="font-medium">{item.marca_id}</td>
+                          <td>{item.produto_id}</td>
                           <td>{item.quantidade}</td>
                           <td>{new Date(item.data_validade).toLocaleDateString()}</td>
                           <td>{item.rede}</td>
@@ -404,8 +541,8 @@ export default function DataCurtaPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  setMarca(item.marca);
-                                  setProduto(item.produto);
+                                  setMarcaSelecionada(item.marca_id);
+                                  setProdutoSelecionado(item.produto_id);
                                   setEstoque(item.quantidade);
                                   setDataValidade(item.data_validade);
                                   setRede(item.rede);
@@ -459,14 +596,14 @@ export default function DataCurtaPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Marca</p>
-                <p className="text-lg font-semibold">{marca}</p>
+                <p className="text-lg font-semibold">{marcaSelecionada}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Produto</p>
-                <p className="text-lg font-semibold">{produto}</p>
+                <p className="text-lg font-semibold">{produtoSelecionado}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Estoque</p>
+                <p className="text-sm font-medium text-gray-500">Quantidade</p>
                 <p className="text-lg font-semibold">{estoque} un/kg</p>
               </div>
               <div>
