@@ -7,7 +7,6 @@ import {
   Search,
   ShoppingCart,
   BarChart3,
-  LayoutDashboard,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,16 +58,6 @@ export function Sidebar() {
       animate={{ width: 72 }}
       className="fixed left-0 top-0 h-full bg-white shadow-xl z-50 flex flex-col"
     >
-      <div className="flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white"
-        >
-          <LayoutDashboard className="h-6 w-6" />
-        </motion.div>
-      </div>
-
       <div className="flex items-center justify-center p-4">
         <UserAvatar />
       </div>

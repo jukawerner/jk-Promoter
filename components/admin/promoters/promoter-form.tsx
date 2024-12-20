@@ -56,6 +56,20 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
     }
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    // Remove tudo que não é número
+    value = value.replace(/\D/g, '');
+    
+    // Formata o número como (00) 00000-0000
+    if (value.length <= 11) {
+      value = value.replace(/^(\d{2})(\d)/g, '($1) $2');
+      value = value.replace(/(\d)(\d{4})$/, '$1-$2');
+    }
+    
+    setValue('telefone', value);
+  };
+
   const onSubmit = async (data: z.infer<typeof promoterSchema>) => {
     try {
       await onSave({
@@ -143,11 +157,11 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
             <Input
               id="telefone"
               {...register("telefone")}
+              onChange={handlePhoneChange}
               placeholder="(00) 00000-0000"
-              className={errors.telefone ? "border-red-500" : ""}
             />
             {errors.telefone && (
-              <p className="text-red-500 text-sm">{errors.telefone.message}</p>
+              <p className="text-sm text-red-500">{errors.telefone.message}</p>
             )}
           </div>
 

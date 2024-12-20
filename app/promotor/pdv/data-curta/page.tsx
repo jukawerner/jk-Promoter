@@ -332,17 +332,6 @@ export default function DataCurtaPage() {
       className="min-h-screen bg-gray-50"
     >
       <div className="container mx-auto p-6 max-w-[800px]">
-        <div className="flex justify-end mb-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/promotor/pdv/ponto-de-venda")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Voltar
-          </Button>
-        </div>
-
         {/* Header com ícone e título */}
         <div className="flex flex-col items-center text-center space-y-3 mb-8">
           <motion.div 

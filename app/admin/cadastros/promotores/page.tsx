@@ -46,12 +46,15 @@ export default function CadastroPromotor() {
         avatar_url = await uploadAvatar(data.avatarFile);
       }
 
+      // Remove formatação do telefone
+      const telefone = data.telefone.replace(/\D/g, '');
+
       // Preparar dados para o Supabase
       const userData = {
         nome: data.nome,
         apelido: data.apelido,
         email: data.email,
-        telefone: data.telefone,
+        telefone: telefone, // Telefone sem formatação
         endereco: data.endereco,
         bairro: data.bairro,
         cidade: data.cidade,
