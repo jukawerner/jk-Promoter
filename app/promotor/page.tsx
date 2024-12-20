@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { StoreCard } from "@/components/promoter/store-card";
 import { BrandsPage } from "@/components/promoter/brands-page";
@@ -23,13 +24,13 @@ interface Store {
   nome: string;
   rede: { nome: string };
   endereco: string;
-  numero: string;
   bairro: string;
   cidade: string;
   uf: string;
 }
 
 export default function PromotorPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -37,40 +38,63 @@ export default function PromotorPage() {
   const [networks, setNetworks] = useState<string[]>([]);
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const phone = localStorage.getItem("userPhone");
+      if (!phone) {
+        toast.error("Usuário não está logado");
+        router.push("/");
+        return false;
+      }
+
+      // Verifica se o usuário é realmente um promotor
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("tipo")
+        .eq("telefone", phone)
+        .single();
+
+      if (userError || !userData || userData.tipo?.toUpperCase() !== "PROMOTOR") {
+        toast.error("Acesso não autorizado");
+        router.push("/");
+        return false;
+      }
+
+      return true;
+    };
+
     const loadStores = async () => {
       try {
-        const phone = localStorage.getItem("userPhone");
-        if (!phone) {
-          toast.error("Usuário não está logado");
-          return;
-        }
+        const isAuthorized = await checkAuth();
+        if (!isAuthorized) return;
 
-        // Primeiro, busca o ID do promotor pelo telefone
+        const phone = localStorage.getItem("userPhone");
+        console.log("Telefone do usuário:", phone);
+
+        // Busca o ID do promotor pelo telefone
         const { data: userData, error: userError } = await supabase
           .from("usuario")
           .select("id")
           .eq("telefone", phone)
           .single();
 
-        if (userError) throw userError;
+        if (userError) {
+          console.error("Erro ao buscar usuário:", userError);
+          throw userError;
+        }
+        
         if (!userData) {
+          console.error("Usuário não encontrado");
           toast.error("Usuário não encontrado");
           return;
         }
 
         console.log("ID do promotor:", userData.id);
 
-        // Depois, busca as lojas vinculadas ao promotor
+        // Busca as lojas vinculadas ao promotor
         const { data: storesData, error: storesError } = await supabase
           .from("loja")
           .select(`
-            id,
-            nome,
-            endereco,
-            numero,
-            bairro,
-            cidade,
-            uf,
+            *,
             rede:rede_id ( nome )
           `)
           .eq("promotor_id", userData.id);
@@ -81,6 +105,10 @@ export default function PromotorPage() {
         }
 
         console.log("Lojas encontradas:", storesData);
+
+        if (!storesData || storesData.length === 0) {
+          toast.info("Nenhuma loja encontrada para este promotor");
+        }
 
         setStores(storesData || []);
         // Extrai as redes únicas das lojas
@@ -95,7 +123,7 @@ export default function PromotorPage() {
     };
 
     loadStores();
-  }, []);
+  }, [router]);
 
   const filteredStores = useMemo(() => {
     return stores.filter(store => {
@@ -214,7 +242,7 @@ export default function PromotorPage() {
                             id: store.id,
                             rede: store.rede.nome,
                             loja: store.nome,
-                            endereco: `${store.endereco}, ${store.numero}, ${store.bairro}, ${store.cidade} - ${store.uf}`,
+                            endereco: `${store.endereco}, ${store.bairro}, ${store.cidade} - ${store.uf}`,
                             status: "pending",
                             ultimaVisita: new Date().toISOString(),
                             marcas: []

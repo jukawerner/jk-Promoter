@@ -12,8 +12,10 @@ import { Plus, Upload, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Store } from "@/types/store";
 import { getLojas, createLoja, updateLoja, deleteLoja } from "@/lib/actions/loja";
+import { useRouter } from "next/navigation";
 
 export default function CadastroLojas() {
+  const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +81,10 @@ export default function CadastroLojas() {
       toast.success(selectedStore ? "Loja atualizada com sucesso!" : "Loja criada com sucesso!");
       setShowForm(false);
       setSelectedStore(null);
+      
+      // Atualiza a página e redireciona
+      router.refresh();
+      router.push('/admin/cadastros/lojas');
     } catch (error) {
       console.error("Erro detalhado ao salvar loja:", error);
       toast.error(`Erro ao salvar loja: ${(error as Error).message}`);

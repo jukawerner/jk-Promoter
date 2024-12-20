@@ -7,6 +7,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -27,8 +28,8 @@ const formSchema = z.object({
   cep: z.string().min(8, "CEP é obrigatório e deve ter 8 dígitos"),
   rede_id: z.number().min(1, "Rede é obrigatória"),
   promotor_id: z.number().nullable(),
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: z.number().min(-90).max(90, "Latitude inválida"),
+  longitude: z.number().min(-180).max(180, "Longitude inválida"),
 });
 
 interface StoreFormProps {
@@ -49,6 +50,7 @@ interface Promotor {
 }
 
 export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
+  const router = useRouter();
   const [redes, setRedes] = useState<Rede[]>([]);
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -152,10 +154,21 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
     try {
       console.log('Enviando dados do formulário:', data);
       
+      // Validação adicional
+      if (!data.latitude || !data.longitude) {
+        toast.error("Por favor, selecione a localização no mapa");
+        return;
+      }
+
+      if (!data.rede_id) {
+        toast.error("Por favor, selecione uma rede");
+        return;
+      }
+      
       // Garante que os campos numéricos estão no formato correto
       const formattedData = {
         nome: data.nome.trim(),
-        cnpj: data.cnpj.trim(),
+        cnpj: data.cnpj?.trim() || "",
         endereco: data.endereco.trim(),
         cep: data.cep.replace(/\D/g, ''), // Remove caracteres não numéricos
         rede_id: Number(data.rede_id),
@@ -164,12 +177,29 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         longitude: Number(data.longitude),
       };
 
+      // Validação final
+      if (!formattedData.nome || !formattedData.endereco || !formattedData.cep || !formattedData.rede_id) {
+        toast.error("Por favor, preencha todos os campos obrigatórios");
+        return;
+      }
+
       console.log('Dados formatados:', formattedData);
       await onSave(formattedData);
       toast.success(store ? "Loja atualizada com sucesso!" : "Loja criada com sucesso!");
+      
+      // Redireciona para a lista de lojas após salvar
+      router.push('/admin/cadastros/lojas');
+      router.refresh();
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
-      toast.error("Erro ao salvar loja: " + (error as Error).message);
+      if (error instanceof z.ZodError) {
+        // Erros de validação do Zod
+        error.errors.forEach(err => {
+          toast.error(`${err.path.join('.')}: ${err.message}`);
+        });
+      } else {
+        toast.error("Erro ao salvar loja: " + (error as Error).message);
+      }
     }
   };
 
@@ -178,7 +208,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
           <div>
-            <Label htmlFor="nome">Nome da Loja</Label>
+            <Label htmlFor="nome">Nome da Loja *</Label>
             <Input
               id="nome"
               {...register("nome")}
@@ -192,23 +222,22 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <div>
             <Label htmlFor="cnpj">CNPJ</Label>
             <Input id="cnpj" {...register("cnpj")} />
+            {errors.cnpj && (
+              <p className="text-red-500 text-sm mt-1">{errors.cnpj.message}</p>
+            )}
           </div>
 
           <div>
-            <Label htmlFor="cep">CEP</Label>
+            <Label htmlFor="cep">CEP *</Label>
             <div className="relative">
               <Input
                 id="cep"
                 {...register("cep")}
                 onChange={handleCepChange}
                 className={errors.cep ? "border-red-500" : ""}
-                placeholder="00000-000"
-                maxLength={9}
               />
               {isFetchingCep && (
-                <div className="absolute right-3 top-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                </div>
+                <Loader2 className="h-4 w-4 animate-spin absolute right-3 top-3" />
               )}
             </div>
             {errors.cep && (
@@ -217,91 +246,92 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           </div>
 
           <div>
-            <Label htmlFor="endereco">Endereço</Label>
+            <Label htmlFor="endereco">Endereço *</Label>
             <Input
               id="endereco"
               {...register("endereco")}
               className={errors.endereco ? "border-red-500" : ""}
-              disabled={isFetchingCep}
             />
             {errors.endereco && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.endereco.message}
-              </p>
+              <p className="text-red-500 text-sm mt-1">{errors.endereco.message}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="rede_id">Rede</Label>
-              <Select
-                onValueChange={(value) => setValue("rede_id", Number(value))}
-                defaultValue={store?.rede_id?.toString()}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma rede" />
-                </SelectTrigger>
-                <SelectContent>
-                  {redes.map((rede) => (
-                    <SelectItem key={rede.id} value={rede.id.toString()}>
-                      {rede.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.rede_id && (
-                <p className="text-red-500 text-sm mt-1">{errors.rede_id.message}</p>
-              )}
-            </div>
+          <div>
+            <Label htmlFor="rede">Rede *</Label>
+            <Select
+              value={watch("rede_id")?.toString()}
+              onValueChange={(value) => setValue("rede_id", Number(value))}
+            >
+              <SelectTrigger className={errors.rede_id ? "border-red-500" : ""}>
+                <SelectValue placeholder="Selecione uma rede" />
+              </SelectTrigger>
+              <SelectContent>
+                {redes.map((rede) => (
+                  <SelectItem key={rede.id} value={rede.id.toString()}>
+                    {rede.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.rede_id && (
+              <p className="text-red-500 text-sm mt-1">{errors.rede_id.message}</p>
+            )}
+          </div>
 
-            <div>
-              <Label htmlFor="promotor_id">Promotor</Label>
-              <Select
-                onValueChange={(value) =>
-                  setValue("promotor_id", value === "null" ? null : Number(value))
-                }
-                defaultValue={store?.promotor_id?.toString() || "null"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um promotor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Nenhum</SelectItem>
-                  {promotores.map((promotor) => (
-                    <SelectItem key={promotor.id} value={promotor.id.toString()}>
-                      {promotor.nome} ({promotor.apelido})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="promotor">Promotor</Label>
+            <Select
+              value={watch("promotor_id")?.toString() || "null"}
+              onValueChange={(value) => setValue("promotor_id", value === "null" ? null : Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um promotor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="null">Nenhum</SelectItem>
+                {promotores.map((promotor) => (
+                  <SelectItem key={promotor.id} value={promotor.id.toString()}>
+                    {promotor.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="h-[400px] w-full rounded-md border">
-            <MapPicker
-              address={endereco}
-              onAddressChange={handleAddressChange}
-              onCepChange={handleCepUpdate}
-              onLatChange={(lat) => setValue("latitude", lat)}
-              onLngChange={(lng) => setValue("longitude", lng)}
-            />
-          </div>
+          <Label>Localização no Mapa *</Label>
+          <MapPicker
+            address={endereco}
+            onAddressChange={handleAddressChange}
+            onCepUpdate={handleCepUpdate}
+            onCoordinatesChange={(lat, lng) => {
+              setValue("latitude", lat);
+              setValue("longitude", lng);
+            }}
+            initialLatitude={watch("latitude")}
+            initialLongitude={watch("longitude")}
+          />
+          {(errors.latitude || errors.longitude) && (
+            <p className="text-red-500 text-sm mt-1">Por favor, selecione a localização no mapa</p>
+          )}
         </div>
       </div>
 
-      <div className="flex justify-end space-x-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isLoading}
-        >
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
         <Button type="submit" disabled={isLoading}>
-          {store ? "Atualizar" : "Criar"} Loja
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>{store ? "Atualizar" : "Criar"} Loja</>
+          )}
         </Button>
       </div>
     </form>

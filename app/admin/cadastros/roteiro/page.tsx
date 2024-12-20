@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from "@react-google-maps/api";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,27 @@ interface RouteInfo {
   steps: google.maps.DirectionsStep[];
 }
 
+// Opções do mapa memoizadas
+const mapOptions = {
+  mapTypeControl: true,
+  streetViewControl: false,
+  fullscreenControl: true,
+  markerClusterer: null,
+  gestureHandling: 'cooperative',
+  disableDefaultUI: false,
+  zoomControl: true,
+};
+
 export default function CadastroRoteiro() {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: googleMapsApiKey || '',
+    version: "weekly"
+  });
+
+  const mapRef = useRef<google.maps.Map>();
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
   const [selectedPromoter, setSelectedPromoter] = useState<Promoter | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -60,7 +80,7 @@ export default function CadastroRoteiro() {
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [center, setCenter] = useState<google.maps.LatLngLiteral>({
-    lat: -27.5969, // Centro de Florianópolis
+    lat: -27.5969,
     lng: -48.5495
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -297,18 +317,16 @@ export default function CadastroRoteiro() {
     }
   };
 
-  const calculateRoute = async (locations: Location[]) => {
-    if (!selectedPromoter || locations.length === 0 || !window.google) {
+  const calculateRoute = useCallback(async (locations: Location[]) => {
+    if (!selectedPromoter || locations.length === 0 || !isLoaded) {
       console.log('Faltam dados para calcular a rota:', {
         selectedPromoter: !!selectedPromoter,
         locationsLength: locations.length,
-        googleLoaded: !!window.google
+        isLoaded
       });
       return;
     }
 
-    const directionsService = new google.maps.DirectionsService();
-    
     try {
       console.log('Geocodificando endereço do promotor:', selectedPromoter.endereco);
       const promoterLocation = await geocodeAddress(selectedPromoter.endereco);
@@ -316,50 +334,88 @@ export default function CadastroRoteiro() {
         console.error('Não foi possível geocodificar o endereço do promotor');
         return;
       }
-      
+
       const waypoints = locations.map(loc => ({
         location: new google.maps.LatLng(loc.position.lat, loc.position.lng),
         stopover: true
       }));
 
       console.log('Calculando rota com waypoints:', waypoints);
-      const request = {
-        origin: promoterLocation,
-        destination: promoterLocation,
-        waypoints: waypoints,
-        optimizeWaypoints: false,
-        travelMode: google.maps.TravelMode.DRIVING
-      };
-
-      directionsService.route(request, (result, status) => {
-        console.log('Resposta do DirectionsService:', { status, result });
-        if (status === google.maps.DirectionsStatus.OK) {
-          setDirections(result);
-          
-          // Extrair informações da rota
-          const route = result.routes[0];
-          const legs = route.legs;
-          let totalDistance = 0;
-          let totalDuration = 0;
-          
-          legs.forEach(leg => {
-            totalDistance += leg.distance?.value || 0;
-            totalDuration += leg.duration?.value || 0;
-          });
-          
-          setRouteInfo({
-            duration: formatDuration(totalDuration),
-            distance: formatDistance(totalDistance),
-            steps: legs.flatMap(leg => leg.steps || [])
-          });
-        } else {
-          console.error('Erro ao calcular rota:', status);
-        }
+      
+      const directionsService = new google.maps.DirectionsService();
+      
+      return new Promise((resolve, reject) => {
+        directionsService.route(
+          {
+            origin: promoterLocation,
+            destination: promoterLocation, // Retorna ao ponto inicial (endereço do promotor)
+            waypoints: waypoints,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING
+          },
+          (result, status) => {
+            console.log('Resposta do DirectionsService:', { status, result });
+            if (status === google.maps.DirectionsStatus.OK && result) {
+              setDirections(result);
+              
+              // Extrair informações da rota
+              const route = result.routes[0];
+              const legs = route.legs;
+              let totalDistance = 0;
+              let totalDuration = 0;
+              
+              legs.forEach(leg => {
+                totalDistance += leg.distance?.value || 0;
+                totalDuration += leg.duration?.value || 0;
+              });
+              
+              setRouteInfo({
+                duration: formatDuration(totalDuration),
+                distance: formatDistance(totalDistance),
+                steps: legs.flatMap(leg => leg.steps || [])
+              });
+              
+              // Adiciona um marcador para o ponto inicial/final (promotor)
+              if (map) {
+                new google.maps.Marker({
+                  position: promoterLocation,
+                  map: map,
+                  label: {
+                    text: "P",
+                    color: "white",
+                    fontWeight: "bold"
+                  },
+                  icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: "#22c55e",
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: "#ffffff"
+                  },
+                  title: "Ponto de Partida/Retorno (Promotor)"
+                });
+              }
+              
+              resolve(result);
+            } else {
+              console.error('Erro ao calcular rota:', status);
+              reject(status);
+            }
+          }
+        );
       });
     } catch (error) {
       console.error('Erro ao calcular rota:', error);
     }
-  };
+  }, [selectedPromoter, isLoaded, geocodeAddress, map]);
+
+  // Efeito para recalcular a rota quando as locations mudarem
+  useEffect(() => {
+    if (locations.length > 0 && selectedPromoter) {
+      calculateRoute(locations);
+    }
+  }, [locations, selectedPromoter, calculateRoute]);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -499,20 +555,29 @@ export default function CadastroRoteiro() {
               </div>
             </div>
           )}
-          <LoadScript googleMapsApiKey={googleMapsApiKey}>
+          {loadError && (
+            <div className="h-full flex items-center justify-center bg-red-50">
+              <div className="text-center text-red-600">
+                <p>Erro ao carregar o mapa</p>
+                <p className="text-sm">{loadError.message}</p>
+              </div>
+            </div>
+          )}
+          {isLoaded && !loadError && (
             <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '600px' }}
               center={center}
               zoom={12}
-              mapContainerStyle={{ width: '100%', height: '600px' }}
-              options={{
-                mapTypeControl: true,
-                streetViewControl: false,
-                fullscreenControl: true,
-                // Desativa o agrupamento automático de marcadores
-                markerClusterer: null
+              onLoad={(map) => {
+                mapRef.current = map;
+                setMap(map);
               }}
+              onUnmount={() => {
+                mapRef.current = undefined;
+                setMap(null);
+              }}
+              options={mapOptions}
             >
-              {/* Força a ordem dos marcadores definindo o zIndex */}
               {locations.map((location, index) => (
                 <Marker
                   key={location.id.toString()}
@@ -522,9 +587,7 @@ export default function CadastroRoteiro() {
                     color: "white",
                     fontWeight: "bold",
                   }}
-                  // Força a ordem com zIndex
                   zIndex={1000 - index}
-                  // Desativa otimizações que podem afetar a ordem
                   optimized={false}
                 />
               ))}
@@ -532,17 +595,19 @@ export default function CadastroRoteiro() {
                 <DirectionsRenderer 
                   directions={directions}
                   options={{
-                    // Garante que a rota fique abaixo dos marcadores
                     zIndex: 1,
-                    // Não mostra os marcadores padrão do DirectionsRenderer
                     suppressMarkers: true,
-                    // Preserva a ordem dos waypoints
-                    preserveViewport: true
+                    preserveViewport: true,
+                    polylineOptions: {
+                      strokeColor: "#2563eb", // Azul
+                      strokeWeight: 4,
+                      strokeOpacity: 0.8
+                    }
                   }}
                 />
               )}
             </GoogleMap>
-          </LoadScript>
+          )}
         </div>
       </div>
 
