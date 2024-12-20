@@ -52,15 +52,6 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-<<<<<<< HEAD
-=======
-  console.log('Store data:', { store, promotor_id: store?.promotor_id });
-  console.log('Promotor ID selecionado:', store?.promotor_id);
-  console.log('Promotores carregados:', promotores); // Verifica se os promotores estão carregados corretamente
-  console.log('Promotor ID no formulário:', store?.promotor_id);
-  console.log('Promotores carregados:', promotores); // Verifica se os promotores estão carregados corretamente
-
->>>>>>> d49fdaaf535eeaf5019e5ac32cecd3b3ffb77e6a
   const {
     register,
     handleSubmit,
@@ -126,18 +117,12 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
 
       if (error) throw error;
 
-      console.log('Dados dos promotores carregados:', data); // Log dos dados carregados
-
       if (data) {
         const promotoresFormatted = data.map(promotor => ({
           id: promotor.id,
           nome: promotor.nome,
           apelido: promotor.apelido
         }));
-<<<<<<< HEAD
-=======
-        console.log('Promotores formatados:', promotoresFormatted); // Log dos promotores formatados
->>>>>>> d49fdaaf535eeaf5019e5ac32cecd3b3ffb77e6a
         setPromotores(promotoresFormatted);
       } else {
         setPromotores([]);
@@ -146,17 +131,11 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       console.error("Erro ao carregar promotores:", error);
       setPromotores([]);
     }
-    console.log('Promotores após carregamento:', promotores); // Verifica o estado dos promotores após o carregamento
   };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-<<<<<<< HEAD
-=======
-      console.log('Form data:', data);
-      console.log('Dados do formulário ao salvar:', data);
->>>>>>> d49fdaaf535eeaf5019e5ac32cecd3b3ffb77e6a
       onSave({
         ...data,
         cnpj: data.cnpj || "",
@@ -294,16 +273,8 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         <div className="space-y-2">
           <Label htmlFor="promotor_id">Promotor</Label>
           <Select
-<<<<<<< HEAD
             onValueChange={(value) => setValue("promotor_id", value)}
             value={watch("promotor_id")?.toString() || ""}
-=======
-            onValueChange={(value) => {
-              setValue("promotor_id", value);
-              console.log('Promotor selecionado:', value); // Log para verificar o valor selecionado
-            }}
-            value={watch("promotor_id") || undefined}
->>>>>>> d49fdaaf535eeaf5019e5ac32cecd3b3ffb77e6a
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um promotor" />

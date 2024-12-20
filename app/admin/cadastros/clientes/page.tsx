@@ -9,56 +9,43 @@ import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreFilter } from "@/components/admin/stores/store-filter";
 import { ExcelUpload } from "@/components/admin/stores/excel-upload";
 
-interface Store {
-  id: number;
-  rede: string;
-  cnpj: string;
-  loja: string;
-  endereco: string;
-  bairro: string;
-  cidade: string;
-  cep: string;
-  uf: string;
-  marcas: number[];
-}
+import { Store, StoreFormData } from "types/store";
 
 // Dados de exemplo para teste
 const INITIAL_STORES: Store[] = [
   {
     id: 1,
-    rede: "Supermercado ABC",
+    nome: "Filial Centro",
     cnpj: "12.345.678/0001-90",
-    loja: "Filial Centro",
-    endereco: "Rua das Flores, 123",
+    endereco: "Rua das Flores",
+    numero: "123",
     bairro: "Centro",
     cidade: "São Paulo",
     cep: "01234-567",
     uf: "SP",
-    marcas: [1, 2]
+    rede_id: 1,
+    promotor_id: null,
+    rede: {
+      id: 1,
+      nome: "Supermercado ABC"
+    }
   },
   {
     id: 2,
-    rede: "Mercado XYZ",
+    nome: "Unidade Jardins",
     cnpj: "98.765.432/0001-21",
-    loja: "Unidade Jardins",
-    endereco: "Av. Paulista, 1000",
+    endereco: "Av. Paulista",
+    numero: "1000",
     bairro: "Jardins",
     cidade: "São Paulo",
     cep: "04567-890",
     uf: "SP",
-    marcas: [1, 3]
-  },
-  {
-    id: 3,
-    rede: "Supermercado ABC",
-    cnpj: "12.345.678/0002-71",
-    loja: "Filial Campinas",
-    endereco: "Av. Brasil, 500",
-    bairro: "Centro",
-    cidade: "Campinas",
-    cep: "13024-851",
-    uf: "SP",
-    marcas: [2, 3]
+    rede_id: 2,
+    promotor_id: null,
+    rede: {
+      id: 2,
+      nome: "Mercado XYZ"
+    }
   }
 ];
 
@@ -67,29 +54,27 @@ export default function CadastroLojas() {
   const [stores, setStores] = useState<Store[]>(INITIAL_STORES);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [filters, setFilters] = useState({
-    rede: "",
-    loja: "",
-    cidade: "",
+    search: ""
   });
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleFilterChange = (newFilters: { search: string }) => {
+    setFilters(newFilters);
   };
 
   const filteredStores = useMemo(() => {
     return stores.filter(store => {
-      const redeMatch = store.rede.toLowerCase().includes(filters.rede.toLowerCase());
-      const lojaMatch = store.loja.toLowerCase().includes(filters.loja.toLowerCase());
-      const cidadeMatch = store.cidade.toLowerCase().includes(filters.cidade.toLowerCase());
+      const searchTerm = filters.search.toLowerCase();
+      const redeName = store.rede?.nome.toLowerCase() ?? "";
+      const storeName = store.nome.toLowerCase();
+      const cidade = store.cidade.toLowerCase();
       
-      return redeMatch && lojaMatch && cidadeMatch;
+      return redeName.includes(searchTerm) || 
+             storeName.includes(searchTerm) || 
+             cidade.includes(searchTerm);
     });
   }, [stores, filters]);
 
-  const handleSaveStore = (store: Omit<Store, "id">) => {
+  const handleSaveStore = (store: StoreFormData) => {
     if (editingStore) {
       setStores(stores.map(s => 
         s.id === editingStore.id ? { ...store, id: editingStore.id } : s
@@ -152,12 +137,12 @@ export default function CadastroLojas() {
       {showForm && (
         <div className="mb-8">
           <StoreForm
+            store={editingStore}
             onSave={handleSaveStore}
             onCancel={() => {
               setShowForm(false);
               setEditingStore(null);
             }}
-            initialData={editingStore}
           />
         </div>
       )}
@@ -168,7 +153,7 @@ export default function CadastroLojas() {
             key={store.id}
             store={store}
             onEdit={() => handleEditStore(store)}
-            onDelete={() => handleDeleteStore(store.id)}
+            onDelete={() => handleDeleteStore(store.id!)}
           />
         ))}
       </div>

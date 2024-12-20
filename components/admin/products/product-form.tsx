@@ -33,7 +33,7 @@ const productSchema = z.object({
   }),
   peso: z.number().min(0, 'Peso deve ser maior que 0'),
   validade: z.number().min(0, 'Validade deve ser maior que 0'),
-  marca: z.string({
+  marca: z.coerce.string({
     required_error: 'Selecione uma marca',
   }),
 })

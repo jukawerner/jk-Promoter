@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ClipboardList, Users, Building, Package, Network } from "lucide-react";
-import * as XLSX from 'xlsx';
 
 export default function CadastrosPage() {
   const menuCards = [
@@ -44,32 +43,6 @@ export default function CadastrosPage() {
     },
   ];
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-            const formattedData = jsonData.map((row) => {
-                return Object.fromEntries(
-                    Object.entries(row).map(([key, value]) => [
-                        key,
-                        typeof value === 'string' ? value.toUpperCase() : typeof value === 'number' ? Number(value).toFixed(2) : value,
-                    ])
-                );
-            });
-
-            console.log(formattedData); // Aqui você pode atualizar o estado ou fazer o que precisar com os dados formatados
-        };
-        reader.readAsArrayBuffer(file);
-    }
-};
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -77,8 +50,6 @@ export default function CadastrosPage() {
       className="max-w-7xl mx-auto"
     >
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Cadastros</h1>
-      <input type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
-      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {menuCards.map((card) => (
           <Link key={card.href} href={card.href}>
