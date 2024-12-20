@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Store, StoreFormData } from "@/types/store";
-import { supabase } from "@/lib/supabase";
+import { getRedes, getPromotores } from "@/lib/actions/loja";
 
 const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -55,242 +55,215 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
-  } = useForm<z.infer<typeof formSchema>>({
+    setValue,
+    reset,
+  } = useForm<StoreFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: store?.nome || "",
-      cnpj: store?.cnpj || "",
-      endereco: store?.endereco || "",
-      numero: store?.numero || "",
-      bairro: store?.bairro || "",
-      cidade: store?.cidade || "",
-      uf: store?.uf || "",
-      cep: store?.cep || "",
-      rede_id: store?.rede_id || 0,
-      promotor_id: store?.promotor_id === undefined ? null : store?.promotor_id,
+      nome: "",
+      cnpj: "",
+      endereco: "",
+      numero: "",
+      bairro: "",
+      cidade: "",
+      uf: "",
+      cep: "",
+      rede_id: undefined,
+      promotor_id: null,
     },
   });
 
   useEffect(() => {
-    loadRedes();
-    loadPromotores();
-  }, []);
+    if (store) {
+      reset({
+        nome: store.nome,
+        cnpj: store.cnpj || "",
+        endereco: store.endereco,
+        numero: store.numero,
+        bairro: store.bairro,
+        cidade: store.cidade,
+        uf: store.uf,
+        cep: store.cep,
+        rede_id: store.rede_id,
+        promotor_id: store.promotor_id,
+      });
+    }
+  }, [store, reset]);
 
   useEffect(() => {
-    if (store) {
-      setValue("nome", store.nome || "");
-      setValue("cnpj", store.cnpj || "");
-      setValue("endereco", store.endereco || "");
-      setValue("numero", store.numero || "");
-      setValue("bairro", store.bairro || "");
-      setValue("cidade", store.cidade || "");
-      setValue("uf", store.uf || "");
-      setValue("cep", store.cep || "");
-      setValue("rede_id", store.rede_id || 0);
-      setValue("promotor_id", store.promotor_id === undefined ? null : store.promotor_id);
-    }
-  }, [store, setValue]);
-
-  const loadRedes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("rede")
-        .select("*")
-        .order("nome");
-
-      if (error) throw error;
-      setRedes(data || []);
-    } catch (error) {
-      console.error("Erro ao carregar redes:", error);
-    }
-  };
-
-  const loadPromotores = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('usuario')
-        .select("*")
-        .order("apelido");
-
-      if (error) throw error;
-
-      if (data) {
-        const promotoresFormatted = data.map(promotor => ({
-          id: promotor.id,
-          nome: promotor.nome,
-          apelido: promotor.apelido
-        }));
-        setPromotores(promotoresFormatted);
-      } else {
-        setPromotores([]);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [redesData, promotoresData] = await Promise.all([
+          getRedes(),
+          getPromotores()
+        ]);
+        setRedes(redesData);
+        setPromotores(promotoresData);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Erro ao carregar promotores:", error);
-      setPromotores([]);
-    }
-  };
+    };
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    setIsLoading(true);
+    loadData();
+  }, []);
+
+  const onSubmit = async (data: StoreFormData) => {
     try {
-      onSave({
-        ...data,
-        cnpj: data.cnpj || "",
-        promotor_id: data.promotor_id === null ? null : Number(data.promotor_id),
-      });
+      await onSave(data);
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="nome">Nome da Loja</Label>
-          <Input
-            id="nome"
-            {...register("nome")}
-            className={errors.nome ? "border-red-500" : ""}
-          />
-          {errors.nome && (
-            <p className="text-red-500 text-sm">{errors.nome.message}</p>
-          )}
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="nome">Nome da Loja</Label>
+            <Input
+              id="nome"
+              {...register("nome")}
+              className={errors.nome ? "border-red-500" : ""}
+            />
+            {errors.nome && (
+              <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="cnpj">CNPJ</Label>
+            <Input id="cnpj" {...register("cnpj")} />
+          </div>
+
+          <div>
+            <Label htmlFor="rede_id">Rede</Label>
+            <Select
+              onValueChange={(value) => setValue("rede_id", Number(value))}
+              defaultValue={store?.rede_id?.toString()}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma rede" />
+              </SelectTrigger>
+              <SelectContent>
+                {redes.map((rede) => (
+                  <SelectItem key={rede.id} value={rede.id.toString()}>
+                    {rede.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.rede_id && (
+              <p className="text-red-500 text-sm mt-1">{errors.rede_id.message}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="promotor_id">Promotor</Label>
+            <Select
+              onValueChange={(value) =>
+                setValue("promotor_id", value === "null" ? null : Number(value))
+              }
+              defaultValue={store?.promotor_id?.toString() || "null"}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um promotor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="null">Nenhum</SelectItem>
+                {promotores.map((promotor) => (
+                  <SelectItem key={promotor.id} value={promotor.id.toString()}>
+                    {promotor.nome} ({promotor.apelido})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="cnpj">CNPJ</Label>
-          <Input
-            id="cnpj"
-            {...register("cnpj")}
-            className={errors.cnpj ? "border-red-500" : ""}
-          />
-          {errors.cnpj && (
-            <p className="text-red-500 text-sm">{errors.cnpj.message}</p>
-          )}
-        </div>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="endereco">Endereço</Label>
+            <Input
+              id="endereco"
+              {...register("endereco")}
+              className={errors.endereco ? "border-red-500" : ""}
+            />
+            {errors.endereco && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.endereco.message}
+              </p>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="endereco">Endereço</Label>
-          <Input
-            id="endereco"
-            {...register("endereco")}
-            className={errors.endereco ? "border-red-500" : ""}
-          />
-          {errors.endereco && (
-            <p className="text-red-500 text-sm">{errors.endereco.message}</p>
-          )}
-        </div>
+          <div>
+            <Label htmlFor="numero">Número</Label>
+            <Input
+              id="numero"
+              {...register("numero")}
+              className={errors.numero ? "border-red-500" : ""}
+            />
+            {errors.numero && (
+              <p className="text-red-500 text-sm mt-1">{errors.numero.message}</p>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="numero">Número</Label>
-          <Input
-            id="numero"
-            {...register("numero")}
-            className={errors.numero ? "border-red-500" : ""}
-          />
-          {errors.numero && (
-            <p className="text-red-500 text-sm">{errors.numero.message}</p>
-          )}
-        </div>
+          <div>
+            <Label htmlFor="bairro">Bairro</Label>
+            <Input
+              id="bairro"
+              {...register("bairro")}
+              className={errors.bairro ? "border-red-500" : ""}
+            />
+            {errors.bairro && (
+              <p className="text-red-500 text-sm mt-1">{errors.bairro.message}</p>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="bairro">Bairro</Label>
-          <Input
-            id="bairro"
-            {...register("bairro")}
-            className={errors.bairro ? "border-red-500" : ""}
-          />
-          {errors.bairro && (
-            <p className="text-red-500 text-sm">{errors.bairro.message}</p>
-          )}
-        </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="cidade">Cidade</Label>
+              <Input
+                id="cidade"
+                {...register("cidade")}
+                className={errors.cidade ? "border-red-500" : ""}
+              />
+              {errors.cidade && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.cidade.message}
+                </p>
+              )}
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="cidade">Cidade</Label>
-          <Input
-            id="cidade"
-            {...register("cidade")}
-            className={errors.cidade ? "border-red-500" : ""}
-          />
-          {errors.cidade && (
-            <p className="text-red-500 text-sm">{errors.cidade.message}</p>
-          )}
-        </div>
+            <div>
+              <Label htmlFor="uf">UF</Label>
+              <Input
+                id="uf"
+                {...register("uf")}
+                className={errors.uf ? "border-red-500" : ""}
+                maxLength={2}
+              />
+              {errors.uf && (
+                <p className="text-red-500 text-sm mt-1">{errors.uf.message}</p>
+              )}
+            </div>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="uf">UF</Label>
-          <Input
-            id="uf"
-            {...register("uf")}
-            maxLength={2}
-            className={errors.uf ? "border-red-500" : ""}
-          />
-          {errors.uf && (
-            <p className="text-red-500 text-sm">{errors.uf.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cep">CEP</Label>
-          <Input
-            id="cep"
-            {...register("cep")}
-            className={errors.cep ? "border-red-500" : ""}
-          />
-          {errors.cep && (
-            <p className="text-red-500 text-sm">{errors.cep.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="rede_id">Rede</Label>
-          <Select
-            onValueChange={(value) => setValue("rede_id", Number(value))}
-            value={watch("rede_id")?.toString() || ""}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione uma rede" />
-            </SelectTrigger>
-            <SelectContent>
-              {redes.map((rede) => (
-                <SelectItem key={rede.id} value={rede.id.toString()}>
-                  {rede.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.rede_id && (
-            <p className="text-red-500 text-sm">{errors.rede_id.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="promotor_id">Promotor</Label>
-          <Select
-            onValueChange={(value) => setValue("promotor_id", value === "null" ? null : Number(value))}
-            value={watch("promotor_id")?.toString() || ""}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um promotor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="null">Sem promotor</SelectItem>
-              {promotores.map((promotor) => (
-                <SelectItem key={promotor.id} value={promotor.id.toString()}>
-                  {promotor.apelido}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.promotor_id && (
-            <p className="text-red-500 text-sm">{errors.promotor_id.message}</p>
-          )}
+          <div>
+            <Label htmlFor="cep">CEP</Label>
+            <Input
+              id="cep"
+              {...register("cep")}
+              className={errors.cep ? "border-red-500" : ""}
+            />
+            {errors.cep && (
+              <p className="text-red-500 text-sm mt-1">{errors.cep.message}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -299,7 +272,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           Cancelar
         </Button>
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Salvando..." : "Salvar"}
+          {store ? "Atualizar" : "Criar"}
         </Button>
       </div>
     </form>

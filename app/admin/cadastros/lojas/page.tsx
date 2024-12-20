@@ -4,28 +4,21 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase";
 import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreForm } from "@/components/admin/stores/store-form";
 import { StoreFilter } from "@/components/admin/stores/store-filter";
 import { ImportModal } from "@/components/admin/stores/import-modal";
-import { Plus, Upload, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Plus, Upload, Loader2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Store } from "@/types/store";
+import { getLojas, createLoja, updateLoja, deleteLoja } from "@/lib/actions/loja";
 
 export default function CadastroLojas() {
   const [stores, setStores] = useState<Store[]>([]);
-  const [filters, setFilters] = useState({
-    search: "",
-  });
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
@@ -35,26 +28,8 @@ export default function CadastroLojas() {
   const loadStores = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from("loja")
-        .select(`
-          *,
-          usuario:promotor_id (
-            id,
-            nome,
-            apelido,
-            avatar_url
-          ),
-          rede:rede_id (
-            id,
-            nome
-          )
-        `)
-        .order("nome");
-
-      if (error) throw error;
-
-      setStores(data || []);
+      const data = await getLojas();
+      setStores(data);
     } catch (error) {
       console.error("Erro ao carregar lojas:", error);
       toast.error("Erro ao carregar lojas");
@@ -63,14 +38,10 @@ export default function CadastroLojas() {
     }
   };
 
-  const handleFilterChange = (newFilters: typeof filters) => {
-    setFilters(newFilters);
-  };
-
   const filteredStores = useMemo(() => {
-    if (!filters.search) return stores;
+    if (!searchQuery) return stores;
     
-    const searchTerm = filters.search.toLowerCase();
+    const searchTerm = searchQuery.toLowerCase();
     return stores.filter(store => {
       return (
         store.rede?.nome?.toLowerCase().includes(searchTerm) ||
@@ -78,50 +49,67 @@ export default function CadastroLojas() {
         store.usuario?.nome?.toLowerCase().includes(searchTerm)
       );
     });
-  }, [stores, filters]);
+  }, [stores, searchQuery]);
 
-  const handleSaveStore = async (storeData: Omit<Store, 'id' | 'rede' | 'usuario'>) => {
+  const handleSaveStore = async (storeData: any) => {
     try {
-      const { error } = await supabase
-        .from("loja")
-        .upsert({
-          ...storeData,
-          id: selectedStore?.id,
-        });
+      setIsLoading(true);
+      console.log('Dados recebidos:', storeData);
 
-      if (error) throw error;
-
+      let savedStore;
+      if (selectedStore) {
+        console.log('Atualizando loja existente...');
+        savedStore = await updateLoja(selectedStore.id, storeData);
+        // Atualiza a loja localmente para evitar reload
+        setStores(prev => prev.map(p => 
+          p.id === selectedStore.id ? savedStore : p
+        ));
+      } else {
+        console.log('Criando nova loja...');
+        savedStore = await createLoja(storeData);
+        // Adiciona a nova loja localmente para evitar reload
+        setStores(prev => [...prev, savedStore]);
+      }
+      
+      console.log('Loja salva:', savedStore);
       toast.success(selectedStore ? "Loja atualizada com sucesso!" : "Loja criada com sucesso!");
-      await loadStores();
-      setIsDialogOpen(false);
+      setShowForm(false);
       setSelectedStore(null);
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
       toast.error("Erro ao salvar loja");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleEditStore = (store: Store) => {
     setSelectedStore(store);
-    setIsDialogOpen(true);
+    setShowForm(true);
   };
 
   const handleDeleteStore = async (store: Store) => {
-    if (!confirm("Tem certeza que deseja excluir esta loja?")) return;
-
-    try {
-      const { error } = await supabase
-        .from("loja")
-        .delete()
-        .eq("id", store.id);
-
-      if (error) throw error;
-      
-      toast.success("Loja excluída com sucesso!");
-      await loadStores();
-    } catch (error) {
-      console.error("Erro ao excluir loja:", error);
-      toast.error("Erro ao excluir loja");
+    console.log('Tentando excluir loja:', store.id);
+    if (window.confirm("Tem certeza que deseja excluir esta loja?")) {
+      try {
+        setIsLoading(true);
+        console.log('Iniciando exclusão da loja...');
+        await deleteLoja(store.id);
+        console.log('Loja excluída do banco com sucesso');
+        
+        // Remove a loja localmente para evitar reload
+        setStores(prev => {
+          console.log('Atualizando lista local de lojas');
+          return prev.filter(p => p.id !== store.id);
+        });
+        
+        toast.success("Loja excluída com sucesso!");
+      } catch (error) {
+        console.error('Erro detalhado ao excluir loja:', error);
+        toast.error("Erro ao excluir loja");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -148,7 +136,7 @@ export default function CadastroLojas() {
           <Button
             onClick={() => {
               setSelectedStore(null);
-              setIsDialogOpen(true);
+              setShowForm(true);
             }}
             className="flex items-center gap-2"
           >
@@ -158,58 +146,58 @@ export default function CadastroLojas() {
         </div>
       </div>
 
-      <StoreFilter
-        filters={filters}
-        onFilterChange={handleFilterChange}
-      />
-
-      {isLoading ? (
-        <div className="flex justify-center items-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-        </div>
+      {showForm ? (
+        <StoreForm
+          store={selectedStore}
+          onSave={handleSaveStore}
+          onCancel={() => {
+            setShowForm(false);
+            setSelectedStore(null);
+          }}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredStores.map((store) => (
-            <StoreCard
-              key={store.id}
-              store={store}
-              onEdit={handleEditStore}
-              onDelete={handleDeleteStore}
+        <>
+          <div className="mb-6 relative">
+            <Input
+              type="text"
+              placeholder="Buscar por nome, rede ou promotor..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
-          ))}
-          {filteredStores.length === 0 && (
-            <div className="col-span-full text-center py-8 text-gray-500">
-              Nenhuma loja encontrada
+            <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredStores.map((store) => (
+                <StoreCard
+                  key={store.id}
+                  store={store}
+                  onEdit={() => handleEditStore(store)}
+                  onDelete={() => handleDeleteStore(store)}
+                />
+              ))}
+              {filteredStores.length === 0 && (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  {searchQuery
+                    ? "Nenhuma loja encontrada com este filtro."
+                    : "Nenhuma loja cadastrada. Clique em \"Nova Loja\" para começar."}
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent 
-          className="max-w-3xl max-h-[90vh] overflow-y-auto"
-          aria-describedby="store-form-description"
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {selectedStore ? "Editar Loja" : "Nova Loja"}
-            </DialogTitle>
-            <p id="store-form-description" className="text-sm text-gray-500">
-              {selectedStore ? "Edite os dados da loja selecionada" : "Preencha os dados para criar uma nova loja"}
-            </p>
-          </DialogHeader>
-          <StoreForm
-            store={selectedStore}
-            onSave={handleSaveStore}
-            onCancel={() => setIsDialogOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
       <ImportModal
-        isOpen={showImportModal}
+        open={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onSuccess={loadStores}
+        onImport={loadStores}
       />
     </motion.div>
   );
