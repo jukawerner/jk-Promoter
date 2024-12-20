@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
+import { Loader2 } from 'lucide-react';
 
 interface MapPickerProps {
   address: string;
   onAddressChange: (address: string) => void;
   onCepChange: (cep: string) => void;
+  onLatChange: (lat: number) => void;
+  onLngChange: (lng: number) => void;
 }
 
 const defaultCenter = {
@@ -27,7 +30,7 @@ const options = {
   gestureHandling: 'greedy' as const
 };
 
-export function MapPicker({ address, onAddressChange, onCepChange }: MapPickerProps) {
+export function MapPicker({ address, onAddressChange, onCepChange, onLatChange, onLngChange }: MapPickerProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [marker, setMarker] = useState<google.maps.Marker | null>(null);
   const [center, setCenter] = useState(defaultCenter);
@@ -104,33 +107,41 @@ export function MapPicker({ address, onAddressChange, onCepChange }: MapPickerPr
 
   if (!isLoaded) {
     return <div className="w-full h-[400px] rounded-lg bg-gray-100 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-600"></div>
+      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
     </div>;
   }
 
   return (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      center={center}
       zoom={15}
+      center={center}
       onClick={handleMapClick}
-      onLoad={setMap}
       options={options}
+      onLoad={setMap}
     >
       <Marker
         position={center}
         draggable={true}
+        onLoad={onMarkerLoad}
         onDragEnd={(e) => {
           if (e.latLng) {
+            const newPosition = {
+              lat: e.latLng.lat(),
+              lng: e.latLng.lng()
+            };
+            setCenter(newPosition);
+            onLatChange(newPosition.lat);
+            onLngChange(newPosition.lng);
+            
             const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ location: e.latLng }, (results, status) => {
+            geocoder.geocode({ location: newPosition }, (results, status) => {
               if (status === 'OK') {
                 updateAddressAndCep(results);
               }
             });
           }
         }}
-        onLoad={onMarkerLoad}
       />
     </GoogleMap>
   );

@@ -28,9 +28,25 @@ export async function getLojas(): Promise<Store[]> {
 }
 
 export async function createLoja(data: StoreFormData): Promise<Store> {
+  console.log('Dados recebidos em createLoja:', data);
+  
+  // Garantir que os dados estão no formato correto
+  const lojaData = {
+    nome: data.nome,
+    cnpj: data.cnpj,
+    endereco: data.endereco,
+    cep: data.cep,
+    rede_id: Number(data.rede_id),
+    promotor_id: data.promotor_id === null ? null : Number(data.promotor_id),
+    latitude: Number(data.latitude),
+    longitude: Number(data.longitude),
+  };
+
+  console.log('Dados formatados para inserção:', lojaData);
+
   const { data: loja, error } = await supabase
     .from("loja")
-    .insert(data)
+    .insert([lojaData])
     .select(`
       *,
       usuario:promotor_id (
@@ -47,10 +63,21 @@ export async function createLoja(data: StoreFormData): Promise<Store> {
     .single();
 
   if (error) {
-    console.error('Erro ao criar loja:', error);
-    throw error;
+    console.error('Erro detalhado ao criar loja:', error);
+    
+    // Tratamento específico para erro de CNPJ duplicado
+    if (error.code === '23505' && error.message.includes('loja_cnpj_key')) {
+      throw new Error(`Já existe uma loja cadastrada com o CNPJ ${data.cnpj}`);
+    }
+    
+    throw new Error(`Erro ao criar loja: ${error.message}`);
   }
 
+  if (!loja) {
+    throw new Error('Loja não foi criada - nenhum dado retornado');
+  }
+
+  console.log('Loja criada com sucesso:', loja);
   return loja;
 }
 

@@ -45,15 +45,7 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
           <span className="font-medium">CNPJ:</span> {store.cnpj || "N/A"}
         </p>
         <p>
-          <span className="font-medium">Endereço:</span>{" "}
-          {`${store.endereco}, ${store.numero}`}
-        </p>
-        <p>
-          <span className="font-medium">Bairro:</span> {store.bairro}
-        </p>
-        <p>
-          <span className="font-medium">Cidade:</span>{" "}
-          {`${store.cidade} - ${store.uf}`}
+          <span className="font-medium">Endereço:</span> {store.endereco}
         </p>
         <p>
           <span className="font-medium">CEP:</span> {store.cep}

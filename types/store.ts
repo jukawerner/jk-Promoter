@@ -3,13 +3,11 @@ export interface Store {
   nome: string;
   cnpj: string;
   endereco: string;
-  numero: string;
-  bairro: string;
-  cidade: string;
-  uf: string;
   cep: string;
   rede_id: number;
   promotor_id: number | null;
+  latitude: number;
+  longitude: number;
   rede?: {
     id: number;
     nome: string;

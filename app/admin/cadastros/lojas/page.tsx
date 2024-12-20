@@ -54,30 +54,34 @@ export default function CadastroLojas() {
   const handleSaveStore = async (storeData: any) => {
     try {
       setIsLoading(true);
-      console.log('Dados recebidos:', storeData);
+      console.log('Dados recebidos do formulário:', storeData);
 
       let savedStore;
       if (selectedStore) {
         console.log('Atualizando loja existente...');
         savedStore = await updateLoja(selectedStore.id, storeData);
-        // Atualiza a loja localmente para evitar reload
         setStores(prev => prev.map(p => 
           p.id === selectedStore.id ? savedStore : p
         ));
       } else {
-        console.log('Criando nova loja...');
+        console.log('Iniciando criação de nova loja...');
         savedStore = await createLoja(storeData);
-        // Adiciona a nova loja localmente para evitar reload
+        console.log('Resposta da criação:', savedStore);
+        
+        if (!savedStore) {
+          throw new Error('Falha ao criar loja - nenhum dado retornado');
+        }
+        
         setStores(prev => [...prev, savedStore]);
       }
       
-      console.log('Loja salva:', savedStore);
+      console.log('Loja salva com sucesso:', savedStore);
       toast.success(selectedStore ? "Loja atualizada com sucesso!" : "Loja criada com sucesso!");
       setShowForm(false);
       setSelectedStore(null);
     } catch (error) {
-      console.error("Erro ao salvar loja:", error);
-      toast.error("Erro ao salvar loja");
+      console.error("Erro detalhado ao salvar loja:", error);
+      toast.error(`Erro ao salvar loja: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
     }
