@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Edit2, User, Trash2 } from "lucide-react";
+import { Edit2, User, Trash2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ interface UserCardProps {
   promoter: {
     id: number;
     apelido: string;
-    cidade: string;
+    endereco: string;
     avatar_url?: string;
     tipo: string;
   };
@@ -42,7 +42,10 @@ export function UserCard({ promoter, onEdit, onDelete }: UserCardProps) {
                   {promoter.tipo}
                 </Badge>
               </div>
-              <p className="text-gray-600 mt-1">{promoter.cidade}</p>
+              <div className="flex items-center gap-1 text-gray-600 mt-1">
+                <MapPin className="h-4 w-4" />
+                <p className="text-sm">{promoter.endereco}</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button

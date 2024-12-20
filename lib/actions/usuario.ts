@@ -7,8 +7,6 @@ export interface Usuario {
   email: string;
   telefone: string;
   endereco: string;
-  bairro: string;
-  cidade: string;
   cep: string;
   tipo: string;
   avatar_url?: string;
@@ -64,15 +62,19 @@ export async function updateUsuario(id: number, data: Partial<CreateUsuarioInput
 }
 
 export async function deleteUsuario(id: number): Promise<void> {
+  console.log('Iniciando exclusão do usuário no Supabase, ID:', id);
+  
   const { error } = await supabase
     .from('usuario')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error('Erro ao deletar usuário:', error);
+    console.error('Erro detalhado ao deletar usuário no Supabase:', error);
     throw error;
   }
+  
+  console.log('Usuário excluído com sucesso do Supabase');
 }
 
 export async function uploadAvatar(file: File): Promise<string> {

@@ -38,16 +38,20 @@ export default function CadastroPromotor() {
   const handleSavePromoter = async (data: any) => {
     try {
       setIsLoading(true);
+      console.log('Dados recebidos:', data);
       
       let avatar_url = data.avatarUrl;
       
       // Só faz upload se houver um novo arquivo
       if (data.avatarFile instanceof File) {
+        console.log('Fazendo upload do avatar...');
         avatar_url = await uploadAvatar(data.avatarFile);
+        console.log('Avatar URL:', avatar_url);
       }
 
       // Remove formatação do telefone
       const telefone = data.telefone.replace(/\D/g, '');
+      console.log('Telefone formatado:', telefone);
 
       // Preparar dados para o Supabase
       const userData = {
@@ -56,26 +60,29 @@ export default function CadastroPromotor() {
         email: data.email,
         telefone: telefone, // Telefone sem formatação
         endereco: data.endereco,
-        bairro: data.bairro,
-        cidade: data.cidade,
         cep: data.cep,
         tipo: data.tipo,
         avatar_url
       };
+      
+      console.log('Dados para salvar:', userData);
 
       let savedUser;
       if (editingPromoter) {
+        console.log('Atualizando usuário existente...');
         savedUser = await updateUsuario(editingPromoter.id, userData);
         // Atualiza o usuário localmente para evitar reload
         setPromoters(prev => prev.map(p => 
           p.id === editingPromoter.id ? savedUser : p
         ));
       } else {
+        console.log('Criando novo usuário...');
         savedUser = await createUsuario(userData);
         // Adiciona o novo usuário localmente para evitar reload
         setPromoters(prev => [...prev, savedUser]);
       }
       
+      console.log('Usuário salvo:', savedUser);
       toast.success(editingPromoter ? "Usuário atualizado com sucesso!" : "Usuário criado com sucesso!");
       setShowForm(false);
       setEditingPromoter(null);
@@ -93,16 +100,24 @@ export default function CadastroPromotor() {
   };
 
   const handleDeletePromoter = async (id: number) => {
+    console.log('Tentando excluir usuário:', id);
     if (window.confirm("Tem certeza que deseja excluir este usuário?")) {
       try {
         setIsLoading(true);
+        console.log('Iniciando exclusão do usuário...');
         await deleteUsuario(id);
+        console.log('Usuário excluído do banco com sucesso');
+        
         // Remove o usuário localmente para evitar reload
-        setPromoters(prev => prev.filter(p => p.id !== id));
+        setPromoters(prev => {
+          console.log('Atualizando lista local de usuários');
+          return prev.filter(p => p.id !== id);
+        });
+        
         toast.success("Usuário excluído com sucesso!");
       } catch (error) {
+        console.error('Erro detalhado ao excluir usuário:', error);
         toast.error("Erro ao excluir usuário");
-        console.error(error);
       } finally {
         setIsLoading(false);
       }
