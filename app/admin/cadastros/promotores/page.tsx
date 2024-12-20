@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromoterForm } from "@/components/admin/promoters/promoter-form";
 import { UserCard } from "@/components/admin/promoters/promoter-card";
 import { Input } from "@/components/ui/input";
+import { ImportModal } from "@/components/admin/promoters/import-modal";
 import { toast } from "sonner";
 import { createUsuario, getUsuarios, updateUsuario, deleteUsuario, uploadAvatar, Usuario } from "@/lib/actions/usuario";
 
@@ -14,6 +15,7 @@ interface Promoter extends Usuario {}
 
 export default function CadastroPromotor() {
   const [showForm, setShowForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
   const [editingPromoter, setEditingPromoter] = useState<Promoter | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +96,23 @@ export default function CadastroPromotor() {
     }
   };
 
+  const handleImportUsers = async (users: Partial<Usuario>[]) => {
+    try {
+      setIsLoading(true);
+      for (const userData of users) {
+        const savedUser = await createUsuario(userData);
+        setPromoters(prev => [...prev, savedUser]);
+      }
+      toast.success(`${users.length} usuários importados com sucesso!`);
+      setShowImportModal(false);
+    } catch (error) {
+      toast.error("Erro ao importar usuários");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleEditPromoter = (promoter: Promoter) => {
     setEditingPromoter(promoter);
     setShowForm(true);
@@ -140,19 +159,28 @@ export default function CadastroPromotor() {
     >
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cadastro Usuário</h1>
-          <p className="text-gray-600 mt-2">Gerencie os usuários do sistema</p>
+          <h1 className="text-2xl font-bold tracking-tight">Cadastro Usuário</h1>
+          <p className="text-muted-foreground">
+            Gerencie os usuários do sistema
+          </p>
         </div>
-        <Button
-          onClick={() => {
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowImportModal(true)}
+            variant="outline"
+            disabled={isLoading}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar
+          </Button>
+          <Button onClick={() => {
             setEditingPromoter(null);
             setShowForm(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Usuário
-        </Button>
+          }} disabled={isLoading}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Usuário
+          </Button>
+        </div>
       </div>
 
       {showForm ? (
@@ -197,6 +225,13 @@ export default function CadastroPromotor() {
             )}
           </div>
         </>
+      )}
+      {showImportModal && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onConfirm={handleImportUsers}
+        />
       )}
     </motion.div>
   );

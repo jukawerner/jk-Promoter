@@ -199,9 +199,9 @@ export default function CadastroLojas() {
       )}
 
       <ImportModal
-        open={showImportModal}
+        isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImport={loadStores}
+        onSuccess={loadStores}
       />
     </motion.div>
   );

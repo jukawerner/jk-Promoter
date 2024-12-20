@@ -22,6 +22,14 @@ export interface Store {
 
 export type StoreFormData = Omit<Store, 'id' | 'rede' | 'usuario'>;
 
-export interface StoreImportData extends StoreFormData {
+export interface StoreImportData {
+  nome: string;
+  cnpj: string;
+  cep: string;
+  endereco: string;
+  rede_id: number;
+  promotor_id: number | null;
   promotor_apelido?: string | null;
+  latitude?: number;
+  longitude?: number;
 }

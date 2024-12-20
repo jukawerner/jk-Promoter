@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Store, StoreFormData } from '@/types/store';
+import { Store, StoreFormData, StoreImportData } from '@/types/store';
 
 export async function getLojas(): Promise<Store[]> {
   const { data, error } = await supabase
@@ -150,5 +150,47 @@ export async function getPromotores(): Promise<{ id: number; nome: string; apeli
     throw error;
   }
 
+  return data || [];
+}
+
+export async function importLojas(lojas: StoreImportData[]): Promise<Store[]> {
+  console.log('Iniciando importação de lojas:', lojas);
+  
+  const { data, error } = await supabase
+    .from("loja")
+    .insert(lojas.map(loja => ({
+      nome: String(loja.nome).trim().toUpperCase(),
+      cnpj: loja.cnpj,
+      endereco: String(loja.endereco).trim().toUpperCase(),
+      numero: "S/N",  // Valor padrão
+      bairro: "NÃO INFORMADO",  // Valor padrão
+      cidade: "NÃO INFORMADO",  // Valor padrão
+      uf: "SC",  // Valor padrão
+      cep: loja.cep.replace(/\D/g, ''),
+      rede_id: Number(loja.rede_id),
+      promotor_id: loja.promotor_id === null ? null : Number(loja.promotor_id),
+      latitude: Number(loja.latitude) || -23.5505,
+      longitude: Number(loja.longitude) || -46.6333,
+    })))
+    .select(`
+      *,
+      usuario:promotor_id (
+        id,
+        nome,
+        apelido,
+        avatar_url
+      ),
+      rede:rede_id (
+        id,
+        nome
+      )
+    `);
+
+  if (error) {
+    console.error('Erro ao importar lojas:', error);
+    throw new Error(`Erro ao importar lojas: ${error.message}`);
+  }
+
+  console.log('Lojas importadas com sucesso:', data);
   return data || [];
 }

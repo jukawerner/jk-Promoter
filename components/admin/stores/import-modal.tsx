@@ -75,14 +75,35 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
   const formatCNPJ = (cnpj: string) => {
     if (!cnpj) return '';
-    cnpj = cnpj.replace(/\D/g, '');
-    return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+    // Remove tudo que não é número
+    const numbers = cnpj.replace(/\D/g, '').trim();
+    // Se não tiver números suficientes, retorna vazio
+    if (numbers.length < 14) return '';
+    // Pega apenas os primeiros 14 dígitos
+    const formatted = numbers.slice(0, 14);
+    // Formata como XX.XXX.XXX/XXXX-XX
+    return formatted.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
   };
 
   const formatCEP = (cep: string) => {
     if (!cep) return '';
-    cep = cep.replace(/\D/g, '');
-    return cep.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+    // Remove tudo que não é número
+    const numbers = cep.replace(/\D/g, '').trim();
+    // Se não tiver números suficientes, retorna vazio
+    if (numbers.length < 8) return '';
+    // Pega apenas os primeiros 8 dígitos
+    const formatted = numbers.slice(0, 8);
+    // Formata como XXXXX-XXX
+    return formatted.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+  };
+
+  const formatText = (text: string) => {
+    if (!text) return '';
+    return text.trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\s+/g, ' '); // Remove espaços extras
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,26 +132,45 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
           for (let i = 0; i < jsonData.length; i++) {
             const row: any = jsonData[i];
+            console.log('Processando linha:', row); // Log para debug
+
             try {
-              const nome = row['Nome'] || row['NOME'] || row['nome'] || '';
-              const rede = row['Rede'] || row['REDE'] || row['rede'] || '';
-              const cnpj = row['CNPJ'] || row['cnpj'] || '';
-              const endereco = row['Endereço'] || row['ENDERECO'] || row['endereco'] || '';
-              const numero = row['Número'] || row['NUMERO'] || row['numero'] || '';
-              const bairro = row['Bairro'] || row['BAIRRO'] || row['bairro'] || '';
-              const cidade = row['Cidade'] || row['CIDADE'] || row['cidade'] || '';
-              const uf = row['UF'] || row['uf'] || '';
-              const cep = row['CEP'] || row['cep'] || '';
-              const promotorNome = row['Promotor'] || row['PROMOTOR'] || row['promotor'] || '';
+              // Função auxiliar para buscar valor em diferentes variações de nome de coluna
+              const getColumnValue = (baseNames: string[]): string => {
+                const variations = baseNames.reduce((acc: string[], base) => [
+                  ...acc,
+                  base,
+                  base.toUpperCase(),
+                  base.toLowerCase(),
+                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, ''), // sem acentos
+                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(),
+                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+                ], []);
 
-              if (!nome || !rede || !endereco || !cidade || !uf) {
-                throw new Error('Campos obrigatórios não preenchidos');
-              }
+                for (const variant of variations) {
+                  if (row[variant] !== undefined && row[variant] !== null) {
+                    return String(row[variant]);
+                  }
+                }
+                return '';
+              };
 
-              // Busca o ID da rede
-              const rede_id = await getRedeIdByNome(rede);
-              if (!rede_id) {
-                throw new Error(`Rede não encontrada: ${rede}`);
+              const nome = getColumnValue(['Nome', 'NOME DA LOJA', 'LOJA', 'Nome da Loja', 'Loja']);
+              const rede = getColumnValue(['Rede', 'REDE', 'Nome da Rede', 'NOME DA REDE']);
+              const cnpj = getColumnValue(['CNPJ', 'Cnpj']);
+              const endereco = getColumnValue(['Endereco', 'Endereço', 'ENDERECO', 'ENDEREÇO']);
+              const cep = getColumnValue(['CEP', 'Cep']);
+              const promotorNome = getColumnValue(['Promotor', 'PROMOTOR', 'Nome do Promotor', 'NOME DO PROMOTOR']);
+
+              console.log('Valores extraídos:', { nome, rede, cnpj, endereco, cep, promotorNome }); // Log para debug
+
+              // Busca o ID da rede se fornecido
+              let rede_id = null;
+              if (rede) {
+                rede_id = await getRedeIdByNome(rede);
+                if (!rede_id) {
+                  throw new Error(`Rede não encontrada: ${rede}`);
+                }
               }
 
               // Busca o ID do promotor se fornecido
@@ -146,17 +186,15 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
               }
 
               lojas.push({
-                nome: String(nome).toUpperCase(),
+                nome: formatText(nome),
                 cnpj: formatCNPJ(String(cnpj)),
-                endereco: String(endereco).toUpperCase(),
-                numero: String(numero),
-                bairro: String(bairro).toUpperCase(),
-                cidade: String(cidade).toUpperCase(),
-                uf: String(uf).toUpperCase(),
+                endereco: formatText(endereco),
                 cep: formatCEP(String(cep)),
                 rede_id,
                 promotor_id,
-                promotor_apelido,
+                promotor_apelido: promotor_apelido ? formatText(promotor_apelido) : null,
+                latitude: -23.5505,
+                longitude: -46.6333,
               });
             } catch (error) {
               erros.push({
@@ -201,12 +239,10 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const handleImport = async () => {
     try {
       setStep('importing');
-      // Remove o campo promotor_apelido antes de inserir no banco
-      const lojasParaInserir = lojasParaImportar.map(({ promotor_apelido, ...loja }) => loja);
-      
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("loja")
-        .insert(lojasParaInserir);
+        .insert(lojasParaImportar.map(({ promotor_apelido, ...loja }) => loja))
+        .select();
 
       if (error) {
         console.error("Erro ao importar lojas:", error);
@@ -293,10 +329,6 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                     <TableHead>Nome</TableHead>
                     <TableHead>CNPJ</TableHead>
                     <TableHead>Endereço</TableHead>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Bairro</TableHead>
-                    <TableHead>Cidade</TableHead>
-                    <TableHead>UF</TableHead>
                     <TableHead>CEP</TableHead>
                     <TableHead>Promotor</TableHead>
                   </TableRow>
@@ -307,10 +339,6 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                       <TableCell>{loja.nome}</TableCell>
                       <TableCell>{loja.cnpj}</TableCell>
                       <TableCell>{loja.endereco}</TableCell>
-                      <TableCell>{loja.numero}</TableCell>
-                      <TableCell>{loja.bairro}</TableCell>
-                      <TableCell>{loja.cidade}</TableCell>
-                      <TableCell>{loja.uf}</TableCell>
                       <TableCell>{loja.cep}</TableCell>
                       <TableCell>{loja.promotor_apelido || '-'}</TableCell>
                     </TableRow>
@@ -353,16 +381,12 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                   Faça o upload de um arquivo Excel (.xlsx) com as seguintes colunas:
                 </p>
                 <ul className="text-sm text-gray-500 list-disc list-inside">
-                  <li>Nome (obrigatório)</li>
-                  <li>Rede (obrigatório - nome da rede cadastrada)</li>
+                  <li>Nome</li>
+                  <li>Rede (nome da rede cadastrada)</li>
                   <li>CNPJ</li>
-                  <li>Endereço (obrigatório)</li>
-                  <li>Número</li>
-                  <li>Bairro</li>
-                  <li>Cidade (obrigatório)</li>
-                  <li>UF (obrigatório - 2 caracteres)</li>
+                  <li>Endereço</li>
                   <li>CEP</li>
-                  <li>Promotor (opcional - apelido do promotor cadastrado)</li>
+                  <li>Promotor (apelido do promotor cadastrado)</li>
                 </ul>
               </div>
               <div className="flex justify-center">
