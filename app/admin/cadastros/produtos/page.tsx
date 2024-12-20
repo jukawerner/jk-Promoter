@@ -9,7 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { createProduto, getProdutos, updateProduto, deleteProduto } from "@/lib/actions/produto";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
-import { Pencil, Trash2, Upload } from "lucide-react";
+import { Pencil, Trash2, Upload, Plus, Search } from "lucide-react";
 
 interface Produto {
   id: number;
@@ -80,6 +80,23 @@ export default function ProdutosPage() {
         console.error("Erro ao excluir produto:", error);
         toast.error("Erro ao excluir produto");
       }
+    }
+  };
+
+  const handleImportProducts = async (produtos: Produto[]) => {
+    try {
+      setIsLoading(true);
+      for (const produtoData of produtos) {
+        await createProduto(produtoData);
+      }
+      toast.success(`${produtos.length} produtos importados com sucesso!`);
+      setShowImportModal(false);
+      await loadProdutos(); // Recarrega a lista
+    } catch (error) {
+      toast.error("Erro ao importar produtos");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -174,28 +191,41 @@ export default function ProdutosPage() {
 
   return (
     <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-4">Produtos</h1>
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex-1 max-w-md">
-            <Input
-              placeholder="Pesquisar por produto, família ou marca..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Importar Excel
-            </Button>
-            <Button onClick={() => setShowForm(true)}>Novo Produto</Button>
-          </div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
+          <p className="text-muted-foreground">
+            Gerencie os produtos do sistema
+          </p>
         </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowImportModal(true)}
+            variant="outline"
+            disabled={isLoading}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar Excel
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingProduto(null);
+              setShowForm(true);
+            }}
+            disabled={isLoading}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Produto
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 max-w-md">
+        <Input
+          placeholder="Pesquisar por produto, família ou marca..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       <DataTable
@@ -204,11 +234,13 @@ export default function ProdutosPage() {
         loading={isLoading}
       />
 
-      <ImportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSuccess={loadProdutos}
-      />
+      {showImportModal && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onConfirm={handleImportProducts}
+        />
+      )}
     </div>
   );
 }
