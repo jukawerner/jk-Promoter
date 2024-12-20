@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { UserAvatar } from "@/components/user-avatar";
 
 export function Sidebar() {
   const menuItems = [
@@ -56,6 +57,10 @@ export function Sidebar() {
         >
           <LayoutDashboard className="h-6 w-6" />
         </motion.div>
+      </div>
+
+      <div className="flex items-center justify-center p-4">
+        <UserAvatar />
       </div>
 
       <nav className="flex-1 p-4 space-y-2">

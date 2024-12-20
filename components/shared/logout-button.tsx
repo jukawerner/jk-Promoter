@@ -9,6 +9,7 @@ export default function LogoutButton() {
   const router = useRouter();
 
   const handleLogout = () => {
+    localStorage.removeItem("userPhone");
     toast.success("Logout realizado com sucesso!");
     router.push("/");
   };

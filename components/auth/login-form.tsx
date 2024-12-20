@@ -59,6 +59,10 @@ export default function LoginForm() {
         return;
       }
 
+      // Salva o telefone no localStorage
+      const cleanPhone = phone.replace(/\D/g, '');
+      localStorage.setItem("userPhone", cleanPhone);
+
       if (userType?.toUpperCase() === 'ADMIN') {
         toast.success("Login realizado com sucesso! Redirecionando...");
         router.push("/admin");
