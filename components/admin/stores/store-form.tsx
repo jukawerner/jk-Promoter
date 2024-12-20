@@ -27,7 +27,7 @@ const formSchema = z.object({
   uf: z.string().length(2, "UF deve ter 2 caracteres"),
   cep: z.string().min(1, "CEP é obrigatório"),
   rede_id: z.number().min(1, "Rede é obrigatória"),
-  promotor_id: z.string().nullable(),
+  promotor_id: z.number().nullable(),
 });
 
 interface StoreFormProps {
@@ -42,7 +42,7 @@ interface Rede {
 }
 
 interface Promotor {
-  id: string;
+  id: number;
   nome: string;
   apelido: string;
 }
@@ -139,7 +139,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       onSave({
         ...data,
         cnpj: data.cnpj || "",
-        promotor_id: data.promotor_id === "null" ? null : data.promotor_id,
+        promotor_id: data.promotor_id === null ? null : Number(data.promotor_id),
       });
     } catch (error) {
       console.error("Erro ao salvar loja:", error);
@@ -273,13 +273,14 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         <div className="space-y-2">
           <Label htmlFor="promotor_id">Promotor</Label>
           <Select
-            onValueChange={(value) => setValue("promotor_id", value)}
+            onValueChange={(value) => setValue("promotor_id", value === "null" ? null : Number(value))}
             value={watch("promotor_id")?.toString() || ""}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um promotor" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="null">Sem promotor</SelectItem>
               {promotores.map((promotor) => (
                 <SelectItem key={promotor.id} value={promotor.id.toString()}>
                   {promotor.apelido}

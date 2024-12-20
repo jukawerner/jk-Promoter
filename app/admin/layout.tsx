@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { Sidebar } from "@/components/admin/sidebar/sidebar";
-import LogoutButton from "@/components/shared/logout-button";
 
 export default function AdminLayout({
   children,
@@ -18,9 +17,6 @@ export default function AdminLayout({
         transition={{ duration: 0.3 }}
         className="flex-1 p-8 transition-all duration-300"
       >
-        <div className="flex justify-end mb-8">
-          <LogoutButton />
-        </div>
         {children}
       </motion.div>
     </div>

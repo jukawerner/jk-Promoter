@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { StoreCard } from "@/components/promoter/store-card";
 import { BrandsPage } from "@/components/promoter/brands-page";
@@ -15,61 +15,101 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
-// Dados mockados para exemplo
-const mockStores = [
-  {
-    id: 1,
-    rede: "Rede A",
-    loja: "Loja A1",
-    endereco: "Av. Paulista, 1000, São Paulo",
-    status: "active",
-    ultimaVisita: "2024-12-05",
-    marcas: [
-      { id: 1, nome: "Marca A", avatar: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=64&h=64&fit=crop&q=80" },
-      { id: 2, nome: "Marca B", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop&q=80" },
-    ]
-  },
-  {
-    id: 2,
-    rede: "Rede B",
-    loja: "Loja B1",
-    endereco: "Rua Augusta, 500, São Paulo",
-    status: "pending",
-    ultimaVisita: "2024-12-04",
-    marcas: [
-      { id: 1, nome: "Marca A", avatar: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=64&h=64&fit=crop&q=80" },
-      { id: 3, nome: "Marca C", avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=64&h=64&fit=crop&q=80" },
-    ]
-  },
-];
-
-const networks = Array.from(new Set(mockStores.map(store => store.rede)));
+interface Store {
+  id: number;
+  nome: string;
+  rede: { nome: string };
+  endereco: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+}
 
 export default function PromotorPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [networks, setNetworks] = useState<string[]>([]);
 
-  // Simulate loading
-  useState(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
-  });
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const phone = localStorage.getItem("userPhone");
+        if (!phone) {
+          toast.error("Usuário não está logado");
+          return;
+        }
+
+        // Primeiro, busca o ID do promotor pelo telefone
+        const { data: userData, error: userError } = await supabase
+          .from("usuario")
+          .select("id")
+          .eq("telefone", phone)
+          .single();
+
+        if (userError) throw userError;
+        if (!userData) {
+          toast.error("Usuário não encontrado");
+          return;
+        }
+
+        console.log("ID do promotor:", userData.id);
+
+        // Depois, busca as lojas vinculadas ao promotor
+        const { data: storesData, error: storesError } = await supabase
+          .from("loja")
+          .select(`
+            id,
+            nome,
+            endereco,
+            numero,
+            bairro,
+            cidade,
+            uf,
+            rede:rede_id ( nome )
+          `)
+          .eq("promotor_id", userData.id);
+
+        if (storesError) {
+          console.error("Erro ao buscar lojas:", storesError);
+          throw storesError;
+        }
+
+        console.log("Lojas encontradas:", storesData);
+
+        setStores(storesData || []);
+        // Extrai as redes únicas das lojas
+        const uniqueNetworks = Array.from(new Set(storesData?.map(store => store.rede.nome) || []));
+        setNetworks(uniqueNetworks);
+      } catch (error) {
+        console.error("Erro ao carregar lojas:", error);
+        toast.error("Erro ao carregar lojas");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStores();
+  }, []);
 
   const filteredStores = useMemo(() => {
-    return mockStores.filter(store => {
+    return stores.filter(store => {
       const matchesSearch = 
-        store.loja.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
         store.endereco.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesNetwork = !selectedNetwork || store.rede === selectedNetwork;
+      const matchesNetwork = !selectedNetwork || store.rede.nome === selectedNetwork;
       return matchesSearch && matchesNetwork;
     });
-  }, [searchQuery, selectedNetwork]);
+  }, [searchQuery, selectedNetwork, stores]);
 
-  const handleStoreClick = (store: typeof mockStores[0]) => {
-    localStorage.setItem("redeSelected", store.rede);
-    localStorage.setItem("lojaSelected", store.loja);
+  const handleStoreClick = (store: Store) => {
+    localStorage.setItem("redeSelected", store.rede.nome);
+    localStorage.setItem("lojaSelected", store.nome);
   };
 
   const handleClearFilters = () => {
@@ -163,11 +203,25 @@ export default function PromotorPage() {
                   ) : filteredStores.length > 0 ? (
                     // Store cards
                     filteredStores.map((store) => (
-                      <StoreCard
+                      <motion.div
                         key={store.id}
-                        store={store}
-                        onClick={() => handleStoreClick(store)}
-                      />
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <StoreCard
+                          store={{
+                            id: store.id,
+                            rede: store.rede.nome,
+                            loja: store.nome,
+                            endereco: `${store.endereco}, ${store.numero}, ${store.bairro}, ${store.cidade} - ${store.uf}`,
+                            status: "pending",
+                            ultimaVisita: new Date().toISOString(),
+                            marcas: []
+                          }}
+                          onClick={() => handleStoreClick(store)}
+                        />
+                      </motion.div>
                     ))
                   ) : (
                     // Empty state
@@ -181,15 +235,8 @@ export default function PromotorPage() {
                         Nenhuma loja encontrada
                       </h3>
                       <p className="text-gray-500 mt-1">
-                        Tente ajustar seus filtros de busca
+                        Tente ajustar os filtros de busca
                       </p>
-                      <Button
-                        variant="outline"
-                        onClick={handleClearFilters}
-                        className="mt-4"
-                      >
-                        Limpar filtros
-                      </Button>
                     </motion.div>
                   )}
                 </AnimatePresence>

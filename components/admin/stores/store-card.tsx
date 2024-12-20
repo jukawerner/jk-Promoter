@@ -59,14 +59,14 @@ export function StoreCard({ store, onEdit, onDelete }: StoreCardProps) {
           <span className="font-medium">CEP:</span> {store.cep}
         </p>
         {store.usuario && (
-          <div className="flex items-center gap-2 mt-4">
+          <div className="flex items-center gap-2 mt-4 border-t pt-4">
             <Avatar className="h-8 w-8">
               <AvatarImage src={store.usuario.avatar_url} alt={store.usuario.apelido} />
               <AvatarFallback>
                 <User className="h-4 w-4" />
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm text-gray-600">{store.usuario.apelido}</span>
+            <span className="text-sm font-medium text-gray-700">{store.usuario.apelido}</span>
           </div>
         )}
       </div>

@@ -9,13 +9,13 @@ export interface Store {
   uf: string;
   cep: string;
   rede_id: number;
-  promotor_id: string | null;
+  promotor_id: number | null;
   rede?: {
     id: number;
     nome: string;
   };
   usuario?: {
-    id: string;
+    id: number;
     nome: string;
     apelido: string;
     avatar_url: string;

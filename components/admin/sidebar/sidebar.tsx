@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   BarChart3,
   LayoutDashboard,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -18,8 +19,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function Sidebar() {
+  const router = useRouter();
   const menuItems = [
     {
       icon: <ClipboardList className="h-5 w-5" />,
@@ -42,6 +46,12 @@ export function Sidebar() {
       href: "/admin/relatorios",
     },
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem("userPhone");
+    toast.success("Logout realizado com sucesso!");
+    router.push("/");
+  };
 
   return (
     <motion.div
@@ -84,6 +94,26 @@ export function Sidebar() {
           ))}
         </TooltipProvider>
       </nav>
+
+      <div className="p-4">
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleLogout}
+                className={cn(
+                  "flex items-center justify-center p-3 w-full text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                )}
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-gray-900 text-white">
+              <p>Sair</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </motion.div>
   );
 }

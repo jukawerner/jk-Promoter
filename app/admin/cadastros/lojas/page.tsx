@@ -42,6 +42,7 @@ export default function CadastroLojas() {
           usuario:promotor_id (
             id,
             nome,
+            apelido,
             avatar_url
           ),
           rede:rede_id (
@@ -185,11 +186,17 @@ export default function CadastroLojas() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          aria-describedby="store-form-description"
+        >
           <DialogHeader>
             <DialogTitle>
               {selectedStore ? "Editar Loja" : "Nova Loja"}
             </DialogTitle>
+            <p id="store-form-description" className="text-sm text-gray-500">
+              {selectedStore ? "Edite os dados da loja selecionada" : "Preencha os dados para criar uma nova loja"}
+            </p>
           </DialogHeader>
           <StoreForm
             store={selectedStore}
