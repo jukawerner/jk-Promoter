@@ -113,7 +113,7 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
                 const cleanValue = String(value).replace(/[^\d.]/g, '');
                 return Number(cleanValue) || 0;
               };
-              const codigo_ean = getColumnValue(['Codigo EAN', 'CODIGO EAN', 'EAN', 'Código EAN', 'CÓDIGO EAN', 'Codigo', 'CODIGO']);
+              const codigo_ean = getColumnValue(['Codigo EAN', 'CODIGO EAN', 'EAN', 'Código EAN', 'CÓDIGO EAN', 'Codigo', 'CODIGO', 'codigo_ean', 'CODIGO_EAN']);
               const nome = formatText(getColumnValue(['Nome', 'NOME', 'Produto', 'PRODUTO', 'Nome do Produto', 'NOME DO PRODUTO']));
               const familia = formatText(getColumnValue(['Familia', 'FAMILIA', 'Família', 'FAMÍLIA', 'Categoria', 'CATEGORIA']));
               const unidade = formatText(getColumnValue(['Unidade', 'UNIDADE', 'UN', 'Und', 'UND']));

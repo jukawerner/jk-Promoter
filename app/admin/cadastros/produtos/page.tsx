@@ -36,11 +36,23 @@ export default function ProdutosPage() {
 
   const handleSave = async (data: any) => {
     try {
+      const produtoData = {
+        codigo_ean: data.codigo_ean,
+        nome: data.nome,
+        familia: data.familia,
+        unidade: data.unidade,
+        peso: Number(data.peso),
+        validade: Number(data.validade),
+        marca: data.marca
+      };
+
+      console.log('Dados a serem salvos:', produtoData);
+
       if (editingProduto) {
-        await updateProduto(editingProduto.id, data);
+        await updateProduto(editingProduto.id, produtoData);
         toast.success("Produto atualizado com sucesso!");
       } else {
-        await createProduto(data);
+        await createProduto(produtoData);
         toast.success("Produto criado com sucesso!");
       }
       setShowForm(false);
@@ -75,25 +87,29 @@ export default function ProdutosPage() {
       setIsLoading(true);
       console.log('Produtos a serem importados:', produtos);
       const mappedProdutos = produtos.map(p => ({
-        codigo_ean: p.ean,
+        codigo_ean: p.codigo_ean,
         nome: p.nome,
         familia: p.familia,
         unidade: p.unidade,
         peso: p.peso,
         validade: p.validade,
-        marca_id: parseInt(p.marca)
+        marca: p.marca
       }));
+
+      console.log('Produtos mapeados:', mappedProdutos);
 
       for (const produto of mappedProdutos) {
         await createProduto(produto);
       }
 
       toast.success('Produtos importados com sucesso!');
+      loadProdutos(); // Recarrega a lista após importação
     } catch (error) {
       console.error('Erro ao importar produtos:', error);
       toast.error('Erro ao importar produtos');
     } finally {
       setIsLoading(false);
+      setShowImportModal(false);
     }
   };
 
@@ -107,7 +123,7 @@ export default function ProdutosPage() {
     const searchLower = searchTerm.toLowerCase();
     return (
       produto.nome.toLowerCase().includes(searchLower) ||
-      (produto.marca?.nome?.toLowerCase() || '').includes(searchLower)
+      produto.marca.toLowerCase().includes(searchLower)
     );
   });
 
@@ -127,13 +143,13 @@ export default function ProdutosPage() {
                   setEditingProduto(null);
                 }}
                 initialData={editingProduto ? {
-                  ean: editingProduto.codigo_ean || '',
+                  codigo_ean: editingProduto.codigo_ean || '',
                   nome: editingProduto.nome,
                   familia: editingProduto.familia,
                   unidade: editingProduto.unidade as 'UN' | 'KG',
                   peso: editingProduto.peso,
                   validade: editingProduto.validade,
-                  marca: editingProduto.marca_id.toString()
+                  marca: editingProduto.marca
                 } : undefined}
               />
             </div>
@@ -197,7 +213,7 @@ export default function ProdutosPage() {
               <tr key={produto.id}>
                 <td className="border px-4 py-2">{produto.codigo_ean}</td>
                 <td className="border px-4 py-2">{produto.nome}</td>
-                <td className="border px-4 py-2">{produto.marca?.nome || 'Sem marca'}</td>
+                <td className="border px-4 py-2">{produto.marca}</td>
                 <td className="border px-4 py-2">
                   <div className="flex gap-2">
                     <Button

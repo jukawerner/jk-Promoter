@@ -18,7 +18,7 @@ import { getMarcas } from '@/lib/actions/produto'
 import { toast } from 'sonner'
 
 const productSchema = z.object({
-  ean: z.string()
+  codigo_ean: z.string()
     .min(8, 'O código EAN deve ter pelo menos 8 dígitos')
     .max(14, 'O código EAN deve ter no máximo 14 dígitos')
     .regex(/^\d+$/, 'O código EAN deve conter apenas números'),
@@ -33,7 +33,7 @@ const productSchema = z.object({
   }),
   peso: z.number().min(0, 'Peso deve ser maior que 0'),
   validade: z.number().min(0, 'Validade deve ser maior que 0'),
-  marca: z.coerce.string({
+  marca: z.string({
     required_error: 'Selecione uma marca',
   }),
 })
@@ -61,10 +61,11 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: initialData || {
-      ean: '',
+      codigo_ean: '',
       nome: '',
       familia: '',
       unidade: 'UN',
@@ -93,25 +94,36 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
 
   const onSubmit = async (data: ProductFormData) => {
     try {
-      await onSave(data)
-      reset()
+      console.log('Dados do formulário:', data)
+      const produtoData = {
+        codigo_ean: data.codigo_ean,
+        nome: data.nome,
+        familia: data.familia,
+        unidade: data.unidade,
+        peso: data.peso,
+        validade: data.validade,
+        marca: data.marca
+      };
+      console.log('Dados mapeados:', produtoData);
+      await onSave(produtoData);
+      reset();
     } catch (error) {
-      console.error('Erro ao salvar produto:', error)
-      toast.error('Erro ao salvar produto')
+      console.error('Erro ao salvar produto:', error);
+      toast.error('Erro ao salvar produto');
     }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <Label htmlFor="ean">Código EAN</Label>
+        <Label htmlFor="codigo_ean">Código EAN</Label>
         <Input
-          id="ean"
-          {...register('ean')}
+          id="codigo_ean"
+          {...register('codigo_ean')}
           placeholder="Digite o código EAN"
         />
-        {errors.ean && (
-          <p className="text-sm text-red-500 mt-1">{errors.ean.message}</p>
+        {errors.codigo_ean && (
+          <p className="text-sm text-red-500 mt-1">{errors.codigo_ean.message}</p>
         )}
       </div>
 
@@ -183,13 +195,16 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
 
       <div>
         <Label htmlFor="marca">Marca</Label>
-        <Select onValueChange={(value) => setValue('marca', value)}>
+        <Select 
+          defaultValue={watch('marca')}
+          onValueChange={(value) => setValue('marca', value)}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Selecione a marca" />
           </SelectTrigger>
           <SelectContent>
             {marcas.map((marca) => (
-              <SelectItem key={marca.id} value={marca.id.toString()}>
+              <SelectItem key={marca.id} value={marca.nome}>
                 {marca.nome}
               </SelectItem>
             ))}
@@ -200,11 +215,15 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
         )}
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit">
           Salvar
         </Button>
       </div>

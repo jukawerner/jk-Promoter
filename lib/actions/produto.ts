@@ -2,27 +2,41 @@ import { supabase } from '@/lib/supabase'
 
 export interface Produto {
   id: number
-  codigo_ean?: string
+  codigo_ean: string
   nome: string
   familia: string
   unidade: string
   peso: number
   validade: number
-  marca_id: number
-  marca?: {
-    nome: string
-  }
+  marca: string
   created_at?: string
   updated_at?: string
 }
 
-export type CreateProdutoInput = Omit<Produto, 'id' | 'created_at' | 'updated_at' | 'marca'>
+export type CreateProdutoInput = {
+  codigo_ean: string
+  nome: string
+  familia: string
+  unidade: string
+  peso: number
+  validade: number
+  marca: string
+}
 
 export async function createProduto(data: CreateProdutoInput): Promise<Produto> {
+  console.log('Dados recebidos para criar produto:', data)
   const { data: produto, error } = await supabase
     .from("produto")
-    .insert([data])
-    .select("*, marca(nome)")
+    .insert([{
+      codigo_ean: data.codigo_ean,
+      nome: data.nome,
+      familia: data.familia,
+      unidade: data.unidade,
+      peso: data.peso,
+      validade: data.validade,
+      marca: data.marca
+    }])
+    .select()
     .single()
 
   if (error) {
@@ -36,7 +50,7 @@ export async function getProdutos(): Promise<Produto[]> {
   console.log('Buscando produtos...')
   const { data, error } = await supabase
     .from("produto")
-    .select("*, marca(nome)")
+    .select("*")
     .order("nome")
 
   if (error) {
@@ -51,9 +65,12 @@ export async function getProdutos(): Promise<Produto[]> {
 export async function updateProduto(id: number, data: Partial<CreateProdutoInput>): Promise<Produto> {
   const { data: produto, error } = await supabase
     .from("produto")
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update({
+      ...data,
+      updated_at: new Date().toISOString()
+    })
     .eq("id", id)
-    .select("*, marca(nome)")
+    .select()
     .single()
 
   if (error) {
