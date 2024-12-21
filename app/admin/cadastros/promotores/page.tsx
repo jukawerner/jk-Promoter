@@ -69,19 +69,23 @@ export default function CadastroPromotor() {
       
       console.log('Dados para salvar:', userData);
 
-      let savedUser;
+      let savedUser: Usuario | null = null;
       if (editingPromoter) {
         console.log('Atualizando usuário existente...');
         savedUser = await updateUsuario(editingPromoter.id, userData);
         // Atualiza o usuário localmente para evitar reload
-        setPromoters(prev => prev.map(p => 
-          p.id === editingPromoter.id ? savedUser : p
-        ));
+        if (savedUser) {
+          setPromoters(prev => prev.map(p => 
+            p.id === editingPromoter.id ? savedUser as Usuario : p
+          ));
+        }
       } else {
         console.log('Criando novo usuário...');
         savedUser = await createUsuario(userData);
         // Adiciona o novo usuário localmente para evitar reload
-        setPromoters(prev => [...prev, savedUser]);
+        if (savedUser) {
+          setPromoters(prev => [...prev, savedUser as Usuario]);
+        }
       }
       
       console.log('Usuário salvo:', savedUser);

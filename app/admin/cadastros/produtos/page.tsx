@@ -70,94 +70,75 @@ export default function ProdutosPage() {
     }
   };
 
-  const handleImportProducts = async (produtos: Produto[]) => {
+  const handleImportProducts = async (produtos: any[]) => {
     try {
       setIsLoading(true);
-      for (const produtoData of produtos) {
-        await createProduto(produtoData);
+      console.log('Produtos a serem importados:', produtos);
+      const mappedProdutos = produtos.map(p => ({
+        codigo_ean: p.ean,
+        nome: p.nome,
+        familia: p.familia,
+        unidade: p.unidade,
+        peso: p.peso,
+        validade: p.validade,
+        marca_id: parseInt(p.marca)
+      }));
+
+      for (const produto of mappedProdutos) {
+        await createProduto(produto);
       }
-      toast.success(`${produtos.length} produtos importados com sucesso!`);
-      setShowImportModal(false);
+
+      toast.success('Produtos importados com sucesso!');
     } catch (error) {
-      toast.error("Erro ao importar produtos");
-      console.error(error);
+      console.error('Erro ao importar produtos:', error);
+      toast.error('Erro ao importar produtos');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleImportSuccess = async () => {
+    setShowImportModal(false);
     await loadProdutos(); // Recarrega a lista após importação bem-sucedida
   };
 
-  const columns = [
-    {
-      accessorKey: "codigo_ean",
-      header: "Código EAN",
-    },
-    {
-      accessorKey: "nome",
-      header: "Nome",
-    },
-    {
-      accessorKey: "marca.nome",
-      header: "Marca",
-    },
-    {
-      id: "actions",
-      header: "Ações",
-      cell: ({ row }) => {
-        const produto = row.original;
-        return (
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleEdit(produto)}
-              className="h-8 w-8 p-0"
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleDelete(produto.id)}
-              className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Excluir</span>
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
-
   const filteredProdutos = produtos.filter((produto) => {
+    if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
       produto.nome.toLowerCase().includes(searchLower) ||
-      produto.marca.nome.toLowerCase().includes(searchLower)
+      (produto.marca?.nome?.toLowerCase() || '').includes(searchLower)
     );
   });
 
   if (showForm) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-4">
-            {editingProduto ? "Editar Produto" : "Novo Produto"}
-          </h1>
-          <ProductForm
-            onSave={handleSave}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingProduto(null);
-            }}
-            initialData={editingProduto}
-          />
-        </div>
+      <div className="container mx-auto py-10">
+        {showForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h1 className="text-2xl font-bold mb-4">
+                {editingProduto ? "Editar Produto" : "Novo Produto"}
+              </h1>
+              <ProductForm
+                onSave={handleSave}
+                onCancel={() => {
+                  setShowForm(false);
+                  setEditingProduto(null);
+                }}
+                initialData={editingProduto ? {
+                  ean: editingProduto.codigo_ean || '',
+                  nome: editingProduto.nome,
+                  familia: editingProduto.familia,
+                  unidade: editingProduto.unidade as 'UN' | 'KG',
+                  peso: editingProduto.peso,
+                  validade: editingProduto.validade,
+                  marca: editingProduto.marca_id.toString()
+                } : undefined}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -216,7 +197,7 @@ export default function ProdutosPage() {
               <tr key={produto.id}>
                 <td className="border px-4 py-2">{produto.codigo_ean}</td>
                 <td className="border px-4 py-2">{produto.nome}</td>
-                <td className="border px-4 py-2">{produto.marca.nome}</td>
+                <td className="border px-4 py-2">{produto.marca?.nome || 'Sem marca'}</td>
                 <td className="border px-4 py-2">
                   <div className="flex gap-2">
                     <Button
@@ -249,8 +230,10 @@ export default function ProdutosPage() {
         <ImportModal
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
-          onConfirm={handleImportProducts}
-          onSuccess={handleImportSuccess}
+          onConfirm={async (produtos) => {
+            await handleImportProducts(produtos);
+            await handleImportSuccess();
+          }}
         />
       )}
     </div>
