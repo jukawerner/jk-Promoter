@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreForm } from "@/components/admin/stores/store-form";
-import { StoreFilter } from "@/components/admin/stores/store-filter";
 import { ImportModal } from "@/components/admin/stores/import-modal";
 import { Plus, Upload, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -58,8 +57,8 @@ export default function CadastroLojas() {
       setIsLoading(true);
       console.log('Dados recebidos do formulário:', storeData);
 
-      let savedStore;
-      if (selectedStore) {
+      let savedStore: Store | null = null;
+      if (selectedStore && selectedStore.id) {
         console.log('Atualizando loja existente...');
         savedStore = await updateLoja(selectedStore.id, storeData);
         setStores(prev => prev.map(p => 

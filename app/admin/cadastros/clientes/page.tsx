@@ -11,47 +11,9 @@ import { ExcelUpload } from "@/components/admin/stores/excel-upload";
 
 import { Store, StoreFormData } from "types/store";
 
-// Dados de exemplo para teste
-const INITIAL_STORES: Store[] = [
-  {
-    id: 1,
-    nome: "Filial Centro",
-    cnpj: "12.345.678/0001-90",
-    endereco: "Rua das Flores",
-    numero: "123",
-    bairro: "Centro",
-    cidade: "São Paulo",
-    cep: "01234-567",
-    uf: "SP",
-    rede_id: 1,
-    promotor_id: null,
-    rede: {
-      id: 1,
-      nome: "Supermercado ABC"
-    }
-  },
-  {
-    id: 2,
-    nome: "Unidade Jardins",
-    cnpj: "98.765.432/0001-21",
-    endereco: "Av. Paulista",
-    numero: "1000",
-    bairro: "Jardins",
-    cidade: "São Paulo",
-    cep: "04567-890",
-    uf: "SP",
-    rede_id: 2,
-    promotor_id: null,
-    rede: {
-      id: 2,
-      nome: "Mercado XYZ"
-    }
-  }
-];
-
 export default function CadastroLojas() {
   const [showForm, setShowForm] = useState(false);
-  const [stores, setStores] = useState<Store[]>(INITIAL_STORES);
+  const [stores, setStores] = useState<Store[]>([]);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [filters, setFilters] = useState({
     search: ""

@@ -72,8 +72,8 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
       cep: "",
       rede_id: undefined,
       promotor_id: null,
-      latitude: -23.5505,
-      longitude: -46.6333,
+      latitude: undefined,
+      longitude: undefined,
     },
   });
 

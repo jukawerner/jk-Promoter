@@ -68,8 +68,8 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
       nome: '',
       familia: '',
       unidade: 'UN',
-      peso: 0,
-      validade: 0,
+      peso: undefined,
+      validade: undefined,
       marca: '',
     },
   })
