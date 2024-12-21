@@ -30,28 +30,52 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
 
   const startCamera = async () => {
     try {
-      // Request the highest possible resolution
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         video: {
-          facingMode: "environment",
+          facingMode: { exact: "environment" },
           width: { ideal: 4096 },
-          height: { ideal: 2160 }
+          height: { ideal: 3072 },
+          frameRate: { ideal: 60 }
         },
         audio: false
-      });
-      
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setIsVideoReady(true);
-        };
+      };
+
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        handleStreamSuccess(mediaStream);
+      } catch (err) {
+        console.warn('Failed to get environment camera, trying without exact constraint:', err);
+        // Fallback to any available camera if environment camera fails
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 4096 },
+            height: { ideal: 3072 }
+          },
+          audio: false
+        });
+        handleStreamSuccess(fallbackStream);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast.error('Erro ao acessar a câmera. Verifique as permissões.');
       onClose();
+    }
+  };
+
+  const handleStreamSuccess = (mediaStream: MediaStream) => {
+    setStream(mediaStream);
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      // Log camera capabilities
+      const track = mediaStream.getVideoTracks()[0];
+      console.log('Camera capabilities:', track.getCapabilities());
+      console.log('Camera settings:', track.getSettings());
+      
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play();
+        setIsVideoReady(true);
+      };
     }
   };
 
@@ -70,43 +94,47 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
     }
 
     try {
-      const canvas = document.createElement('canvas');
       const video = videoRef.current;
+      const canvas = document.createElement('canvas');
       
-      // Use the actual video dimensions for maximum quality
+      // Use the actual video dimensions
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
+      console.log('Capturing photo with dimensions:', canvas.width, 'x', canvas.height);
+      
       const ctx = canvas.getContext('2d', { 
         alpha: false,
-        desynchronized: true
+        willReadFrequently: true
       });
       
       if (!ctx) {
         throw new Error('Não foi possível criar contexto do canvas');
       }
 
-      // Flip horizontally if using front camera
-      if (stream?.getVideoTracks()[0].getSettings().facingMode === "user") {
-        ctx.scale(-1, 1);
-        ctx.translate(-canvas.width, 0);
-      }
+      // Draw the video frame to canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Capture in highest quality
-      ctx.drawImage(video, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], `photo-${Date.now()}.jpg`, { 
-            type: 'image/jpeg',
-            lastModified: Date.now()
-          });
-          onCapture(file);
-          onClose();
-        } else {
-          throw new Error('Falha ao criar imagem');
-        }
-      }, 'image/jpeg', 1.0); // Maximum quality (1.0)
+      // Convert to blob with maximum quality
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            // Create file with original dimensions and quality
+            const file = new File([blob], `photo_${canvas.width}x${canvas.height}_${Date.now()}.jpg`, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            
+            console.log('Created image file:', file.name, 'Size:', file.size);
+            onCapture(file);
+            onClose();
+          } else {
+            throw new Error('Falha ao criar imagem');
+          }
+        },
+        'image/jpeg',
+        1.0  // Maximum quality
+      );
     } catch (error) {
       console.error('Erro ao capturar foto:', error);
       toast.error('Erro ao capturar foto. Tente novamente.');

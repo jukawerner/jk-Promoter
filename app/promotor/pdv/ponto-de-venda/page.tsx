@@ -240,16 +240,22 @@ export default function PontoVenda() {
         // Upload de cada imagem
         for (const image of item.imagens) {
           try {
-            // Limpar o nome do arquivo
-            const cleanFileName = image.name.replace(/[^a-zA-Z0-9.]/g, '_');
-            const fileName = `${Date.now()}_${cleanFileName}`;
+            // Limpar o nome do arquivo mantendo as dimensões originais
+            const cleanFileName = `${Date.now()}_${image.size}_${image.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-            // Upload da imagem
+            console.log('Uploading image:', {
+              name: cleanFileName,
+              size: image.size,
+              type: image.type
+            });
+
+            // Upload da imagem com configurações para alta qualidade
             const { error: uploadError } = await supabase.storage
               .from('pdv-photos')
-              .upload(fileName, image, {
+              .upload(cleanFileName, image, {
                 cacheControl: '3600',
-                upsert: false
+                upsert: false,
+                contentType: 'image/jpeg'
               });
 
             if (uploadError) {
@@ -261,8 +267,9 @@ export default function PontoVenda() {
             // Obter URL pública da imagem
             const { data: { publicUrl } } = supabase.storage
               .from('pdv-photos')
-              .getPublicUrl(fileName);
+              .getPublicUrl(cleanFileName);
 
+            console.log('Image uploaded successfully:', publicUrl);
             uploadedUrls.push(publicUrl);
           } catch (imageError) {
             console.error('Erro ao processar imagem:', imageError);
