@@ -5,8 +5,31 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { validateSelect } from "@/lib/utils/validation";
 
-const Select = SelectPrimitive.Root;
+const Select = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & {
+    error?: string;
+    required?: boolean;
+    onValidate?: (error: string | null) => void;
+  }
+>(({ error, required, onValidate, onValueChange, ...props }, ref) => {
+  const handleValueChange = (value: string) => {
+    if (required) {
+      const validationError = validateSelect(value, props.name || 'seleção');
+      if (onValidate) onValidate(validationError);
+    }
+    if (onValueChange) onValueChange(value);
+  };
+
+  return (
+    <SelectPrimitive.Root {...props} ref={ref} onValueChange={handleValueChange}>
+      {props.children}
+    </SelectPrimitive.Root>
+  );
+});
+Select.displayName = SelectPrimitive.Root.displayName;
 
 const SelectGroup = SelectPrimitive.Group;
 

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
 import { Trash2, Download, X, Image, Eye, Presentation } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "components/ui/dialog";
+import { Checkbox } from "components/ui/checkbox";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 
@@ -22,6 +23,16 @@ interface PDV {
   updated_at: string;
   rede?: string;
   loja?: string;
+}
+
+interface RowSelection {
+  [key: string]: boolean;
+}
+
+interface DataTableProps<TData> {
+  columns: ColumnDef<TData>[];
+  data: TData[];
+  loading?: boolean;
 }
 
 interface SupabasePDV {
@@ -94,6 +105,12 @@ export default function PDVPage() {
     dataInicio: null,
     dataFim: null,
   });
+  const [selectedRows, setSelectedRows] = useState<PDV[]>([]);
+  const [selectedCount, setSelectedCount] = useState(0);
+
+  useEffect(() => {
+    setSelectedCount(selectedRows.length);
+  }, [selectedRows]);
 
   useEffect(() => {
     loadPDV();
@@ -116,29 +133,15 @@ export default function PDVPage() {
         throw pdvError;
       }
 
-      const { data: lojaData, error: lojaError } = await supabase
-        .from("loja")
-        .select("id, nome, rede:rede_id(nome)");
-
-      if (lojaError) {
-        console.error("Erro ao buscar lojas:", lojaError);
-        throw lojaError;
-      }
-
-      const lojaMap = new Map(lojaData.map(loja => [
-        loja.id,
-        { nome: loja.nome, rede: loja.rede?.nome }
-      ]));
-
       const formattedData = (pdvData || []).map(item => ({
         id: item.id,
-        marca: item.marca,
+        marca: (item.marca || '').toUpperCase(),
         ponto_extra_conquistado: item.ponto_extra_conquistado,
         fotos: item.fotos || [],
         created_at: item.created_at,
         updated_at: item.updated_at,
-        rede: lojaMap.get(item.loja_id)?.rede || 'N/A',
-        loja: lojaMap.get(item.loja_id)?.nome || 'N/A'
+        rede: (item.rede || 'N/A').toUpperCase(),
+        loja: (item.loja || 'N/A').toUpperCase()
       }));
       
       setPdvCompleto(formattedData);
@@ -172,119 +175,209 @@ export default function PDVPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Tem certeza que deseja excluir este registro de PDV?")) {
-      try {
-        const { error } = await supabase
-          .from("pdv")
-          .delete()
-          .eq("id", id);
+    if (!window.confirm("Tem certeza que deseja excluir este registro?")) {
+      return;
+    }
 
-        if (error) throw error;
-        toast.success("Registro excluído com sucesso!");
-        loadPDV();
-      } catch (error) {
-        console.error("Erro ao excluir registro:", error);
-        toast.error("Erro ao excluir registro");
-      }
+    try {
+      const pdvToDelete = pdvData.find(pdv => pdv.id === id);
+      if (!pdvToDelete?.fotos) return;
+
+      // Excluir fotos do storage
+      await Promise.all(pdvToDelete.fotos.map(async (fotoUrl) => {
+        const fileName = fotoUrl.split('pdv-photos/')[1];
+        await supabase.storage.from('pdv-photos').remove([fileName]);
+      }));
+
+      // Excluir registro do banco
+      await supabase.from("pdv").delete().eq("id", id);
+      
+      toast.success("Registro excluído com sucesso!");
+      loadPDV();
+    } catch (error) {
+      toast.error("Erro ao excluir registro");
     }
   };
 
-  const exportToExcel = () => {
+const exportToExcel = () => {
     try {
-      const dadosExport = pdvData.map((item) => ({
+      if (selectedRows.length === 0) {
+        toast.error("Por favor, selecione pelo menos um item para exportar.");
+        return;
+      }
+
+      const rowsToExport = selectedRows;
+      const dadosExport = rowsToExport.map((item) => ({
         Data: new Date(item.updated_at).toLocaleDateString('pt-BR'),
         Rede: item.rede?.toUpperCase() || 'N/A',
         Loja: item.loja?.toUpperCase() || 'N/A',
         Marca: item.marca.toUpperCase(),
         "Ponto Extra": item.ponto_extra_conquistado ? "SIM" : "NÃO",
-        "Quantidade de Fotos": item.fotos?.length || 0,
+        "Quantidade de Fotos": Array.isArray(item.fotos) ? item.fotos.length : 0,
       }));
 
       const ws = XLSX.utils.json_to_sheet(dadosExport);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "PDV");
-      XLSX.writeFile(wb, "relatorio-pdv.xlsx");
+      
+      // Usar o XLSX.write para gerar o arquivo
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+      
+      // Converter para Blob e criar URL
+      const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Criar link e fazer download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio_pdv_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.click();
+      
+      // Limpar
+      window.URL.revokeObjectURL(url);
       toast.success("Relatório exportado com sucesso!");
     } catch (error) {
-      console.error("Erro ao exportar:", error);
+      console.error("Erro ao exportar para Excel:", error);
       toast.error("Erro ao exportar relatório");
     }
   };
 
-  const exportToPowerPoint = async () => {
+  // Função auxiliar para converter string para ArrayBuffer
+  function s2ab(s: string): ArrayBuffer {
+    const buf = new ArrayBuffer(s.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+    return buf;
+  }
+
+  const exportToPresentation = async (singlePdv?: PDV) => {
+    const toastId = toast.loading("Gerando apresentação...");
+    
     try {
       const pptx = new pptxgen();
+      pptx.layout = 'LAYOUT_16x9';
       
-      // Agrupar dados por marca
-      const groupedByMarca: Record<string, PDV[]> = {};
-      pdvData.forEach(item => {
-        const marca = item.marca || 'Sem Marca';
-        if (!groupedByMarca[marca]) {
-          groupedByMarca[marca] = [];
-        }
-        groupedByMarca[marca].push(item);
-      });
+      // Define margens e espaçamentos padrão
+      const MARGINS = {
+        top: '5%',
+        left: '5%',
+        right: '5%',
+        bottom: '5%'
+      };
+      
+      const rowsToExport = singlePdv 
+        ? [singlePdv] 
+        : (selectedRows.length > 0 ? selectedRows : pdvData);
 
-      // Para cada marca
-      for (const [marca, items] of Object.entries(groupedByMarca)) {
-        // Criar slide de título para a marca
-        const titleSlide = pptx.addSlide();
-        titleSlide.addText(marca.toUpperCase(), {
-          x: 0.5,
-          y: 0.5,
-          w: 9,
-          h: 1,
-          align: "center",
+      toast.loading("Gerando apresentação...", { id: toastId });
+      
+      for (const pdv of rowsToExport) {
+        const slide = pptx.addSlide();
+        
+        // Título com estilo melhorado
+        slide.addText(`PDV - ${pdv.marca}`, {
+          x: MARGINS.left,
+          y: MARGINS.top,
+          w: '90%',
+          h: '8%',
+          fontSize: 32,
           bold: true,
-          color: "363636"
+          color: '363636',
+          align: 'left',
+          fontFace: 'Arial'
         });
 
-        // Para cada item da marca
-        for (const item of items) {
-          if (!item.fotos) continue;
-          
-          // Para cada foto do item
-          for (const foto of item.fotos) {
-            const slide = pptx.addSlide();
-            
-            // Adicionar foto
-            slide.addImage({
-              path: foto,
-              x: 0.5,
-              y: 0.5,
-              w: 9,
-              h: 5,
-              sizing: { type: "contain", w: 9, h: 5 }
-            });
+        // Informações em formato de tabela sem bordas
+        const infoData = [
+          ['Data', new Date(pdv.updated_at).toLocaleDateString('pt-BR')],
+          ['Rede', pdv.rede || 'N/A'],
+          ['Loja', pdv.loja || 'N/A'],
+          ['Marca', pdv.marca],
+          ['Ponto Extra', pdv.ponto_extra_conquistado ? "SIM" : "NÃO"]
+        ];
 
-            // Adicionar informações
-            const textContent = [
-              `Data: ${new Date(item.updated_at).toLocaleDateString('pt-BR')}`,
-              ` | Rede: ${item.rede}`,
-              ` | Loja: ${item.loja}`,
-              ` | Marca: ${item.marca}`,
-              ` | Ponto Extra: ${item.ponto_extra_conquistado ? 'SIM' : 'NÃO'}`
-            ].join("");
+        // Adiciona cada linha de informação separadamente para melhor controle
+        infoData.forEach((row, index) => {
+          // Label (primeira coluna)
+          slide.addText(row[0], {
+            x: MARGINS.left,
+            y: `${15 + (index * 5)}%`,
+            w: '15%',
+            h: '5%',
+            fontSize: 14,
+            bold: true,
+            color: '363636',
+            align: 'left',
+            fontFace: 'Arial'
+          });
 
-            slide.addText(textContent, {
-              x: 0.5,
-              y: 6,
-              w: 9,
-              h: 0.5,
-              align: "center",
-              color: "363636",
-              fill: { color: "F1F1F1" }
-            });
+          // Valor (segunda coluna)
+          slide.addText(row[1], {
+            x: `${parseInt(MARGINS.left) + 15}%`,
+            y: `${15 + (index * 5)}%`,
+            w: '75%',
+            h: '5%',
+            fontSize: 14,
+            color: '363636',
+            align: 'left',
+            fontFace: 'Arial'
+          });
+        });
+
+        // Adicionar fotos se existirem
+        if (Array.isArray(pdv.fotos) && pdv.fotos.length > 0) {
+          const photosPerRow = 3;
+          const totalWidth = 90; // Largura total disponível em %
+          const photoWidth = Math.floor(totalWidth / photosPerRow); // Divide igualmente o espaço
+          const photoHeight = 45; // Altura fixa para todas as fotos
+          const horizontalGap = 2; // Espaço pequeno entre as fotos
+          const startY = 35; // Começa um pouco mais abaixo dos dados
+
+          for (let i = 0; i < pdv.fotos.length; i++) {
+            try {
+              const foto = pdv.fotos[i];
+              if (!foto) continue;
+
+              const response = await fetch(foto);
+              const blob = await response.blob();
+              const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              });
+
+              // Calcular posição da foto
+              const row = Math.floor(i / photosPerRow);
+              const col = i % photosPerRow;
+              
+              const x = parseInt(MARGINS.left) + (col * (photoWidth + horizontalGap));
+              const y = startY;
+
+              slide.addImage({
+                data: base64,
+                x: `${x}%`,
+                y: `${y}%`,
+                w: `${photoWidth}%`,
+                h: `${photoHeight}%`
+              });
+            } catch (error) {
+              console.error(`Erro ao processar foto ${i + 1}:`, error);
+            }
           }
         }
       }
 
-      // Salvar apresentação
-      await pptx.writeFile({ fileName: "apresentacao-pdv.pptx" });
-      toast.success("Apresentação exportada com sucesso!");
+      // Gerar nome do arquivo
+      const fileName = singlePdv 
+        ? `pdv_${singlePdv.marca}_${new Date().toISOString().split('T')[0]}.pptx`
+        : `pdv_geral_${new Date().toISOString().split('T')[0]}.pptx`;
+
+      // Salvar arquivo
+      await pptx.writeFile({ fileName });
+      toast.success("Apresentação exportada com sucesso!", { id: toastId });
     } catch (error) {
       console.error("Erro ao exportar apresentação:", error);
-      toast.error("Erro ao exportar apresentação");
+      toast.error("Erro ao exportar apresentação", { id: toastId });
     }
   };
 
@@ -298,10 +391,38 @@ export default function PDVPage() {
 
   const columns: ColumnDef<PDV>[] = [
     {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => {
+            table.toggleAllPageRowsSelected(!!value);
+            setSelectedRows(value ? pdvData : []);
+          }}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={selectedRows.some(item => item.id === row.original.id)}
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value);
+            setSelectedRows(prev => {
+              if (value) {
+                return [...prev, row.original];
+              }
+              return prev.filter(item => item.id !== row.original.id);
+            });
+          }}
+          aria-label="Select row"
+        />
+      ),
+    },
+    {
       accessorKey: "updated_at",
       header: "Data",
       cell: ({ row }) => {
-        const date = new Date(row.original.updated_at);
+        const date = new Date(row.getValue("updated_at"));
         return date.toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: '2-digit',
@@ -312,18 +433,21 @@ export default function PDVPage() {
     {
       accessorKey: "marca",
       header: "Marca",
-      cell: ({ row }) => row.original.marca.toUpperCase(),
+    },
+    {
+      accessorKey: "rede",
+      header: "Rede",
+    },
+    {
+      accessorKey: "loja",
+      header: "Loja",
     },
     {
       accessorKey: "ponto_extra_conquistado",
       header: "Ponto Extra",
       cell: ({ row }) => (
-        <span className={`px-2 py-1 rounded-full text-sm ${
-          row.original.ponto_extra_conquistado 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {row.original.ponto_extra_conquistado ? 'SIM' : 'NÃO'}
+        <span className={row.getValue("ponto_extra_conquistado") ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+          {row.getValue("ponto_extra_conquistado") ? "SIM" : "NÃO"}
         </span>
       ),
     },
@@ -331,9 +455,9 @@ export default function PDVPage() {
       accessorKey: "fotos",
       header: "Fotos",
       cell: ({ row }) => (
-        <div className="flex items-center">
-          <Image className="w-4 h-4 mr-2" />
-          {row.original.fotos?.length || 0} foto(s)
+        <div className="flex items-center gap-2">
+          <Image className="w-4 h-4" />
+          <span className="font-medium">{row.getValue("fotos")?.length || 0} foto(s)</span>
         </div>
       ),
     },
@@ -341,16 +465,17 @@ export default function PDVPage() {
       id: "actions",
       header: "Ações",
       cell: ({ row }) => {
+        const pdv = row.original;
         return (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setDialogState({
                 isOpen: true,
-                fotos: row.original.fotos || [],
-                marca: row.original.marca,
-                data: row.original.updated_at
+                fotos: pdv.fotos,
+                marca: pdv.marca,
+                data: pdv.updated_at,
               })}
             >
               <Eye className="w-4 h-4" />
@@ -358,7 +483,14 @@ export default function PDVPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleDelete(row.original.id)}
+              onClick={() => exportToPresentation(pdv)}
+            >
+              <Presentation className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDelete(pdv.id)}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -370,16 +502,26 @@ export default function PDVPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Relatório de PDV</h1>
         <div className="flex gap-2">
-          <Button onClick={exportToExcel}>
+          <Button
+            variant="outline"
+            onClick={exportToExcel}
+            disabled={isLoading}
+          >
             <Download className="w-4 h-4 mr-2" />
             Exportar Excel
+            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
           </Button>
-          <Button onClick={exportToPowerPoint} variant="secondary">
+          <Button
+            variant="outline"
+            onClick={() => exportToPresentation()}
+            disabled={isLoading}
+          >
             <Presentation className="w-4 h-4 mr-2" />
             Exportar Apresentação
+            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
           </Button>
         </div>
       </div>

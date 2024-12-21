@@ -19,6 +19,7 @@ import { toast, Toaster } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { supabase } from "@/lib/supabase";
+import { resizeImage } from "lib/utils/imageResizer";
 
 interface PontoVendaItem {
   id: number;
@@ -132,18 +133,35 @@ export default function PontoVenda() {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const newImages = Array.from(files).filter(file => 
-        file.type.startsWith('image/')
-      );
-      
-      if (newImages.length > 0) {
-        setImagens(prev => [...prev, ...newImages]);
-        toast.success("Imagens adicionadas com sucesso!");
-      } else {
-        toast.error("Por favor, selecione apenas arquivos de imagem");
+      try {
+        const newImages = Array.from(files).filter(file => 
+          file.type.startsWith('image/')
+        );
+        
+        if (newImages.length > 0) {
+          // Redimensionar cada imagem antes de adicionar
+          const resizedImages = await Promise.all(
+            newImages.map(async (file) => {
+              const resizedBlob = await resizeImage(file);
+              // Converter o blob para File
+              return new File([resizedBlob], file.name, {
+                type: 'image/jpeg',
+                lastModified: new Date().getTime()
+              });
+            })
+          );
+          
+          setImagens(prev => [...prev, ...resizedImages]);
+          toast.success("Imagens adicionadas com sucesso!");
+        } else {
+          toast.error("Por favor, selecione apenas arquivos de imagem");
+        }
+      } catch (error) {
+        console.error('Erro ao processar imagens:', error);
+        toast.error("Erro ao processar as imagens");
       }
     }
   };
@@ -151,11 +169,51 @@ export default function PontoVenda() {
   const handleCameraCapture = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // Aqui você pode implementar a lógica para capturar a foto
-      // Por enquanto, vamos apenas mostrar que a câmera foi acessada
-      toast.success("Câmera aberta com sucesso!");
+      
+      // Criar elementos de vídeo e canvas
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      if (!context) {
+        throw new Error('Não foi possível obter o contexto do canvas');
+      }
+
+      // Configurar o vídeo
+      video.srcObject = stream;
+      await video.play();
+
+      // Configurar o tamanho do canvas
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Capturar o frame
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Converter para blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+        }, 'image/jpeg', 0.8);
+      });
+
+      // Redimensionar a imagem
+      const resizedBlob = await resizeImage(blob);
+
+      // Converter para File
+      const file = new File([resizedBlob], `camera_${new Date().getTime()}.jpg`, {
+        type: 'image/jpeg',
+        lastModified: new Date().getTime()
+      });
+
+      // Adicionar à lista de imagens
+      setImagens(prev => [...prev, file]);
+      
+      // Limpar
       stream.getTracks().forEach(track => track.stop());
+      toast.success("Foto capturada com sucesso!");
     } catch (error) {
+      console.error('Erro ao capturar foto:', error);
       toast.error("Erro ao acessar a câmera");
     }
   };
@@ -173,9 +231,52 @@ export default function PontoVenda() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: number) => {
-    setItems(items.filter(item => item.id !== id));
-    toast.success("Item excluído com sucesso!");
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Tem certeza que deseja excluir este item?")) {
+      return;
+    }
+
+    try {
+      // 1. Buscar o registro com as fotos
+      const { data: pdvData } = await supabase
+        .from('pdv')
+        .select('fotos')
+        .eq('id', id)
+        .single();
+
+      // 2. Excluir as fotos do storage
+      if (pdvData?.fotos) {
+        const fileNames = pdvData.fotos.map(url => {
+          const parts = url.split('pdv-photos/');
+          return parts[parts.length - 1];
+        }).filter(Boolean);
+
+        if (fileNames.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('pdv-photos')
+            .remove(fileNames);
+
+          if (storageError) {
+            console.error('Erro ao excluir fotos:', storageError);
+          }
+        }
+      }
+
+      // 3. Excluir o registro
+      const { error: deleteError } = await supabase
+        .from('pdv')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      // 4. Atualizar interface
+      setItems(items.filter(item => item.id !== id));
+      toast.success("Item excluído com sucesso!");
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      toast.error("Erro ao excluir o item");
+    }
   };
 
   const handleSave = async () => {
@@ -467,8 +568,7 @@ export default function PontoVenda() {
                       }}
                       className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                     >
-                      <ArrowLeft className="w-4 h-4" />
-                      Voltar
+                      <ArrowLeft className="w-4 h-4" /> Voltar
                     </Button>
                     <Button
                       onClick={handleConfirm}
