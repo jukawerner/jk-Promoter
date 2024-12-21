@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,6 @@ export default function CadastroRoteiro() {
   const [selectedPromoter, setSelectedPromoter] = useState<Promoter | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
-  const mapRef = useRef<google.maps.Map>();
   const supabase = createClient();
 
   useEffect(() => {
@@ -159,8 +158,15 @@ export default function CadastroRoteiro() {
     const directionsService = new google.maps.DirectionsService();
     
     try {
-      const origin = locs[0].position;
-      const destination = locs[locs.length - 1].position;
+      const firstLocation = locs[0];
+      const lastLocation = locs[locs.length - 1];
+
+      if (!firstLocation || !lastLocation) {
+        throw new Error('Invalid locations array');
+      }
+
+      const origin = firstLocation.position;
+      const destination = lastLocation.position;
       const waypoints = locs.slice(1, -1).map(loc => ({
         location: loc.position,
         stopover: true,
@@ -178,8 +184,18 @@ export default function CadastroRoteiro() {
       
       // Calcular informações da rota
       const route = result.routes[0];
-      const distance = route.legs.reduce((total, leg) => total + leg.distance.value, 0);
-      const duration = route.legs.reduce((total, leg) => total + leg.duration.value, 0);
+      if (!route || !route.legs) {
+        throw new Error('Invalid route result');
+      }
+      
+      const distance = route.legs.reduce((total, leg) => {
+        if (!leg.distance?.value) return total;
+        return total + leg.distance.value;
+      }, 0);
+      const duration = route.legs.reduce((total, leg) => {
+        if (!leg.duration?.value) return total;
+        return total + leg.duration.value;
+      }, 0);
       
       setRouteInfo({
         distance: `${(distance / 1000).toFixed(1)} km`,
@@ -195,6 +211,8 @@ export default function CadastroRoteiro() {
 
     const items = Array.from(locations);
     const [reorderedItem] = items.splice(result.source.index, 1);
+    if (!reorderedItem) return;
+    
     items.splice(result.destination.index, 0, reorderedItem);
 
     setLocations(items);
@@ -208,7 +226,7 @@ export default function CadastroRoteiro() {
   };
 
   const saveRoute = async () => {
-    if (!selectedPromoter || locations.length < 2) {
+    if (!selectedPromoter || locations.length < 2 || !locations[0]) {
       alert('Selecione um promotor e adicione pelo menos 2 pontos no roteiro');
       return;
     }
@@ -357,7 +375,6 @@ export default function CadastroRoteiro() {
                     streetViewControl: false,
                     mapTypeControl: true,
                     fullscreenControl: true,
-                    language: 'pt-BR',
                   }}
                 >
                   {locations.map((location, index) => (
