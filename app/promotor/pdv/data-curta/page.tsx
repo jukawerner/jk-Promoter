@@ -44,8 +44,18 @@ export default function DataCurtaPage() {
   const [produto, setProduto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [dataValidade, setDataValidade] = useState("");
-  const [items, setItems] = useState([]);
-  const [editingItem, setEditingItem] = useState(null);
+interface Item {
+  id: number;
+  marca: string;
+  produto: string;
+  quantidade: string;
+  data_validade: string;
+  rede: string;
+  loja: string;
+}
+
+  const [items, setItems] = useState<Item[]>([]);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [rede, setRede] = useState("");
@@ -162,8 +172,8 @@ export default function DataCurtaPage() {
       }
 
       const dadosParaSalvar = {
-        produto: parseInt(produtoSelecionado), // Nome correto da coluna
-        marca: parseInt(marcaSelecionada), // Nome correto da coluna
+        produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
+        marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
         quantidade: parseFloat(estoque),
         data_validade: dataValidade,
         rede,
@@ -205,10 +215,8 @@ export default function DataCurtaPage() {
 
       setItems([...items, {
         id: Date.now(),
-        marca_id: parseInt(marcaSelecionada),
-        marca_nome: marcaObj?.nome || '',
-        produto_id: parseInt(produtoSelecionado),
-        produto_nome: produtoObj?.nome || '',
+        marca: marcaObj?.nome || '',
+        produto: produtoObj?.nome || '',
         quantidade: estoque,
         data_validade: dataValidade,
         rede,
@@ -226,8 +234,8 @@ export default function DataCurtaPage() {
       const { error } = await supabase
         .from("data_curta")
         .insert({
-          marca_id: marcaSelecionada,
-          produto_id: produtoSelecionado,
+          marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
+          produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
           quantidade: parseFloat(estoque),
           data_validade: dataValidade,
           rede,
@@ -245,21 +253,17 @@ export default function DataCurtaPage() {
       setDataValidade("");
       setShowConfirmDialog(false);
       
-      // Adicionar item à lista
-      const marcaObj = marcasState.find(m => m.id === marcaSelecionada);
-      const produtoObj = produtosState.find(p => p.id === produtoSelecionado);
-
-      setItems([...items, {
+      const novoItem: Item = {
         id: Date.now(),
-        marca_id: marcaSelecionada,
-        marca_nome: marcaObj?.nome || '',
-        produto_id: produtoSelecionado,
-        produto_nome: produtoObj?.nome || '',
+        marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
+        produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
         quantidade: estoque,
         data_validade: dataValidade,
         rede,
         loja
-      }]);
+      };
+      
+      setItems([...items, novoItem]);
       
     } catch (error) {
       console.error("Erro ao salvar:", error);
@@ -268,14 +272,14 @@ export default function DataCurtaPage() {
     }
   };
 
-  const handleEdit = async (item) => {
+  const handleEdit = async (item: Item) => {
     try {
       // Atualizar no Supabase
       const { error } = await supabase
         .from("data_curta")
         .update({
-          marca_id: item.marca_id,
-          produto_id: item.produto_id,
+          marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
+          produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
           quantidade: parseFloat(item.quantidade),
           data_validade: item.data_validade,
           rede: item.rede,
@@ -296,7 +300,7 @@ export default function DataCurtaPage() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     try {
       // Deletar no Supabase
       const { error } = await supabase
@@ -518,8 +522,8 @@ export default function DataCurtaPage() {
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="font-medium">{item.marca_id}</td>
-                          <td>{item.produto_id}</td>
+                          <td className="font-medium">{item.marca}</td>
+                          <td>{item.produto}</td>
                           <td>{item.quantidade}</td>
                           <td>{new Date(item.data_validade).toLocaleDateString()}</td>
                           <td>{item.rede}</td>
@@ -530,8 +534,10 @@ export default function DataCurtaPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  setMarcaSelecionada(item.marca_id);
-                                  setProdutoSelecionado(item.produto_id);
+                                  const marca = marcasState.find(m => m.nome === item.marca);
+                                  const produto = produtosState.find(p => p.nome === item.produto);
+                                  setMarcaSelecionada(marca?.id || '');
+                                  setProdutoSelecionado(produto?.id || '');
                                   setEstoque(item.quantidade);
                                   setDataValidade(item.data_validade);
                                   setRede(item.rede);
