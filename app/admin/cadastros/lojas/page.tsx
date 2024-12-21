@@ -60,10 +60,13 @@ export default function CadastroLojas() {
       let savedStore: Store | null = null;
       if (selectedStore && selectedStore.id) {
         console.log('Atualizando loja existente...');
-        savedStore = await updateLoja(selectedStore.id, storeData);
-        setStores(prev => prev.map(p => 
-          p.id === selectedStore.id ? savedStore : p
-        ));
+        const updatedStore = await updateLoja(selectedStore.id, storeData);
+        if (updatedStore) {
+          setStores(prev => prev.map(p => 
+            p.id === selectedStore.id ? updatedStore : p
+          ));
+          savedStore = updatedStore;
+        }
       } else {
         console.log('Iniciando criação de nova loja...');
         savedStore = await createLoja(storeData);
@@ -73,7 +76,7 @@ export default function CadastroLojas() {
           throw new Error('Falha ao criar loja - nenhum dado retornado');
         }
         
-        setStores(prev => [...prev, savedStore]);
+        setStores(prev => [...prev, savedStore as Store]);
       }
       
       console.log('Loja salva com sucesso:', savedStore);
@@ -103,6 +106,9 @@ export default function CadastroLojas() {
       try {
         setIsLoading(true);
         console.log('Iniciando exclusão da loja...');
+        if (!store.id) {
+          throw new Error('ID da loja não encontrado');
+        }
         await deleteLoja(store.id);
         console.log('Loja excluída do banco com sucesso');
         

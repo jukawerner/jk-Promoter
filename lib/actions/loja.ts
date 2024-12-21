@@ -81,7 +81,7 @@ export async function createLoja(data: StoreFormData): Promise<Store> {
   return loja;
 }
 
-export async function updateLoja(id: number, data: StoreFormData): Promise<Store> {
+export async function updateLoja(id: number, data: StoreFormData): Promise<Store | null> {
   const { data: loja, error } = await supabase
     .from("loja")
     .update(data)
@@ -104,6 +104,10 @@ export async function updateLoja(id: number, data: StoreFormData): Promise<Store
   if (error) {
     console.error('Erro ao atualizar loja:', error);
     throw error;
+  }
+
+  if (!loja) {
+    throw new Error('Loja não foi atualizada - nenhum dado retornado');
   }
 
   return loja;

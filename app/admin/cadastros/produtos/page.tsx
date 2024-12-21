@@ -3,24 +3,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ProdutoForm } from "@/components/admin/produtos/produto-form";
-import { ImportModal } from "@/components/admin/produtos/import-modal";
-import { DataTable } from "@/components/ui/data-table";
-import { createProduto, getProdutos, updateProduto, deleteProduto } from "@/lib/actions/produto";
+import { ProductForm } from "@/components/admin/products/product-form";
+import { ImportModal } from "@/components/admin/products/import-modal";
+import { createProduto, getProdutos, updateProduto, deleteProduto, Produto } from "@/lib/actions/produto";
 import { toast } from "sonner";
-import { ColumnDef } from "@tanstack/react-table";
-import { Pencil, Trash2, Upload, Plus, Search } from "lucide-react";
-
-interface Produto {
-  id: number;
-  codigo_ean: string;
-  nome: string;
-  familia: string;
-  unidade: string;
-  peso: number;
-  validade: number;
-  marca: { nome: string };
-}
+import { Pencil, Trash2, Upload, Plus } from "lucide-react";
 
 export default function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -103,7 +90,7 @@ export default function ProdutosPage() {
     await loadProdutos(); // Recarrega a lista após importação bem-sucedida
   };
 
-  const columns: ColumnDef<Produto>[] = [
+  const columns = [
     {
       accessorKey: "codigo_ean",
       header: "Código EAN",
@@ -111,22 +98,6 @@ export default function ProdutosPage() {
     {
       accessorKey: "nome",
       header: "Nome",
-    },
-    {
-      accessorKey: "familia",
-      header: "Família",
-    },
-    {
-      accessorKey: "unidade",
-      header: "Unidade",
-    },
-    {
-      accessorKey: "peso",
-      header: "Peso (g)",
-    },
-    {
-      accessorKey: "validade",
-      header: "Validade (dias)",
     },
     {
       accessorKey: "marca.nome",
@@ -167,7 +138,6 @@ export default function ProdutosPage() {
     const searchLower = searchTerm.toLowerCase();
     return (
       produto.nome.toLowerCase().includes(searchLower) ||
-      produto.familia.toLowerCase().includes(searchLower) ||
       produto.marca.nome.toLowerCase().includes(searchLower)
     );
   });
@@ -179,7 +149,7 @@ export default function ProdutosPage() {
           <h1 className="text-2xl font-bold mb-4">
             {editingProduto ? "Editar Produto" : "Novo Produto"}
           </h1>
-          <ProdutoForm
+          <ProductForm
             onSave={handleSave}
             onCancel={() => {
               setShowForm(false);
@@ -225,17 +195,55 @@ export default function ProdutosPage() {
 
       <div className="flex-1 max-w-md">
         <Input
-          placeholder="Pesquisar por produto, família ou marca..."
+          placeholder="Pesquisar por produto ou marca..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      <DataTable
-        columns={columns}
-        data={filteredProdutos}
-        loading={isLoading}
-      />
+      <div className="overflow-x-auto">
+        <table className="table-auto w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-2">Código EAN</th>
+              <th className="px-4 py-2">Nome</th>
+              <th className="px-4 py-2">Marca</th>
+              <th className="px-4 py-2">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProdutos.map((produto) => (
+              <tr key={produto.id}>
+                <td className="border px-4 py-2">{produto.codigo_ean}</td>
+                <td className="border px-4 py-2">{produto.nome}</td>
+                <td className="border px-4 py-2">{produto.marca.nome}</td>
+                <td className="border px-4 py-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(produto)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Editar</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(produto.id)}
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Excluir</span>
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {showImportModal && (
         <ImportModal
