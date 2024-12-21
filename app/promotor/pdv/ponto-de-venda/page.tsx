@@ -19,7 +19,6 @@ import { toast, Toaster } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { supabase } from "@/lib/supabase";
-import { resizeImage } from "lib/utils/imageResizer";
 import { CameraCapture } from "@/components/camera-capture";
 
 interface PontoVendaItem {
@@ -137,34 +136,22 @@ export default function PontoVenda() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      try {
-        const newImages = Array.from(files).filter(file => 
-          file.type.startsWith('image/')
-        );
-        
-        if (newImages.length > 0) {
-          // Redimensionar cada imagem antes de adicionar
-          const resizedImages = await Promise.all(
-            newImages.map(async (file) => {
-              const resizedBlob = await resizeImage(file);
-              // Converter o blob para File
-              return new File([resizedBlob], file.name, {
-                type: 'image/jpeg',
-                lastModified: new Date().getTime()
-              });
-            })
-          );
-          
-          setImagens(prev => [...prev, ...resizedImages]);
-          toast.success("Imagens adicionadas com sucesso!");
-        } else {
-          toast.error("Por favor, selecione apenas arquivos de imagem");
-        }
-      } catch (error) {
-        console.error('Erro ao processar imagens:', error);
-        toast.error("Erro ao processar as imagens");
+    if (!files) return;
+
+    try {
+      const validImageFiles = Array.from(files).filter(file =>
+        file.type.startsWith('image/')
+      );
+
+      if (validImageFiles.length > 0) {
+        setImagens(prev => [...prev, ...validImageFiles]);
+        toast.success("Imagens adicionadas com sucesso!");
+      } else {
+        toast.error("Por favor, selecione apenas arquivos de imagem");
       }
+    } catch (error) {
+      console.error('Erro ao processar imagens:', error);
+      toast.error("Erro ao processar as imagens");
     }
   };
 
@@ -256,12 +243,6 @@ export default function PontoVenda() {
             // Limpar o nome do arquivo
             const cleanFileName = image.name.replace(/[^a-zA-Z0-9.]/g, '_');
             const fileName = `${Date.now()}_${cleanFileName}`;
-
-            // Verificar o tamanho do arquivo (limite de 2MB)
-            if (image.size > 2 * 1024 * 1024) {
-              toast.error(`Imagem ${image.name} muito grande. Máximo 2MB.`);
-              continue;
-            }
 
             // Upload da imagem
             const { error: uploadError } = await supabase.storage
