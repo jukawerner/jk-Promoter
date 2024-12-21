@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
