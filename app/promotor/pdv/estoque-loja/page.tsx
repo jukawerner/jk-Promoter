@@ -19,13 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Plus, Pencil, Trash2, Store, Package2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Store, Package2, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { supabase } from "@/lib/supabase";
+import { QRScannerModal } from "@/components/qr-scanner-modal";
 
 interface EstoqueItem {
   id?: string;
@@ -60,6 +61,7 @@ export default function EstoqueLoja() {
   const [showForm, setShowForm] = useState(true);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const router = useRouter();
 
   // Carregar rede e loja do localStorage quando o componente montar
@@ -267,6 +269,30 @@ export default function EstoqueLoja() {
     }
   };
 
+  const handleQRCodeScan = async (result: string) => {
+    try {
+      // Assuming the QR code contains the product's EAN code
+      const { data, error } = await supabase
+        .from('produto')
+        .select('*')
+        .eq('codigo_ean', result)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setMarca(data.marca);
+        setProduto(data.nome);
+        toast.success('Produto encontrado!');
+      } else {
+        toast.error('Produto não encontrado');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produto:', error);
+      toast.error('Erro ao buscar produto');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -341,25 +367,35 @@ export default function EstoqueLoja() {
                   {/* Campos Marca e Produto lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="marca">Marca</Label>
-                      <Select
-                        value={marca}
-                        onValueChange={(value) => {
-                          console.log('Marca selecionada:', value);
-                          setMarca(value);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {marcas.map((marca) => (
-                            <SelectItem key={marca.id} value={marca.nome}>
-                              {marca.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Marca</Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={marca}
+                          onValueChange={(value) => {
+                            console.log('Marca selecionada:', value);
+                            setMarca(value);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a marca" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {marcas.map((marca) => (
+                              <SelectItem key={marca.id} value={marca.nome}>
+                                {marca.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          type="button"
+                          onClick={() => setShowQRScanner(true)}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -526,6 +562,13 @@ export default function EstoqueLoja() {
           </AnimatePresence>
         </motion.div>
       </div>
+      {showQRScanner && (
+        <QRScannerModal
+          isOpen={showQRScanner}
+          onClose={() => setShowQRScanner(false)}
+          onScan={handleQRCodeScan}
+        />
+      )}
     </motion.div>
   );
 }

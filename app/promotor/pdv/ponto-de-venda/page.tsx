@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { WhatsappButton } from "@/components/whatsapp-button";
 import { supabase } from "@/lib/supabase";
 import { resizeImage } from "lib/utils/imageResizer";
+import { CameraCapture } from "@/components/camera-capture";
 
 interface PontoVendaItem {
   id: number;
@@ -41,6 +42,7 @@ export default function PontoVenda() {
   const [showForm, setShowForm] = useState(true);
   const [rede, setRede] = useState("");
   const [loja, setLoja] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Carregar marcas do Supabase
@@ -166,55 +168,13 @@ export default function PontoVenda() {
     }
   };
 
-  const handleCameraCapture = async () => {
+  const handleImageCapture = async (imageFile: File) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      
-      // Criar elementos de vídeo e canvas
-      const video = document.createElement('video');
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
-      if (!context) {
-        throw new Error('Não foi possível obter o contexto do canvas');
-      }
-
-      // Configurar o vídeo
-      video.srcObject = stream;
-      await video.play();
-
-      // Configurar o tamanho do canvas
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      // Capturar o frame
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Converter para blob
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-        }, 'image/jpeg', 0.8);
-      });
-
-      // Redimensionar a imagem
-      const resizedBlob = await resizeImage(blob);
-
-      // Converter para File
-      const file = new File([resizedBlob], `camera_${new Date().getTime()}.jpg`, {
-        type: 'image/jpeg',
-        lastModified: new Date().getTime()
-      });
-
-      // Adicionar à lista de imagens
-      setImagens(prev => [...prev, file]);
-      
-      // Limpar
-      stream.getTracks().forEach(track => track.stop());
-      toast.success("Foto capturada com sucesso!");
+      const resizedImage = await resizeImage(imageFile);
+      setImagens(prev => [...prev, resizedImage]);
     } catch (error) {
-      console.error('Erro ao capturar foto:', error);
-      toast.error("Erro ao acessar a câmera");
+      console.error('Erro ao processar imagem:', error);
+      toast.error('Erro ao processar imagem');
     }
   };
 
@@ -509,7 +469,7 @@ export default function PontoVenda() {
                             />
                             <Button
                               variant="outline"
-                              onClick={handleCameraCapture}
+                              onClick={() => setShowCamera(true)}
                               className="flex items-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
                             >
                               <Camera className="w-4 h-4" />
@@ -666,6 +626,13 @@ export default function PontoVenda() {
           </AnimatePresence>
         </motion.div>
       </div>
+      {showCamera && (
+        <CameraCapture
+          isOpen={showCamera}
+          onClose={() => setShowCamera(false)}
+          onCapture={handleImageCapture}
+        />
+      )}
     </motion.div>
   );
 }

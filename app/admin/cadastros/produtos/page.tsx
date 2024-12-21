@@ -123,7 +123,8 @@ export default function ProdutosPage() {
     const searchLower = searchTerm.toLowerCase();
     return (
       produto.nome.toLowerCase().includes(searchLower) ||
-      produto.marca.toLowerCase().includes(searchLower)
+      produto.marca.toLowerCase().includes(searchLower) ||
+      produto.codigo_ean?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -212,8 +213,8 @@ export default function ProdutosPage() {
             {filteredProdutos.map((produto) => (
               <tr key={produto.id}>
                 <td className="border px-4 py-2">{produto.codigo_ean}</td>
-                <td className="border px-4 py-2">{produto.nome}</td>
-                <td className="border px-4 py-2">{produto.marca}</td>
+                <td className="border px-4 py-2">{produto.nome.toUpperCase()}</td>
+                <td className="border px-4 py-2">{produto.marca.toUpperCase()}</td>
                 <td className="border px-4 py-2">
                   <div className="flex gap-2">
                     <Button
