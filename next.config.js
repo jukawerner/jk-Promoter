@@ -4,7 +4,21 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    domains: ['localhost', 'your-supabase-project.supabase.co'], // Add your Supabase project URL here
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'your-supabase-project.supabase.co',
+      },
+    ],
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  swcMinify: true,
+  poweredByHeader: false,
+  reactStrictMode: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
   },
 };
 
