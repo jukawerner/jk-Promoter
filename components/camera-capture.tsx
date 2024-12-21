@@ -34,21 +34,11 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { ideal: 4096 }, // 4K
-          height: { ideal: 2160 },
-          aspectRatio: { ideal: 4/3 },
-          frameRate: { ideal: 30 }
+          width: { ideal: 4096 },
+          height: { ideal: 2160 }
         },
         audio: false
       });
-
-      // Get the actual constraints being used
-      const videoTrack = mediaStream.getVideoTracks()[0];
-      const capabilities = videoTrack.getCapabilities();
-      const settings = videoTrack.getSettings();
-      
-      console.log('Camera capabilities:', capabilities);
-      console.log('Active settings:', settings);
       
       setStream(mediaStream);
       if (videoRef.current) {
@@ -83,22 +73,18 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
       const canvas = document.createElement('canvas');
       const video = videoRef.current;
       
-      // Use the actual video dimensions
+      // Use the actual video dimensions for maximum quality
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d', { 
         alpha: false,
-        desynchronized: true // Pode melhorar o desempenho
+        desynchronized: true
       });
       
       if (!ctx) {
         throw new Error('Não foi possível criar contexto do canvas');
       }
-
-      // Configurações para melhor qualidade
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
 
       // Flip horizontally if using front camera
       if (stream?.getVideoTracks()[0].getSettings().facingMode === "user") {
@@ -107,7 +93,7 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
       }
       
       // Capture in highest quality
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0);
       
       canvas.toBlob((blob) => {
         if (blob) {
@@ -120,7 +106,7 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
         } else {
           throw new Error('Falha ao criar imagem');
         }
-      }, 'image/jpeg', 0.95); // Increased quality to 95%
+      }, 'image/jpeg', 1.0); // Maximum quality (1.0)
     } catch (error) {
       console.error('Erro ao capturar foto:', error);
       toast.error('Erro ao capturar foto. Tente novamente.');

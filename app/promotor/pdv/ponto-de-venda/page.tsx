@@ -170,13 +170,7 @@ export default function PontoVenda() {
 
   const handleImageCapture = async (imageFile: File) => {
     try {
-      const resizedBlob = await resizeImage(imageFile);
-      // Convert blob to File
-      const resizedFile = new File([resizedBlob], imageFile.name, {
-        type: 'image/jpeg',
-        lastModified: Date.now()
-      });
-      setImagens(prev => [...prev, resizedFile]);
+      setImagens(prev => [...prev, imageFile]);
       toast.success('Foto capturada com sucesso!');
     } catch (error) {
       console.error('Erro ao processar imagem:', error);
