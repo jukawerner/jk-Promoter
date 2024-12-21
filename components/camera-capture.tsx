@@ -30,14 +30,25 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
 
   const startCamera = async () => {
     try {
+      // Request the highest possible resolution
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: "environment",
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 4096 }, // 4K
+          height: { ideal: 2160 },
+          aspectRatio: { ideal: 4/3 },
+          frameRate: { ideal: 30 }
         },
         audio: false
       });
+
+      // Get the actual constraints being used
+      const videoTrack = mediaStream.getVideoTracks()[0];
+      const capabilities = videoTrack.getCapabilities();
+      const settings = videoTrack.getSettings();
+      
+      console.log('Camera capabilities:', capabilities);
+      console.log('Active settings:', settings);
       
       setStream(mediaStream);
       if (videoRef.current) {
@@ -76,10 +87,18 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { 
+        alpha: false,
+        desynchronized: true // Pode melhorar o desempenho
+      });
+      
       if (!ctx) {
         throw new Error('Não foi possível criar contexto do canvas');
       }
+
+      // Configurações para melhor qualidade
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // Flip horizontally if using front camera
       if (stream?.getVideoTracks()[0].getSettings().facingMode === "user") {
@@ -87,7 +106,8 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
         ctx.translate(-canvas.width, 0);
       }
       
-      ctx.drawImage(video, 0, 0);
+      // Capture in highest quality
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       canvas.toBlob((blob) => {
         if (blob) {
@@ -100,7 +120,7 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
         } else {
           throw new Error('Falha ao criar imagem');
         }
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.95); // Increased quality to 95%
     } catch (error) {
       console.error('Erro ao capturar foto:', error);
       toast.error('Erro ao capturar foto. Tente novamente.');
@@ -118,7 +138,7 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
             ref={videoRef}
             autoPlay
             playsInline
-            className="w-full aspect-[3/4] object-cover rounded-lg"
+            className="w-full aspect-[4/3] object-cover rounded-lg"
           />
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
             <Button

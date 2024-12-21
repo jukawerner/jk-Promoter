@@ -8,6 +8,7 @@ import { ImportModal } from "@/components/admin/products/import-modal";
 import { createProduto, getProdutos, updateProduto, deleteProduto, Produto } from "@/lib/actions/produto";
 import { toast } from "sonner";
 import { Pencil, Trash2, Upload, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -16,6 +17,7 @@ export default function ProdutosPage() {
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   useEffect(() => {
     loadProdutos();
@@ -26,9 +28,51 @@ export default function ProdutosPage() {
       setIsLoading(true);
       const data = await getProdutos();
       setProdutos(data);
+      setSelectedItems([]); // Clear selection when reloading
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       toast.error("Erro ao carregar produtos");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(filteredProdutos.map(p => p.id));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedItems(prev => [...prev, id]);
+    } else {
+      setSelectedItems(prev => prev.filter(itemId => itemId !== id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Selecione pelo menos um item para excluir");
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir ${selectedItems.length} produto(s)?`)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      for (const id of selectedItems) {
+        await deleteProduto(id);
+      }
+      toast.success(`${selectedItems.length} produto(s) excluído(s) com sucesso!`);
+      loadProdutos();
+    } catch (error) {
+      console.error("Erro ao excluir produtos:", error);
+      toast.error("Erro ao excluir produtos");
     } finally {
       setIsLoading(false);
     }
@@ -170,6 +214,16 @@ export default function ProdutosPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {selectedItems.length > 0 && (
+            <Button
+              onClick={handleDeleteSelected}
+              variant="destructive"
+              disabled={isLoading}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Selecionados ({selectedItems.length})
+            </Button>
+          )}
           <Button
             onClick={() => setShowImportModal(true)}
             variant="outline"
@@ -191,7 +245,7 @@ export default function ProdutosPage() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-md">
+      <div className="flex-1 max-w-md mb-4">
         <Input
           placeholder="Pesquisar por produto ou marca..."
           value={searchTerm}
@@ -203,6 +257,13 @@ export default function ProdutosPage() {
         <table className="table-auto w-full">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-4 py-2">
+                <Checkbox
+                  checked={selectedItems.length === filteredProdutos.length && filteredProdutos.length > 0}
+                  onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                  aria-label="Selecionar todos"
+                />
+              </th>
               <th className="px-4 py-2">Código EAN</th>
               <th className="px-4 py-2">Nome</th>
               <th className="px-4 py-2">Marca</th>
@@ -212,6 +273,13 @@ export default function ProdutosPage() {
           <tbody>
             {filteredProdutos.map((produto) => (
               <tr key={produto.id}>
+                <td className="border px-4 py-2">
+                  <Checkbox
+                    checked={selectedItems.includes(produto.id)}
+                    onCheckedChange={(checked) => handleSelectItem(produto.id, checked as boolean)}
+                    aria-label={`Selecionar ${produto.nome}`}
+                  />
+                </td>
                 <td className="border px-4 py-2">{produto.codigo_ean}</td>
                 <td className="border px-4 py-2">{produto.nome.toUpperCase()}</td>
                 <td className="border px-4 py-2">{produto.marca.toUpperCase()}</td>
