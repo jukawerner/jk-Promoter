@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
+  images: {
+    domains: ['localhost', 'your-supabase-project.supabase.co'], // Add your Supabase project URL here
+  },
 };
 
 module.exports = nextConfig;
