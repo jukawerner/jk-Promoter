@@ -144,16 +144,32 @@ export default function EstoqueLoja() {
         return;
       }
 
+      // Buscar o nome da marca selecionada
+      const { data: marcaData } = await supabase
+        .from('marca')
+        .select('nome')
+        .eq('id', marca)
+        .single();
+
+      // Buscar o nome do produto selecionado
+      const { data: produtoData } = await supabase
+        .from('produto')
+        .select('nome')
+        .eq('id', produto)
+        .single();
+
       // Criar novo item
       const { error } = await supabase
         .from('estoque')
         .insert([{
-          marca: marca,
-          produto: produto,
+          rede: rede,
+          loja: loja,
+          marca: marcaData?.nome,         // Salva o nome da marca
+          produto: produtoData?.nome,     // Salva o nome do produto
+          marca_id: marca,                // Também salva o ID da marca
+          produto_id: produto,            // Também salva o ID do produto
           estoque_fisico: estoqueNum,
           estoque_virtual: estoqueVirtualNum,
-          rede,
-          loja,
         }]);
 
       if (error) throw error;
@@ -192,16 +208,30 @@ export default function EstoqueLoja() {
   const handleGravar = async () => {
     try {
       for (const item of items) {
+        const { data: marcaData } = await supabase
+          .from('marca')
+          .select('nome')
+          .eq('id', item.marca)
+          .single();
+
+        const { data: produtoData } = await supabase
+          .from('produto')
+          .select('nome')
+          .eq('id', item.produto)
+          .single();
+
         const { error } = await supabase
           .from("estoque")
           .insert([
             {
-              marca: item.marca,
-              produto: item.produto,
+              rede: item.rede,
+              loja: item.loja,
+              marca: marcaData?.nome,         // Salva o nome da marca
+              produto: produtoData?.nome,     // Salva o nome do produto
+              marca_id: item.marca,           // Também salva o ID da marca
+              produto_id: item.produto,       // Também salva o ID do produto
               estoque_fisico: parseFloat(item.estoque),
               estoque_virtual: parseFloat(item.estoqueVirtual),
-              rede: item.rede,
-              loja: item.loja
             }
           ]);
           

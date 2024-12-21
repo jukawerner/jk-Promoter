@@ -91,13 +91,16 @@ export default function ProdutosPage() {
       }
       toast.success(`${produtos.length} produtos importados com sucesso!`);
       setShowImportModal(false);
-      await loadProdutos(); // Recarrega a lista
     } catch (error) {
       toast.error("Erro ao importar produtos");
       console.error(error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleImportSuccess = async () => {
+    await loadProdutos(); // Recarrega a lista após importação bem-sucedida
   };
 
   const columns: ColumnDef<Produto>[] = [
@@ -239,6 +242,7 @@ export default function ProdutosPage() {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onConfirm={handleImportProducts}
+          onSuccess={handleImportSuccess}
         />
       )}
     </div>

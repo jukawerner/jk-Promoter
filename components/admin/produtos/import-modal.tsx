@@ -196,14 +196,20 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
       if (erros.length > 0) {
         setErrosImportacao(erros);
         setStep('error');
-      } else {
+      }
+
+      if (successCount > 0) {
         toast.success(
           `Importação concluída: ${successCount} produtos importados, ${errorCount} erros`
         );
-        onSuccess();
-        onClose();
+        // Primeiro reseta os estados
         setStep('upload');
         setProdutosParaImportar([]);
+        // Depois fecha o modal e atualiza a lista
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          if (onClose) onClose();
+        }, 100);
       }
     } catch (error) {
       console.error("Erro na importação:", error);
