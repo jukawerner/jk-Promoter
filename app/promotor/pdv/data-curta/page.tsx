@@ -32,7 +32,17 @@ interface Marca {
 interface Produto {
   id: string;
   nome: string;
-  marca_id: string;
+  marca: string;
+}
+
+interface Item {
+  id: number;
+  marca: string;
+  produto: string;
+  quantidade: string;
+  data_validade: string;
+  rede: string;
+  loja: string;
 }
 
 const marcas = [] as Marca[];
@@ -44,24 +54,14 @@ export default function DataCurtaPage() {
   const [produto, setProduto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [dataValidade, setDataValidade] = useState("");
-interface Item {
-  id: number;
-  marca: string;
-  produto: string;
-  quantidade: string;
-  data_validade: string;
-  rede: string;
-  loja: string;
-}
-
   const [items, setItems] = useState<Item[]>([]);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [rede, setRede] = useState("");
   const [loja, setLoja] = useState("");
-  const [marcaSelecionada, setMarcaSelecionada] = useState<string>("");
-  const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
+  const [marcasState, setMarcasState] = useState<Marca[]>([]);
+  const [produtosState, setProdutosState] = useState<Produto[]>([]);
 
   // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
@@ -80,69 +80,55 @@ interface Item {
     }
   }, [router]);
 
+  // Carregar marcas do Supabase
   useEffect(() => {
-    carregarMarcas();
-  }, []);
+    const fetchMarcas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('marca')
+          .select('*')
+          .order('nome');
 
-  useEffect(() => {
-    if (marcaSelecionada) {
-      carregarProdutos(marcaSelecionada);
-    } else {
-      setProdutosState([]);
-    }
-  }, [marcaSelecionada]);
-
-  useEffect(() => {
-    const verificarTabela = async () => {
-      const { data, error } = await supabase
-        .from('data_curta')
-        .select()
-        .limit(1);
-
-      if (error) {
-        console.error('Erro ao verificar tabela:', error);
-      } else {
-        // Isso vai mostrar as colunas da tabela
-        if (data && data.length > 0) {
-          console.log('Colunas da tabela:', Object.keys(data[0]));
-        }
+        if (error) throw error;
+        setMarcasState(data || []);
+      } catch (error) {
+        console.error('Erro ao carregar marcas:', error);
+        toast.error('Erro ao carregar marcas');
       }
     };
 
-    verificarTabela();
+    fetchMarcas();
   }, []);
 
-  const [marcasState, setMarcasState] = useState<Marca[]>([]);
-  const [produtosState, setProdutosState] = useState<Produto[]>([]);
-
-  const carregarMarcas = async () => {
+  // Carregar produtos quando uma marca é selecionada
+  const carregarProdutos = async (marcaNome: string) => {
     try {
-      const { data, error } = await supabase
-        .from('marca')
-        .select('*')
-        .order('nome');
-
-      if (error) {
-        throw error;
-      }
-
-      setMarcasState(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar marcas:', error);
-      toast.error('Erro ao carregar marcas');
-    }
-  };
-
-  const carregarProdutos = async (marcaId: string) => {
-    try {
+      console.log('Carregando produtos da marca:', marcaNome);
+      
+      // Consulta case-insensitive
       const { data, error } = await supabase
         .from('produto')
         .select('*')
-        .eq('marca_id', marcaId)
+        .ilike('marca', marcaNome)
         .order('nome');
 
       if (error) {
+        console.error('Erro na consulta:', error);
         throw error;
+      }
+
+      console.log('Resultado da consulta:', data);
+
+      if (!data || data.length === 0) {
+        // Consulta de debug para ver todas as marcas disponíveis
+        const { data: allProducts, error: debugError } = await supabase
+          .from('produto')
+          .select('marca')
+          .distinct();
+        
+        console.log('Marcas disponíveis:', allProducts);
+        console.log('Nenhum produto encontrado para a marca:', marcaNome);
+        toast.error('Nenhum produto encontrado para esta marca');
       }
 
       setProdutosState(data || []);
@@ -152,28 +138,25 @@ interface Item {
     }
   };
 
+  // Efeito para carregar produtos quando a marca muda
+  useEffect(() => {
+    if (marca) {
+      carregarProdutos(marca);
+    } else {
+      setProdutosState([]);
+    }
+  }, [marca]);
+
   const handleSubmit = async () => {
-    if (!marcaSelecionada || !produtoSelecionado || !estoque || !dataValidade) {
+    if (!marca || !produto || !estoque || !dataValidade) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
 
     try {
-      // Primeiro vamos verificar a estrutura da tabela
-      const { data: estrutura, error: erroBusca } = await supabase
-        .from('data_curta')
-        .select()
-        .limit(1);
-
-      if (erroBusca) {
-        console.error('Erro ao verificar tabela:', erroBusca);
-      } else {
-        console.log('Estrutura atual:', estrutura);
-      }
-
       const dadosParaSalvar = {
-        produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
-        marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
+        produto: produto,
+        marca: marca,
         quantidade: parseFloat(estoque),
         data_validade: dataValidade,
         rede,
@@ -190,134 +173,20 @@ interface Item {
 
       if (error) {
         console.error('Erro ao salvar:', error);
-        console.error('Detalhes do erro:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
         throw error;
       }
 
-      console.log('Dados salvos com sucesso:', data);
-      toast.success("Produto registrado com sucesso!");
+      toast.success("Produto cadastrado com sucesso!");
       
       // Limpar formulário
-      setMarcaSelecionada("");
-      setProdutoSelecionado("");
+      setMarca("");
+      setProduto("");
       setEstoque("");
       setDataValidade("");
-      setShowConfirmDialog(false);
-
-      // Adicionar item à lista
-      const marcaObj = marcasState.find(m => m.id === marcaSelecionada);
-      const produtoObj = produtosState.find(p => p.id === produtoSelecionado);
-
-      setItems([...items, {
-        id: Date.now(),
-        marca: marcaObj?.nome || '',
-        produto: produtoObj?.nome || '',
-        quantidade: estoque,
-        data_validade: dataValidade,
-        rede,
-        loja
-      }]);
-    } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast.error("Erro ao salvar o produto");
-    }
-  };
-
-  const handleConfirm = async () => {
-    try {
-      // Inserir no Supabase
-      const { error } = await supabase
-        .from("data_curta")
-        .insert({
-          marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
-          produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
-          quantidade: parseFloat(estoque),
-          data_validade: dataValidade,
-          rede,
-          loja
-        });
-
-      if (error) throw error;
-
-      toast.success("Produto registrado com sucesso!");
-      
-      // Limpar formulário
-      setMarcaSelecionada("");
-      setProdutoSelecionado("");
-      setEstoque("");
-      setDataValidade("");
-      setShowConfirmDialog(false);
-      
-      const novoItem: Item = {
-        id: Date.now(),
-        marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
-        produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
-        quantidade: estoque,
-        data_validade: dataValidade,
-        rede,
-        loja
-      };
-      
-      setItems([...items, novoItem]);
       
     } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast.error("Erro ao salvar os dados. Por favor, tente novamente.");
-      setShowConfirmDialog(false);
-    }
-  };
-
-  const handleEdit = async (item: Item) => {
-    try {
-      // Atualizar no Supabase
-      const { error } = await supabase
-        .from("data_curta")
-        .update({
-          marca: marcasState.find(m => m.id === marcaSelecionada)?.nome || '',
-          produto: produtosState.find(p => p.id === produtoSelecionado)?.nome || '',
-          quantidade: parseFloat(item.quantidade),
-          data_validade: item.data_validade,
-          rede: item.rede,
-          loja: item.loja
-        })
-        .eq("id", item.id);
-
-      if (error) throw error;
-
-      toast.success("Produto atualizado com sucesso!");
-      
-      // Atualizar item na lista
-      setItems(items.map(i => i.id === item.id ? item : i));
-      
-    } catch (error) {
-      console.error("Erro ao atualizar:", error);
-      toast.error("Erro ao atualizar os dados. Por favor, tente novamente.");
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      // Deletar no Supabase
-      const { error } = await supabase
-        .from("data_curta")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Produto excluído com sucesso!");
-      
-      // Remover item da lista
-      setItems(items.filter(item => item.id !== id));
-      
-    } catch (error) {
-      console.error("Erro ao excluir:", error);
-      toast.error("Erro ao excluir os dados. Por favor, tente novamente.");
+      console.error('Erro ao salvar produto:', error);
+      toast.error("Erro ao salvar produto");
     }
   };
 
@@ -395,15 +264,21 @@ interface Item {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Marca</label>
-                      <Select value={marcaSelecionada} onValueChange={setMarcaSelecionada}>
+                      <Label htmlFor="marca">Marca</Label>
+                      <Select
+                        value={marca}
+                        onValueChange={(value) => {
+                          console.log('Marca selecionada:', value);
+                          setMarca(value);
+                        }}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a marca" />
                         </SelectTrigger>
                         <SelectContent>
-                          {marcasState.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.nome}
+                          {marcasState.map((marca) => (
+                            <SelectItem key={marca.id} value={marca.nome}>
+                              {marca.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -411,15 +286,19 @@ interface Item {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Produto</label>
-                      <Select value={produtoSelecionado} onValueChange={setProdutoSelecionado} disabled={!marcaSelecionada}>
+                      <Label htmlFor="produto">Produto</Label>
+                      <Select
+                        value={produto}
+                        onValueChange={setProduto}
+                        disabled={!marca}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
-                          {produtosState.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.nome}
+                          {produtosState.map((produto) => (
+                            <SelectItem key={produto.id} value={produto.nome}>
+                              {produto.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -536,8 +415,8 @@ interface Item {
                                 onClick={() => {
                                   const marca = marcasState.find(m => m.nome === item.marca);
                                   const produto = produtosState.find(p => p.nome === item.produto);
-                                  setMarcaSelecionada(marca?.id || '');
-                                  setProdutoSelecionado(produto?.id || '');
+                                  setMarca(marca?.nome || '');
+                                  setProduto(produto?.nome || '');
                                   setEstoque(item.quantidade);
                                   setDataValidade(item.data_validade);
                                   setRede(item.rede);
@@ -552,7 +431,10 @@ interface Item {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => {
+                                  // Deletar item da lista
+                                  setItems(items.filter(i => i.id !== item.id));
+                                }}
                                 className="hover:bg-red-50 hover:text-red-600"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -576,64 +458,6 @@ interface Item {
           </AnimatePresence>
         </motion.div>
       </div>
-
-      {/* Modal de Confirmação */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar Produto</DialogTitle>
-            <DialogDescription>
-              Verifique se os dados estão corretos antes de confirmar.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Marca</p>
-                <p className="text-lg font-semibold">{marcaSelecionada}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Produto</p>
-                <p className="text-lg font-semibold">{produtoSelecionado}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Quantidade</p>
-                <p className="text-lg font-semibold">{estoque} un/kg</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Data de Validade</p>
-                <p className="text-lg font-semibold">
-                  {dataValidade && format(new Date(dataValidade), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Rede</p>
-                <p className="text-lg font-semibold">{rede}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Loja</p>
-                <p className="text-lg font-semibold">{loja}</p>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="bg-rose-600 hover:bg-rose-700 text-white"
-              onClick={handleConfirm}
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 }

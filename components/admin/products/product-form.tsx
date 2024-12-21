@@ -102,9 +102,9 @@ export function ProductForm({ onSave, onCancel, initialData }: ProductFormProps)
         unidade: data.unidade,
         peso: data.peso,
         validade: data.validade,
-        marca: data.marca
+        marca: data.marca // Usando o nome da marca diretamente
       };
-      console.log('Dados mapeados:', produtoData);
+      console.log('Dados mapeados para salvar:', produtoData);
       await onSave(produtoData);
       reset();
     } catch (error) {

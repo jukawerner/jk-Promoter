@@ -60,7 +60,6 @@ export default function EstoqueLoja() {
   const [showForm, setShowForm] = useState(true);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [marcaSelecionada, setMarcaSelecionada] = useState("");
   const router = useRouter();
 
   // Carregar rede e loja do localStorage quando o componente montar
@@ -101,16 +100,34 @@ export default function EstoqueLoja() {
   }, []);
 
   // Carregar produtos quando uma marca é selecionada
-  const carregarProdutos = async (marcaId: string) => {
+  const carregarProdutos = async (marcaNome: string) => {
     try {
+      console.log('Carregando produtos da marca:', marcaNome);
+      
+      // Primeiro, vamos fazer uma consulta case-insensitive
       const { data, error } = await supabase
         .from('produto')
         .select('*')
-        .eq('marca_id', marcaId)
+        .ilike('marca', marcaNome) // Usando ilike para case-insensitive
         .order('nome');
 
       if (error) {
+        console.error('Erro na consulta:', error);
         throw error;
+      }
+
+      console.log('Resultado da consulta:', data);
+
+      if (!data || data.length === 0) {
+        // Tentar uma segunda consulta para debug
+        const { data: allProducts, error: debugError } = await supabase
+          .from('produto')
+          .select('marca')
+          .distinct();
+        
+        console.log('Marcas disponíveis:', allProducts);
+        console.log('Nenhum produto encontrado para a marca:', marcaNome);
+        toast.error('Nenhum produto encontrado para esta marca');
       }
 
       setProdutos(data || []);
@@ -122,12 +139,26 @@ export default function EstoqueLoja() {
 
   // Efeito para carregar produtos quando a marca muda
   useEffect(() => {
-    if (marcaSelecionada) {
-      carregarProdutos(marcaSelecionada);
+    if (marca) {
+      carregarProdutos(marca);
     } else {
       setProdutos([]);
     }
-  }, [marcaSelecionada]);
+  }, [marca]);
+
+  // Função para debug - remover depois
+  const debugProdutos = async () => {
+    const { data, error } = await supabase
+      .from('produto')
+      .select('*');
+    console.log('Todos os produtos:', data);
+    console.log('Erro se houver:', error);
+  };
+
+  // Chamar função de debug quando o componente montar
+  useEffect(() => {
+    debugProdutos();
+  }, []);
 
   const handleConfirm = async () => {
     if (!marca || !produto || !estoque || !estoqueVirtual || !rede || !loja) {
@@ -136,44 +167,34 @@ export default function EstoqueLoja() {
     }
 
     try {
-      const estoqueNum = parseFloat(estoque);
-      const estoqueVirtualNum = parseFloat(estoqueVirtual);
+      console.log('Dados para salvar:', {
+        rede,
+        loja,
+        marca,
+        produto,
+        estoque_fisico: parseFloat(estoque),
+        estoque_virtual: parseFloat(estoqueVirtual)
+      });
 
-      if (isNaN(estoqueNum) || isNaN(estoqueVirtualNum)) {
-        toast.error("Por favor, insira valores numéricos válidos para os estoques");
-        return;
-      }
-
-      // Buscar o nome da marca selecionada
-      const { data: marcaData } = await supabase
-        .from('marca')
-        .select('nome')
-        .eq('id', marca)
-        .single();
-
-      // Buscar o nome do produto selecionado
-      const { data: produtoData } = await supabase
-        .from('produto')
-        .select('nome')
-        .eq('id', produto)
-        .single();
-
-      // Criar novo item
-      const { error } = await supabase
-        .from('estoque')
+      const { data, error } = await supabase
+        .from("estoque")
         .insert([{
           rede: rede,
           loja: loja,
-          marca: marcaData?.nome,         // Salva o nome da marca
-          produto: produtoData?.nome,     // Salva o nome do produto
-          marca_id: marca,                // Também salva o ID da marca
-          produto_id: produto,            // Também salva o ID do produto
-          estoque_fisico: estoqueNum,
-          estoque_virtual: estoqueVirtualNum,
-        }]);
+          marca: marca,
+          produto: produto,
+          estoque_fisico: parseFloat(estoque),
+          estoque_virtual: parseFloat(estoqueVirtual),
+          created_at: new Date().toISOString()
+        }])
+        .select();
 
-      if (error) throw error;
-      
+      if (error) {
+        console.error('Erro ao salvar:', error);
+        throw error;
+      }
+
+      console.log('Dados salvos com sucesso:', data);
       toast.success("Estoque cadastrado com sucesso!");
 
       // Limpar formulário
@@ -190,7 +211,6 @@ export default function EstoqueLoja() {
 
   const handleEdit = (item: EstoqueItem) => {
     setMarca(item.marca);
-    setMarcaSelecionada(item.marca);
     setProduto(item.produto);
     setEstoque(item.estoque);
     setEstoqueVirtual(item.estoqueVirtual);
@@ -211,13 +231,13 @@ export default function EstoqueLoja() {
         const { data: marcaData } = await supabase
           .from('marca')
           .select('nome')
-          .eq('id', item.marca)
+          .eq('nome', item.marca)
           .single();
 
         const { data: produtoData } = await supabase
           .from('produto')
           .select('nome')
-          .eq('id', item.produto)
+          .eq('nome', item.produto)
           .single();
 
         const { error } = await supabase
@@ -228,8 +248,8 @@ export default function EstoqueLoja() {
               loja: item.loja,
               marca: marcaData?.nome,         // Salva o nome da marca
               produto: produtoData?.nome,     // Salva o nome do produto
-              marca_id: item.marca,           // Também salva o ID da marca
-              produto_id: item.produto,       // Também salva o ID do produto
+              marca_id: marcaData?.id,        // Também salva o ID da marca
+              produto_id: produtoData?.id,    // Também salva o ID do produto
               estoque_fisico: parseFloat(item.estoque),
               estoque_virtual: parseFloat(item.estoqueVirtual),
             }
@@ -325,8 +345,8 @@ export default function EstoqueLoja() {
                       <Select
                         value={marca}
                         onValueChange={(value) => {
+                          console.log('Marca selecionada:', value);
                           setMarca(value);
-                          setMarcaSelecionada(value);
                         }}
                       >
                         <SelectTrigger>
@@ -334,7 +354,7 @@ export default function EstoqueLoja() {
                         </SelectTrigger>
                         <SelectContent>
                           {marcas.map((marca) => (
-                            <SelectItem key={marca.id} value={marca.id}>
+                            <SelectItem key={marca.id} value={marca.nome}>
                               {marca.nome}
                             </SelectItem>
                           ))}
@@ -347,13 +367,14 @@ export default function EstoqueLoja() {
                       <Select
                         value={produto}
                         onValueChange={setProduto}
+                        disabled={!marca}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
                           {produtos.map((produto) => (
-                            <SelectItem key={produto.id} value={produto.id}>
+                            <SelectItem key={produto.id} value={produto.nome}>
                               {produto.nome}
                             </SelectItem>
                           ))}
