@@ -307,16 +307,24 @@ export default function EstoqueLoja() {
 
   const handleBarcodeScan = async (result: string) => {
     setIsScannerOpen(false);
+    console.log('Código de barras lido:', result);
     
     try {
       const product = await findProductByEAN(result);
+      console.log('Produto retornado:', product);
       
       if (product) {
+        console.log('Atualizando campos com:', {
+          marca: product.marca_nome?.toUpperCase(),
+          produto: product.nome.toUpperCase()
+        });
+
         // Define a marca e produto diretamente
         setMarca(product.marca_nome?.toUpperCase() || '');
         setProduto(product.nome.toUpperCase());
         toast.success("Produto encontrado!");
       } else {
+        console.log('Nenhum produto encontrado para o código:', result);
         toast.error("Produto não encontrado no sistema");
       }
     } catch (error) {

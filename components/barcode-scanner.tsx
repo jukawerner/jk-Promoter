@@ -62,29 +62,58 @@ export default function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScann
         formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13 ],
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
-        }
+        },
+        aspectRatio: 1.0,
+        focusMode: 'continuous',
+        supportedScanTypes: [ Html5QrcodeSupportedFormats.EAN_13 ]
       };
 
       scannerRef.current = new Html5Qrcode("reader");
 
-      try {
-        // Tenta primeiro com a câmera traseira
-        await scannerRef.current.start(
-          { facingMode: "environment" },
-          config,
-          handleScan,
-          handleError
-        );
-      } catch (err) {
-        console.log("Erro ao iniciar câmera traseira, tentando qualquer câmera:", err);
-        
-        // Tenta com qualquer câmera disponível
-        await scannerRef.current.start(
-          true,
-          config,
-          handleScan,
-          handleError
-        );
+      // Lista todas as câmeras disponíveis
+      const devices = await Html5Qrcode.getCameras();
+      console.log("Câmeras disponíveis:", devices);
+
+      if (devices && devices.length > 0) {
+        try {
+          // Tenta usar a câmera traseira primeiro (se houver)
+          const rearCamera = devices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('traseira') ||
+            device.label.toLowerCase().includes('environment')
+          );
+
+          if (rearCamera) {
+            console.log("Usando câmera traseira:", rearCamera.label);
+            await scannerRef.current.start(
+              rearCamera.id,
+              config,
+              handleScan,
+              handleError
+            );
+          } else {
+            // Se não encontrar câmera traseira, usa a primeira disponível
+            console.log("Usando primeira câmera disponível:", devices[0].label);
+            await scannerRef.current.start(
+              devices[0].id,
+              config,
+              handleScan,
+              handleError
+            );
+          }
+        } catch (err) {
+          console.error("Erro ao iniciar câmera específica:", err);
+          
+          // Tenta com configuração genérica
+          await scannerRef.current.start(
+            { facingMode: "environment" },
+            config,
+            handleScan,
+            handleError
+          );
+        }
+      } else {
+        throw new Error("Nenhuma câmera encontrada");
       }
     } catch (error) {
       console.error("Erro ao inicializar scanner:", error);
