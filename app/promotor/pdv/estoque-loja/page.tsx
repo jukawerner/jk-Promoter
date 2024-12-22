@@ -1,32 +1,31 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "components/ui/select";
+import { Input } from "components/ui/input";
+import { Label } from "components/ui/label";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "components/ui/table";
 import { ArrowLeft, Plus, Pencil, Trash2, Store, Package2, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { WhatsappButton } from "@/components/whatsapp-button";
-import { supabase } from "@/lib/supabase";
-import { QRScannerModal } from "@/components/qr-scanner-modal";
+import { WhatsappButton } from "components/whatsapp-button";
+import { supabase } from "lib/supabase";
+import { CodeScanner } from "components/code-scanner";
 
 interface EstoqueItem {
   id?: string;
@@ -64,7 +63,6 @@ export default function EstoqueLoja() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const router = useRouter();
 
-  // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const redeSelected = localStorage.getItem("redeSelected") || "";
@@ -81,7 +79,6 @@ export default function EstoqueLoja() {
     }
   }, [router]);
 
-  // Carregar marcas do Supabase
   useEffect(() => {
     const fetchMarcas = async () => {
       try {
@@ -101,34 +98,17 @@ export default function EstoqueLoja() {
     fetchMarcas();
   }, []);
 
-  // Carregar produtos quando uma marca é selecionada
   const carregarProdutos = async (marcaNome: string) => {
     try {
-      console.log('Carregando produtos da marca:', marcaNome);
-      
-      // Primeiro, vamos fazer uma consulta case-insensitive
       const { data, error } = await supabase
         .from('produto')
         .select('*')
-        .ilike('marca', marcaNome) // Usando ilike para case-insensitive
+        .ilike('marca', marcaNome)
         .order('nome');
 
-      if (error) {
-        console.error('Erro na consulta:', error);
-        throw error;
-      }
-
-      console.log('Resultado da consulta:', data);
+      if (error) throw error;
 
       if (!data || data.length === 0) {
-        // Tentar uma segunda consulta para debug
-        const { data: allProducts, error: debugError } = await supabase
-          .from('produto')
-          .select('marca')
-          .distinct();
-        
-        console.log('Marcas disponíveis:', allProducts);
-        console.log('Nenhum produto encontrado para a marca:', marcaNome);
         toast.error('Nenhum produto encontrado para esta marca');
       }
 
@@ -139,7 +119,6 @@ export default function EstoqueLoja() {
     }
   };
 
-  // Efeito para carregar produtos quando a marca muda
   useEffect(() => {
     if (marca) {
       carregarProdutos(marca);
@@ -148,20 +127,6 @@ export default function EstoqueLoja() {
     }
   }, [marca]);
 
-  // Função para debug - remover depois
-  const debugProdutos = async () => {
-    const { data, error } = await supabase
-      .from('produto')
-      .select('*');
-    console.log('Todos os produtos:', data);
-    console.log('Erro se houver:', error);
-  };
-
-  // Chamar função de debug quando o componente montar
-  useEffect(() => {
-    debugProdutos();
-  }, []);
-
   const handleConfirm = async () => {
     if (!marca || !produto || !estoque || !estoqueVirtual || !rede || !loja) {
       toast.error("Por favor, preencha todos os campos");
@@ -169,15 +134,6 @@ export default function EstoqueLoja() {
     }
 
     try {
-      console.log('Dados para salvar:', {
-        rede,
-        loja,
-        marca,
-        produto,
-        estoque_fisico: parseFloat(estoque),
-        estoque_virtual: parseFloat(estoqueVirtual)
-      });
-
       const { data, error } = await supabase
         .from("estoque")
         .insert([{
@@ -191,15 +147,9 @@ export default function EstoqueLoja() {
         }])
         .select();
 
-      if (error) {
-        console.error('Erro ao salvar:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Dados salvos com sucesso:', data);
       toast.success("Estoque cadastrado com sucesso!");
-
-      // Limpar formulário
       setMarca("");
       setProduto("");
       setEstoque("");
@@ -230,28 +180,14 @@ export default function EstoqueLoja() {
   const handleGravar = async () => {
     try {
       for (const item of items) {
-        const { data: marcaData } = await supabase
-          .from('marca')
-          .select('nome')
-          .eq('nome', item.marca)
-          .single();
-
-        const { data: produtoData } = await supabase
-          .from('produto')
-          .select('nome')
-          .eq('nome', item.produto)
-          .single();
-
         const { error } = await supabase
           .from("estoque")
           .insert([
             {
               rede: item.rede,
               loja: item.loja,
-              marca: marcaData?.nome,         // Salva o nome da marca
-              produto: produtoData?.nome,     // Salva o nome do produto
-              marca_id: marcaData?.id,        // Também salva o ID da marca
-              produto_id: produtoData?.id,    // Também salva o ID do produto
+              marca: item.marca,
+              produto: item.produto,
               estoque_fisico: parseFloat(item.estoque),
               estoque_virtual: parseFloat(item.estoqueVirtual),
             }
@@ -263,15 +199,14 @@ export default function EstoqueLoja() {
       toast.success("Estoque salvo com sucesso!");
       setItems([]);
       router.push("/promotor/pdv/ponto-de-venda");
-    } catch (error: any) {
-      console.log("Erro ao salvar estoque:", error);
+    } catch (error) {
+      console.error("Erro ao salvar estoque:", error);
       toast.error("Erro ao salvar estoque");
     }
   };
 
   const handleQRCodeScan = async (result: string) => {
     try {
-      // Assuming the QR code contains the product's EAN code
       const { data, error } = await supabase
         .from('produto')
         .select('*')
@@ -304,7 +239,6 @@ export default function EstoqueLoja() {
           <WhatsappButton />
         </div>
 
-        {/* Header com ícone e título */}
         <div className="flex flex-col items-center text-center space-y-3 mb-8">
           <motion.div 
             className="relative"
@@ -341,7 +275,6 @@ export default function EstoqueLoja() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="grid gap-4">
-                  {/* Campos Rede e Loja lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="rede">Rede</Label>
@@ -364,7 +297,6 @@ export default function EstoqueLoja() {
                     </div>
                   </div>
 
-                  {/* Campos Marca e Produto lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Marca</Label>
@@ -372,7 +304,6 @@ export default function EstoqueLoja() {
                         <Select
                           value={marca}
                           onValueChange={(value) => {
-                            console.log('Marca selecionada:', value);
                             setMarca(value);
                           }}
                         >
@@ -419,7 +350,6 @@ export default function EstoqueLoja() {
                     </div>
                   </div>
 
-                  {/* Campos Estoque Físico e Virtual lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="estoque">Estoque Físico</Label>
@@ -453,7 +383,6 @@ export default function EstoqueLoja() {
                   </div>
                 </div>
 
-                {/* Botões */}
                 <div className="flex justify-between items-center pt-6 border-t">
                   <Button
                     variant="ghost"
@@ -538,7 +467,6 @@ export default function EstoqueLoja() {
                   </Table>
                 </div>
 
-                {/* Botões da tabela */}
                 <div className="flex justify-between items-center pt-6">
                   <Button
                     variant="ghost"
@@ -562,13 +490,11 @@ export default function EstoqueLoja() {
           </AnimatePresence>
         </motion.div>
       </div>
-      {showQRScanner && (
-        <QRScannerModal
-          isOpen={showQRScanner}
-          onClose={() => setShowQRScanner(false)}
-          onScan={handleQRCodeScan}
-        />
-      )}
+      <CodeScanner
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={handleQRCodeScan}
+      />
     </motion.div>
   );
 }
