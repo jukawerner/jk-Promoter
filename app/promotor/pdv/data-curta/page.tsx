@@ -22,7 +22,9 @@ import { supabase } from "lib/supabase";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, AlertTriangle, Package2 } from "lucide-react";
+import { Clock, AlertTriangle, Package2, QrCode } from "lucide-react";
+import BarcodeScanner from "components/barcode-scanner";
+import { ConfirmModal } from "components/ConfirmModal";
 import { formatNumber, parseFormattedNumber } from "lib/utils/formatters";
 
 interface Marca {
@@ -63,6 +65,11 @@ export default function DataCurtaPage() {
   const [loja, setLoja] = useState("");
   const [marcasState, setMarcasState] = useState<Marca[]>([]);
   const [produtosState, setProdutosState] = useState<Produto[]>([]);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scannedBrand, setScannedBrand] = useState("");
+  const [scannedProduct, setScannedProduct] = useState("");
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -188,6 +195,38 @@ export default function DataCurtaPage() {
     router.push("/promotor/pdv/avaliacao");
   };
 
+  const handleBarcodeScan = async (result: string) => {
+    setIsScannerOpen(false);
+    
+    try {
+      const { data: product, error } = await supabase
+        .from('produto')
+        .select('nome, marca')
+        .eq('codigo_ean', result)
+        .single();
+
+      if (error) throw error;
+      
+      if (product) {
+        setScannedBarcode(result);
+        setScannedBrand(product.marca.toUpperCase());
+        setScannedProduct(product.nome.toUpperCase());
+        setIsModalOpen(true);
+      } else {
+        toast.error("Produto não encontrado no sistema");
+      }
+    } catch (error) {
+      console.error('Erro ao processar código de barras:', error);
+      toast.error("Erro ao buscar produto. Tente novamente.");
+    }
+  };
+
+  const handleConfirmScan = () => {
+    setMarca(scannedBrand);
+    setProduto(scannedProduct);
+    setIsModalOpen(false);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -254,23 +293,33 @@ export default function DataCurtaPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="marca">Marca</Label>
-                      <Select
-                        value={marca}
-                        onValueChange={(value) => {
-                          setMarca(value);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {marcasState.map((marca) => (
-                            <SelectItem key={marca.id} value={marca.nome}>
-                              {marca.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Select
+                          value={marca}
+                          onValueChange={(value) => {
+                            setMarca(value);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a marca" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {marcasState.map((marca) => (
+                              <SelectItem key={marca.id} value={marca.nome}>
+                                {marca.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          type="button"
+                          onClick={() => setIsScannerOpen(true)}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -447,6 +496,19 @@ export default function DataCurtaPage() {
           </AnimatePresence>
         </motion.div>
       </div>
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmScan}
+        barcode={scannedBarcode}
+        brand={scannedBrand}
+        product={scannedProduct}
+      />
     </motion.div>
   );
 }

@@ -11,7 +11,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Store, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Store, Plus, QrCode } from "lucide-react";
+import BarcodeScanner from "components/barcode-scanner";
+import { ConfirmModal } from "components/ConfirmModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -55,6 +57,43 @@ export default function PesquisaPreco() {
   const [loja, setLoja] = useState("");
   const [promo, setPromo] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scannedBrand, setScannedBrand] = useState("");
+  const [scannedProduct, setScannedProduct] = useState("");
+
+  const handleBarcodeScan = async (result: string) => {
+    setIsScannerOpen(false);
+    
+    try {
+      const { data: product, error } = await supabase
+        .from('produto')
+        .select('nome, marca')
+        .eq('codigo_ean', result)
+        .single();
+
+      if (error) throw error;
+      
+      if (product) {
+        setScannedBarcode(result);
+        setScannedBrand(product.marca.toUpperCase());
+        setScannedProduct(product.nome.toUpperCase());
+        setIsModalOpen(true);
+      } else {
+        toast.error("Produto não encontrado no sistema");
+      }
+    } catch (error) {
+      console.error('Erro ao processar código de barras:', error);
+      toast.error("Erro ao buscar produto. Tente novamente.");
+    }
+  };
+
+  const handleConfirmScan = () => {
+    setMarca(scannedBrand);
+    setProduto(scannedProduct);
+    setIsModalOpen(false);
+  };
 
   // Dados mockados para exemplo
   const marcas = ["Marca A", "Marca B", "Marca C"];
@@ -248,18 +287,28 @@ export default function PesquisaPreco() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="marca">Marca</Label>
-                      <Select value={marca} onValueChange={setMarca}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {marcas.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Select value={marca} onValueChange={setMarca}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a marca" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {marcas.map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          type="button"
+                          onClick={() => setIsScannerOpen(true)}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -459,6 +508,19 @@ export default function PesquisaPreco() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmScan}
+        barcode={scannedBarcode}
+        brand={scannedBrand}
+        product={scannedProduct}
+      />
     </motion.div>
   );
 }
