@@ -34,7 +34,12 @@ export default function PesquisaPrecoPage() {
   const [pesquisaPreco, setPesquisaPreco] = useState<PesquisaPreco[]>([]);
   const [pesquisaPrecoCompleto, setPesquisaPrecoCompleto] = useState<PesquisaPreco[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [rowSelection, setRowSelection] = useState({});
+  const [selectedRows, setSelectedRows] = useState<PesquisaPreco[]>([]);
+  const [selectedCount, setSelectedCount] = useState(0);
+
+  useEffect(() => {
+    setSelectedCount(selectedRows.length);
+  }, [selectedRows]);
   const [filtros, setFiltros] = useState<Filtros>({
     busca: "",
     dataInicio: null,
@@ -153,14 +158,26 @@ export default function PesquisaPrecoPage() {
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          onCheckedChange={(value) => {
+            table.toggleAllPageRowsSelected(!!value);
+            const allPageRows = table.getRowModel().rows.map(row => row.original);
+            setSelectedRows(value ? allPageRows : []);
+          }}
           aria-label="Selecionar tudo"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          checked={selectedRows.some(item => item.id === row.original.id)}
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value);
+            setSelectedRows(prev => {
+              if (value) {
+                return [...prev, row.original];
+              }
+              return prev.filter(item => item.id !== row.original.id);
+            });
+          }}
           aria-label="Selecionar linha"
         />
       ),
@@ -246,10 +263,36 @@ export default function PesquisaPrecoPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Relatório de Pesquisa de Preços</h1>
-        <Button onClick={exportToExcel}>
-          <Download className="w-4 h-4 mr-2" />
-          Exportar Excel
-        </Button>
+        <div className="flex gap-2">
+          {selectedCount > 0 && (
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!window.confirm(`Tem certeza que deseja excluir ${selectedCount} registros?`)) {
+                  return;
+                }
+                try {
+                  for (const item of selectedRows) {
+                    await supabase.from("pesquisa_preco").delete().eq("id", item.id);
+                  }
+                  toast.success(`${selectedCount} registros excluídos com sucesso!`);
+                  loadPesquisaPreco();
+                  setSelectedRows([]);
+                } catch (error) {
+                  toast.error("Erro ao excluir registros");
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Selecionados ({selectedCount})
+            </Button>
+          )}
+          <Button onClick={exportToExcel}>
+            <Download className="w-4 h-4 mr-2" />
+            Exportar Excel
+            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow mb-6">
@@ -277,7 +320,31 @@ export default function PesquisaPrecoPage() {
             />
           </div>
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-between gap-2">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (selectedRows.length === pesquisaPreco.length) {
+                  setSelectedRows([]);
+                } else {
+                  setSelectedRows([...pesquisaPreco]);
+                }
+              }}
+            >
+              {selectedRows.length === pesquisaPreco.length ? (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Desmarcar Todos
+                </>
+              ) : (
+                <>
+                  <Checkbox className="w-4 h-4 mr-2" />
+                  Selecionar Todos
+                </>
+              )}
+            </Button>
+          </div>
           <Button variant="outline" onClick={limparFiltros}>
             <X className="w-4 h-4 mr-2" />
             Limpar Filtros

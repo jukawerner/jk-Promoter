@@ -397,7 +397,8 @@ const exportToExcel = () => {
           checked={table.getIsAllPageRowsSelected()}
           onCheckedChange={(value) => {
             table.toggleAllPageRowsSelected(!!value);
-            setSelectedRows(value ? pdvData : []);
+            const allPageRows = table.getRowModel().rows.map(row => row.original);
+            setSelectedRows(value ? allPageRows : []);
           }}
           aria-label="Select all"
         />
@@ -505,6 +506,37 @@ const exportToExcel = () => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Relatório de PDV</h1>
         <div className="flex gap-2">
+          {selectedCount > 0 && (
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!window.confirm(`Tem certeza que deseja excluir ${selectedCount} registros?`)) {
+                  return;
+                }
+                try {
+                  for (const pdv of selectedRows) {
+                    // Excluir fotos do storage
+                    if (pdv.fotos) {
+                      await Promise.all(pdv.fotos.map(async (fotoUrl) => {
+                        const fileName = fotoUrl.split('pdv-photos/')[1];
+                        await supabase.storage.from('pdv-photos').remove([fileName]);
+                      }));
+                    }
+                    // Excluir registro do banco
+                    await supabase.from("pdv").delete().eq("id", pdv.id);
+                  }
+                  toast.success(`${selectedCount} registros excluídos com sucesso!`);
+                  loadPDV();
+                  setSelectedRows([]);
+                } catch (error) {
+                  toast.error("Erro ao excluir registros");
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Selecionados ({selectedCount})
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={exportToExcel}
@@ -551,7 +583,31 @@ const exportToExcel = () => {
             />
           </div>
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-between gap-2">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (selectedRows.length === pdvData.length) {
+                  setSelectedRows([]);
+                } else {
+                  setSelectedRows([...pdvData]);
+                }
+              }}
+            >
+              {selectedRows.length === pdvData.length ? (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Desmarcar Todos
+                </>
+              ) : (
+                <>
+                  <Checkbox className="w-4 h-4 mr-2" />
+                  Selecionar Todos
+                </>
+              )}
+            </Button>
+          </div>
           <Button variant="outline" onClick={limparFiltros}>
             <X className="w-4 h-4 mr-2" />
             Limpar Filtros
