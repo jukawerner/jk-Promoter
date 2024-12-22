@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "components/whatsapp-button";
 import { supabase } from "lib/supabase";
-import { CodeScanner } from "components/code-scanner";
+import { BarcodeScanner } from "components/barcode-scanner";
 
 interface EstoqueItem {
   id?: string;
@@ -490,7 +490,7 @@ export default function EstoqueLoja() {
           </AnimatePresence>
         </motion.div>
       </div>
-      <CodeScanner
+      <BarcodeScanner
         isOpen={showQRScanner}
         onClose={() => setShowQRScanner(false)}
         onScan={handleQRCodeScan}
