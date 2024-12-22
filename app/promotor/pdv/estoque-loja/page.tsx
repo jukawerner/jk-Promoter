@@ -313,31 +313,23 @@ export default function EstoqueLoja() {
       
       if (product) {
         // Busca a marca correspondente
-        const marcaFound = marcas.find(m => m.id === product.marca);
-        if (marcaFound) {
-          setMarca(marcaFound.id);
+        const { data: marcaData } = await supabase
+          .from('marca')
+          .select('nome')
+          .eq('id', product.marca)
+          .single();
+
+        if (marcaData) {
+          // Define a marca pelo nome
+          setMarca(marcaData.nome.toUpperCase());
           
-          // Atualiza a lista de produtos da marca
-          const { data: produtosData } = await supabase
-            .from('produto')
-            .select('*')
-            .eq('marca', marcaFound.id)
-            .order('nome');
+          // Define o produto pelo nome
+          setProduto(product.nome.toUpperCase());
           
-          if (produtosData) {
-            const formattedProdutos = produtosData.map(item => ({
-              id: item.id,
-              nome: item.nome.toUpperCase(),
-              marca: item.marca
-            }));
-            setProdutos(formattedProdutos);
-          }
-          
-          // Define o produto
-          setProduto(product.id);
+          toast.success("Produto encontrado!");
+        } else {
+          toast.error("Marca não encontrada");
         }
-        
-        toast.success("Produto encontrado!");
       } else {
         toast.error("Produto não encontrado no sistema");
       }
