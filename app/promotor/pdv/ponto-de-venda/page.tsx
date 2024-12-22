@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "components/whatsapp-button";
 import { supabase } from "lib/supabase";
-import { CameraCapture } from "components/camera-capture";
 
 interface PontoVendaItem {
   id: number;
@@ -41,7 +40,6 @@ export default function PontoVenda() {
   const [showForm, setShowForm] = useState(true);
   const [rede, setRede] = useState("");
   const [loja, setLoja] = useState("");
-  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -151,16 +149,6 @@ export default function PontoVenda() {
     }
   };
 
-  const handleImageCapture = async (imageFile: File) => {
-    try {
-      setImagens(prev => [...prev, imageFile]);
-      toast.success('Foto capturada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao processar imagem:', error);
-      toast.error('Erro ao processar imagem. Tente novamente.');
-    }
-  };
-
   const handleDeleteImage = (index: number) => {
     setImagens(prev => prev.filter((_, i) => i !== index));
     toast.success("Imagem removida com sucesso!");
@@ -245,7 +233,7 @@ export default function PontoVenda() {
               continue;
             }
 
-            const { data: { publicUrl } } = supabase.storage
+            const { data: { publicUrl } }: { data: { publicUrl: string } } = supabase.storage
               .from('pdv-photos')
               .getPublicUrl(cleanFileName);
 
@@ -299,8 +287,8 @@ export default function PontoVenda() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-gray-50"
     >
-      <div className="container mx-auto px-4 py-6 md:p-6 max-w-[800px]">
-        <div className="flex flex-col items-center text-center space-y-4 md:space-y-6 mb-6 md:mb-8">
+      <div className="container mx-auto px-3 py-4 md:p-6 max-w-[800px]">
+        <div className="flex flex-col items-center text-center space-y-3 md:space-y-6 mb-4 md:mb-8">
           <motion.div 
             className="relative"
             initial={{ scale: 0 }}
@@ -321,7 +309,7 @@ export default function PontoVenda() {
         </div>
 
         <motion.div 
-          className="space-y-6 md:space-y-8 bg-white rounded-xl shadow-sm p-4 md:p-6 border"
+          className="space-y-3 md:space-y-8 bg-white rounded-lg shadow-sm p-3 md:p-6 border"
           initial={{ y: 20 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.1 }}
@@ -335,42 +323,42 @@ export default function PontoVenda() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="rede">Rede</Label>
+                <div className="grid gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="rede" className="text-sm">Rede</Label>
                       <Input
                         id="rede"
                         value={rede}
                         disabled
-                        className="bg-gray-50"
+                        className="bg-gray-50 h-9"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="loja">Loja</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="loja" className="text-sm">Loja</Label>
                       <Input
                         id="loja"
                         value={loja}
                         disabled
-                        className="bg-gray-50"
+                        className="bg-gray-50 h-9"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="marca">Marca</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="marca" className="text-sm">Marca</Label>
                       <Select
                         value={marca}
                         onValueChange={setMarca}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a marca" />
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a marca" className="text-sm" />
                         </SelectTrigger>
                         <SelectContent>
                           {marcas.map((marca) => (
-                            <SelectItem key={marca.id} value={marca.id}>
+                            <SelectItem key={marca.id} value={marca.id} className="text-sm">
                               {marca.nome}
                             </SelectItem>
                           ))}
@@ -378,8 +366,8 @@ export default function PontoVenda() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="h-6" />
+                    <div className="space-y-1.5">
+                      <div className="h-5" />
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="pontoExtra"
@@ -388,7 +376,7 @@ export default function PontoVenda() {
                         />
                         <label
                           htmlFor="pontoExtra"
-                          className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                          className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
                         >
                           Ponto Extra conquistado
                         </label>
@@ -397,19 +385,19 @@ export default function PontoVenda() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-4 md:p-8 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
-                      <div className="flex flex-col items-center gap-3 md:gap-4">
+                    <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-3 md:p-6 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
+                      <div className="flex flex-col items-center gap-2 md:gap-4">
                         <div className="text-center space-y-2">
                           <div className="text-gray-500 dark:text-gray-400">
                             <ImageIcon className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 text-gray-400" />
-                            <p className="text-xs md:text-sm">Arraste e solte suas imagens aqui ou</p>
+                            <p className="text-[10px] md:text-sm">Adicione suas imagens</p>
                           </div>
-                          <div className="flex flex-col md:flex-row gap-2 md:gap-3">
-                            <div className="w-full flex flex-col sm:flex-row gap-2">
+                          <div className="flex flex-col gap-2 w-full">
+                            <div className="w-full grid grid-cols-2 gap-2">
                               <Button
                                 variant="outline"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
+                                className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
                               >
                                 <ImageIcon className="w-4 h-4" />
                                 Galeria
@@ -422,14 +410,23 @@ export default function PontoVenda() {
                                 onChange={handleImageUpload}
                                 className="hidden"
                               />
-                              <Button
-                                variant="outline"
-                                onClick={() => setShowCamera(true)}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
-                              >
-                                <Camera className="w-4 h-4" />
-                                Câmera
-                              </Button>
+                              <label htmlFor="camera-input">
+                                <Button
+                                  variant="outline"
+                                  className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
+                                >
+                                  <Camera className="w-4 h-4" />
+                                  Câmera
+                                </Button>
+                              </label>
+                              <input
+                                id="camera-input"
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                              />
                             </div>
                           </div>
                         </div>
@@ -442,7 +439,7 @@ export default function PontoVenda() {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-4"
+                          className="grid grid-cols-3 gap-1.5 md:gap-4"
                         >
                           {imagens.map((image, index) => (
                             <motion.div
@@ -450,7 +447,7 @@ export default function PontoVenda() {
                               initial={{ opacity: 0, scale: 0.8 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.8 }}
-                              className="relative group aspect-square"
+                              className="relative group aspect-square rounded-md overflow-hidden"
                             >
                               <img
                                 src={URL.createObjectURL(image)}
@@ -459,9 +456,9 @@ export default function PontoVenda() {
                               />
                               <button
                                 onClick={() => handleDeleteImage(index)}
-                                className="absolute -top-2 -right-2 bg-rose-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-rose-600 hover:scale-110"
+                                className="absolute -top-1 -right-1 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-rose-600 hover:scale-110"
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-2.5 w-2.5" />
                               </button>
                             </motion.div>
                           ))}
@@ -470,17 +467,17 @@ export default function PontoVenda() {
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 pt-6 border-t">
+                  <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-2 pt-4 md:pt-6 border-t">
                     <Button
                       variant="ghost"
                       onClick={() => router.push("/promotor")}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900"
+                      className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 text-sm h-9"
                     >
                       <ArrowLeft className="w-4 h-4" /> Voltar
                     </Button>
                     <Button
                       onClick={handleConfirm}
-                      className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center gap-2"
+                      className="w-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center gap-2 text-sm h-9"
                     >
                       <Plus className="w-4 h-4" />
                       {editingItem ? "Atualizar" : "Adicionar"}
@@ -500,39 +497,39 @@ export default function PontoVenda() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="whitespace-nowrap">Marca</TableHead>
-                        <TableHead className="whitespace-nowrap">Imagens</TableHead>
-                        <TableHead className="whitespace-nowrap">Ponto Extra</TableHead>
-                        <TableHead className="hidden md:table-cell">Rede</TableHead>
-                        <TableHead className="hidden md:table-cell">Loja</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs md:text-sm py-2 md:py-3">Marca</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs md:text-sm py-2 md:py-3">Imagens</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs md:text-sm py-2 md:py-3">Ponto Extra</TableHead>
+                        <TableHead className="hidden md:table-cell text-xs md:text-sm py-2 md:py-3">Rede</TableHead>
+                        <TableHead className="hidden md:table-cell text-xs md:text-sm py-2 md:py-3">Loja</TableHead>
+                        <TableHead className="text-right text-xs md:text-sm py-2 md:py-3">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium whitespace-nowrap">{item.marca_nome}</TableCell>
-                          <TableCell className="whitespace-nowrap">{item.imagens.length} imagem(ns)</TableCell>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="font-medium whitespace-nowrap text-xs md:text-sm py-2 md:py-3">{item.marca_nome}</TableCell>
+                          <TableCell className="whitespace-nowrap text-xs md:text-sm py-2 md:py-3">{item.imagens.length} imagem(ns)</TableCell>
+                          <TableCell className="whitespace-nowrap text-xs md:text-sm py-2 md:py-3">
                             {item.pontoExtra ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] md:text-xs font-medium bg-green-100 text-green-700">
                                 Sim
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] md:text-xs font-medium bg-gray-100 text-gray-700">
                                 Não
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">{item.rede}</TableCell>
-                          <TableCell className="hidden md:table-cell">{item.loja}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs md:text-sm py-2 md:py-3">{item.rede}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs md:text-sm py-2 md:py-3">{item.loja}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1 md:gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(item)}
-                                className="h-8 w-8 text-gray-600 hover:text-blue-600"
+                                className="h-7 w-7 text-gray-600 hover:text-blue-600"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -540,7 +537,7 @@ export default function PontoVenda() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(item.id)}
-                                className="h-8 w-8 text-gray-600 hover:text-rose-600"
+                                className="h-7 w-7 text-gray-600 hover:text-rose-600"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -552,17 +549,17 @@ export default function PontoVenda() {
                   </Table>
                 </div>
 
-                <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 mt-6 md:mt-8">
+                <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-2 mt-4 md:mt-8">
                   <Button
                     variant="outline"
-                    onClick={() => router.push("/promotor")}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2"
+                    onClick={() => setShowForm(true)}
+                    className="w-full flex items-center justify-center gap-2 text-sm h-9"
                   >
                     <ArrowLeft className="w-4 h-4" /> Voltar
                   </Button>
                   <Button
                     onClick={handleSave}
-                    className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white flex items-center justify-center gap-2"
+                    className="w-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center gap-2 text-sm h-9"
                     disabled={items.length === 0}
                   >
                     Gravar
@@ -573,13 +570,6 @@ export default function PontoVenda() {
           </AnimatePresence>
         </motion.div>
       </div>
-      {showCamera && (
-        <CameraCapture
-          isOpen={showCamera}
-          onClose={() => setShowCamera(false)}
-          onCapture={handleImageCapture}
-        />
-      )}
     </motion.div>
   );
 }
