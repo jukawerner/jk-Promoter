@@ -7,7 +7,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'your-supabase-project.supabase.co',
+        hostname: 'ijdlmwzwulhfdqapgtat.supabase.co',
       },
     ],
   },
@@ -16,10 +16,10 @@ const nextConfig = {
   },
   swcMinify: true,
   poweredByHeader: false,
-  reactStrictMode: true,
+  reactStrictMode: false, // Disable strict mode temporarily for testing
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
-  },
+  }
 };
 
 module.exports = nextConfig;
