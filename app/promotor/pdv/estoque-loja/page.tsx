@@ -306,26 +306,31 @@ export default function EstoqueLoja() {
 
   const handleQRCodeScan = async (result: string) => {
     if (!result || result.trim() === '') {
-      toast.error('Código de barras inválido');
+      console.error('Código de barras vazio');
+      toast.error('Código de barras inválido - vazio');
       return;
     }
 
+    const cleanBarcode = result.trim();
+
     try {
       // First check if the scanned code is in a valid format
-      if (!/^\d+$/.test(result)) {
-        toast.error('Código de barras deve conter apenas números');
+      if (!/^\d+$/.test(cleanBarcode)) {
+        console.error('Código de barras inválido:', cleanBarcode);
+        toast.error(`Código de barras "${cleanBarcode}" inválido - deve conter apenas números`);
         return;
       }
 
       const { data, error } = await supabase
         .from('produto')
         .select('*')
-        .eq('codigo_ean', result.trim())
+        .eq('codigo_ean', cleanBarcode)
         .single();
 
       if (error) {
         if (error.code === 'PGRST116') {
-          toast.error('Produto não encontrado no sistema');
+          console.error('Produto não encontrado:', result);
+          toast.error(`Código de barras "${result}" não encontrado no sistema`);
         } else {
           console.error('Erro ao buscar produto:', error);
           toast.error('Erro ao buscar produto no banco de dados');
@@ -333,33 +338,67 @@ export default function EstoqueLoja() {
         return;
       }
 
-      if (data) {
-        // Verify if the product belongs to any brand
-        if (!data.marca) {
-          toast.error('Produto sem marca cadastrada');
+      if (!data) {
+        console.error('Produto não encontrado:', result);
+        toast.error(`Código de barras "${result}" não encontrado`);
+        return;
+      }
+
+      // Verify if the product belongs to any brand
+      if (!data.marca) {
+        toast.error('Produto sem marca cadastrada');
+        return;
+      }
+
+      try {
+        // Find the marca in the marcas list
+        const marcaFound = marcas.find(m => m.nome.toUpperCase() === data.marca.toUpperCase());
+        if (!marcaFound) {
+          console.error('Marca não encontrada:', data.marca);
+          toast.error(`Marca "${data.marca}" não encontrada na lista`);
           return;
         }
 
-        // Format the scanned product data
-        const formattedProduct = {
-          marca: data.marca.toUpperCase(),
-          nome: data.nome.toUpperCase(),
-          codigo_ean: data.codigo_ean
-        };
+        // Load products first
+        const { data: produtos } = await supabase
+          .from('produto')
+          .select('*')
+          .ilike('marca', marcaFound.nome)
+          .order('nome');
 
-        setMarca(formattedProduct.marca);
-        setProduto(formattedProduct.nome);
+        if (!produtos || produtos.length === 0) {
+          toast.error('Nenhum produto encontrado para esta marca');
+          return;
+        }
+
+        // Find the scanned product in the loaded products
+        const produtoFound = produtos.find(p => p.nome.toUpperCase() === data.nome.toUpperCase());
+        if (!produtoFound) {
+          console.error('Produto não encontrado:', data.nome);
+          toast.error(`Produto "${data.nome}" não encontrado na lista da marca "${marcaFound.nome}"`);
+          return;
+        }
+
+        // Set marca and produto after confirming both exist
+        setMarca(marcaFound.nome);
+        setProduto(produtoFound.nome);
         
-        // Reset quantity fields with proper formatting
+        // Log successful scan and reset quantity fields
+        console.log('Produto encontrado:', { 
+          barcode: cleanBarcode,
+          marca: marcaFound.nome,
+          produto: produtoFound.nome
+        });
         setEstoque(formatNumber(0));
         setEstoqueVirtual(formatNumber(0));
-        toast.success('Produto encontrado com sucesso!');
-      } else {
-        toast.error('Produto não encontrado');
+        toast.success(`Produto "${produtoFound.nome}" da marca "${marcaFound.nome}" encontrado com sucesso!`);
+      } catch (error) {
+        console.error('Erro ao processar produto:', { barcode: cleanBarcode, marca: data.marca, produto: data.nome }, error);
+        toast.error(`Erro ao processar produto "${data.nome}" da marca "${data.marca}"`);
       }
     } catch (error: any) {
-      console.error('Erro ao processar código de barras:', error);
-      toast.error(error.message || 'Erro ao processar código de barras');
+      console.error('Erro ao processar código de barras:', cleanBarcode, error);
+      toast.error(error.message || `Erro ao processar código de barras "${cleanBarcode}"`);
     }
   };
 
