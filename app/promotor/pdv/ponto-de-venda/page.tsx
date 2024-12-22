@@ -38,7 +38,12 @@ export default function PontoVenda() {
           .order('nome');
 
         if (error) throw error;
-        setMarcas(data || []);
+        // Convert marca names to uppercase
+        const formattedData = data?.map(item => ({
+          ...item,
+          nome: item.nome.toUpperCase()
+        }));
+        setMarcas(formattedData || []);
       } catch (error) {
         console.error('Erro ao carregar marcas:', error);
         toast.error('Erro ao carregar marcas');
@@ -49,7 +54,7 @@ export default function PontoVenda() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
       const redeSelected = localStorage.getItem("redeSelected") || "";
       const lojaSelected = localStorage.getItem("lojaSelected") || "";
       
@@ -59,8 +64,8 @@ export default function PontoVenda() {
         return;
       }
       
-      setRede(redeSelected);
-      setLoja(lojaSelected);
+      setRede(redeSelected.toUpperCase());
+      setLoja(lojaSelected.toUpperCase());
     }
   }, [router]);
 
@@ -116,11 +121,11 @@ export default function PontoVenda() {
       const { error: insertError } = await supabase
         .from('pdv')
         .insert({
-          marca: marcaSelecionada.nome,
+          marca: marcaSelecionada.nome.toUpperCase(),
           ponto_extra_conquistado: pontoExtra,
           fotos: uploadedUrls,
-          rede: rede,
-          loja: loja
+          rede: rede.toUpperCase(),
+          loja: loja.toUpperCase()
         });
 
       if (insertError) {

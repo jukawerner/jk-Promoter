@@ -26,6 +26,11 @@ import { useRouter } from "next/navigation";
 import { WhatsappButton } from "components/whatsapp-button";
 import { supabase } from "lib/supabase";
 import { BarcodeScanner } from "components/barcode-scanner";
+import { formatPromoterData, parseFormattedNumber } from "lib/utils/formatters";
+
+type FormattedData = {
+  [key: string]: string | number | FormattedData | FormattedData[] | null;
+};
 
 interface EstoqueItem {
   id?: string;
@@ -74,7 +79,7 @@ export default function EstoqueLoja() {
         return;
       }
       
-      setRede(redeSelected);
+      setRede(redeSelected.toUpperCase());
       setLoja(lojaSelected);
     }
   }, [router]);
@@ -88,7 +93,11 @@ export default function EstoqueLoja() {
           .order('nome');
 
         if (error) throw error;
-        setMarcas(data || []);
+        const formattedData = data?.map(item => ({
+          ...item,
+          nome: item.nome.toUpperCase()
+        }));
+        setMarcas(formattedData || []);
       } catch (error) {
         console.error('Erro ao carregar marcas:', error);
         toast.error('Erro ao carregar marcas');
@@ -112,10 +121,43 @@ export default function EstoqueLoja() {
         toast.error('Nenhum produto encontrado para esta marca');
       }
 
-      setProdutos(data || []);
+      const formattedData = data?.map(item => ({
+        ...item,
+        nome: item.nome.toUpperCase(),
+        marca: item.marca.toUpperCase()
+      }));
+      setProdutos(formattedData || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
+    }
+  };
+
+  const fetchExistingItems = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("estoque")
+        .select("*")
+        .eq("rede", rede)
+        .eq("loja", loja);
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedItems = data.map(item => ({
+          id: item.id,
+          rede: item.rede.toUpperCase(),
+          loja: item.loja.toUpperCase(),
+          marca: item.marca.toUpperCase(),
+          produto: item.produto.toUpperCase(),
+          estoque: formatNumber(item.estoque_fisico),
+          estoqueVirtual: formatNumber(item.estoque_virtual)
+        }));
+        setItems(formattedItems);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar itens:", error);
+      toast.error("Erro ao carregar itens do estoque");
     }
   };
 
@@ -127,6 +169,21 @@ export default function EstoqueLoja() {
     }
   }, [marca]);
 
+  useEffect(() => {
+    if (rede && loja) {
+      fetchExistingItems();
+    }
+  }, [rede, loja]);
+
+  // Format number for display
+  const formatNumber = (value: string | number): string => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(num);
+  };
+
   const handleConfirm = async () => {
     if (!marca || !produto || !estoque || !estoqueVirtual || !rede || !loja) {
       toast.error("Por favor, preencha todos os campos");
@@ -134,22 +191,64 @@ export default function EstoqueLoja() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("estoque")
-        .insert([{
-          rede: rede,
-          loja: loja,
-          marca: marca,
-          produto: produto,
-          estoque_fisico: parseFloat(estoque),
-          estoque_virtual: parseFloat(estoqueVirtual),
-          created_at: new Date().toISOString()
-        }])
-        .select();
+      const itemData = {
+        rede: rede.toUpperCase(),
+        loja: loja.toUpperCase(),
+        marca: marca.toUpperCase(),
+        produto: produto.toUpperCase(),
+        estoque_fisico: parseFormattedNumber(estoque),
+        estoque_virtual: parseFormattedNumber(estoqueVirtual),
+        created_at: new Date().toISOString()
+      };
+
+      let data, error;
+
+      if (editingItem?.id) {
+        // Update existing item
+        const { data: updateData, error: updateError } = await supabase
+          .from("estoque")
+          .update(itemData)
+          .eq('id', editingItem.id)
+          .select();
+        data = updateData;
+        error = updateError;
+      } else {
+        // Insert new item
+        const { data: insertData, error: insertError } = await supabase
+          .from("estoque")
+          .insert([itemData])
+          .select();
+        data = insertData;
+        error = insertError;
+      }
 
       if (error) throw error;
 
-      toast.success("Estoque cadastrado com sucesso!");
+      if (data && data[0]) {
+        const formattedItem = {
+          id: data[0].id,
+          rede: itemData.rede,
+          loja: itemData.loja,
+          marca: itemData.marca,
+          produto: itemData.produto,
+          estoque: formatNumber(itemData.estoque_fisico),
+          estoqueVirtual: formatNumber(itemData.estoque_virtual)
+        };
+
+        setItems(prevItems => {
+          if (editingItem?.id) {
+            // Replace existing item
+            return prevItems.map(item => 
+              item.id === editingItem.id ? formattedItem : item
+            );
+          } else {
+            // Add new item
+            return [...prevItems, formattedItem];
+          }
+        });
+      }
+
+      toast.success(editingItem ? "Estoque atualizado com sucesso!" : "Estoque cadastrado com sucesso!");
       setMarca("");
       setProduto("");
       setEstoque("");
@@ -162,12 +261,12 @@ export default function EstoqueLoja() {
   };
 
   const handleEdit = (item: EstoqueItem) => {
-    setMarca(item.marca);
-    setProduto(item.produto);
-    setEstoque(item.estoque);
-    setEstoqueVirtual(item.estoqueVirtual);
-    setRede(item.rede);
-    setLoja(item.loja);
+    setMarca(item.marca.toUpperCase());
+    setProduto(item.produto.toUpperCase());
+    setEstoque(formatNumber(item.estoque));
+    setEstoqueVirtual(formatNumber(item.estoqueVirtual));
+    setRede(item.rede.toUpperCase());
+    setLoja(item.loja.toUpperCase());
     setEditingItem(item);
     setShowForm(true);
   };
@@ -184,12 +283,12 @@ export default function EstoqueLoja() {
           .from("estoque")
           .insert([
             {
-              rede: item.rede,
-              loja: item.loja,
-              marca: item.marca,
-              produto: item.produto,
-              estoque_fisico: parseFloat(item.estoque),
-              estoque_virtual: parseFloat(item.estoqueVirtual),
+              rede: item.rede.toUpperCase(),
+              loja: item.loja.toUpperCase(),
+              marca: item.marca.toUpperCase(),
+              produto: item.produto.toUpperCase(),
+              estoque_fisico: parseFormattedNumber(item.estoque),
+              estoque_virtual: parseFormattedNumber(item.estoqueVirtual),
             }
           ]);
           
@@ -241,8 +340,19 @@ export default function EstoqueLoja() {
           return;
         }
 
-        setMarca(data.marca);
-        setProduto(data.nome);
+        // Format the scanned product data
+        const formattedProduct = {
+          marca: data.marca.toUpperCase(),
+          nome: data.nome.toUpperCase(),
+          codigo_ean: data.codigo_ean
+        };
+
+        setMarca(formattedProduct.marca);
+        setProduto(formattedProduct.nome);
+        
+        // Reset quantity fields with proper formatting
+        setEstoque(formatNumber(0));
+        setEstoqueVirtual(formatNumber(0));
         toast.success('Produto encontrado com sucesso!');
       } else {
         toast.error('Produto não encontrado');
@@ -382,9 +492,18 @@ export default function EstoqueLoja() {
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
                           id="estoque"
-                          type="number"
+                          type="text"
                           value={estoque}
-                          onChange={(e) => setEstoque(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d,]/g, '');
+                            setEstoque(value);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value) {
+                              const num = parseFormattedNumber(e.target.value);
+                              setEstoque(formatNumber(num));
+                            }
+                          }}
                           placeholder="Quantidade (un/kg)"
                           className="pl-10"
                         />
@@ -397,9 +516,18 @@ export default function EstoqueLoja() {
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
                           id="estoqueVirtual"
-                          type="number"
+                          type="text"
                           value={estoqueVirtual}
-                          onChange={(e) => setEstoqueVirtual(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d,]/g, '');
+                            setEstoqueVirtual(value);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value) {
+                              const num = parseFormattedNumber(e.target.value);
+                              setEstoqueVirtual(formatNumber(num));
+                            }
+                          }}
                           placeholder="Quantidade (un/kg)"
                           className="pl-10"
                         />
@@ -462,12 +590,12 @@ export default function EstoqueLoja() {
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell>{item.rede}</TableCell>
+                          <TableCell>{item.rede.toUpperCase()}</TableCell>
                           <TableCell>{item.loja}</TableCell>
                           <TableCell>{item.marca}</TableCell>
                           <TableCell>{item.produto}</TableCell>
-                          <TableCell>{item.estoque}</TableCell>
-                          <TableCell>{item.estoqueVirtual}</TableCell>
+                          <TableCell>{formatNumber(item.estoque)}</TableCell>
+                          <TableCell>{formatNumber(item.estoqueVirtual)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
