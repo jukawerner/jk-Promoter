@@ -14,30 +14,62 @@ interface BarcodeScannerProps {
 
 export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
   useEffect(() => {
-    if (isOpen) {
-      const html5QrCode = new Html5Qrcode("reader");
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    let html5QrCode: Html5Qrcode | null = null;
 
-      html5QrCode.start(
-        { facingMode: "environment" }, 
-        config,
-        (decodedText) => {
-          onScan(decodedText);
-          html5QrCode.stop();
-          onClose();
-        },
-        (error) => {
-          // Ignorar erros de leitura individual
+    const initializeScanner = async () => {
+      if (!isOpen) return;
+
+      try {
+        // Check if camera access is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera access not supported");
         }
-      ).catch((err) => {
-        console.error("Erro ao iniciar scanner:", err);
-        toast.error("Erro ao iniciar câmera");
-      });
 
-      return () => {
+        // Wait for DOM element to be ready
+        const readerElement = document.getElementById("reader");
+        if (!readerElement) {
+          throw new Error("Scanner element not found");
+        }
+
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // Request camera permission first
+        await navigator.mediaDevices.getUserMedia({ video: true });
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            onScan(decodedText);
+            html5QrCode?.stop();
+            onClose();
+          },
+          (error) => {
+            // Ignore individual scan errors
+            console.debug("Scan error:", error);
+          }
+        );
+      } catch (err: any) {
+        console.error("Scanner initialization error:", err);
+        if (err.message?.includes("permission")) {
+          toast.error("Permissão da câmera negada");
+        } else if (err.message?.includes("supported")) {
+          toast.error("Seu navegador não suporta acesso à câmera");
+        } else {
+          toast.error("Erro ao iniciar câmera. Tente novamente.");
+        }
+        onClose();
+      }
+    };
+
+    initializeScanner();
+
+    return () => {
+      if (html5QrCode) {
         html5QrCode.stop().catch(console.error);
-      };
-    }
+      }
+    };
   }, [isOpen, onClose, onScan]);
 
   return (

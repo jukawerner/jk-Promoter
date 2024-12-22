@@ -206,25 +206,50 @@ export default function EstoqueLoja() {
   };
 
   const handleQRCodeScan = async (result: string) => {
+    if (!result || result.trim() === '') {
+      toast.error('Código de barras inválido');
+      return;
+    }
+
     try {
+      // First check if the scanned code is in a valid format
+      if (!/^\d+$/.test(result)) {
+        toast.error('Código de barras deve conter apenas números');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('produto')
         .select('*')
-        .eq('codigo_ean', result)
+        .eq('codigo_ean', result.trim())
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          toast.error('Produto não encontrado no sistema');
+        } else {
+          console.error('Erro ao buscar produto:', error);
+          toast.error('Erro ao buscar produto no banco de dados');
+        }
+        return;
+      }
 
       if (data) {
+        // Verify if the product belongs to any brand
+        if (!data.marca) {
+          toast.error('Produto sem marca cadastrada');
+          return;
+        }
+
         setMarca(data.marca);
         setProduto(data.nome);
-        toast.success('Produto encontrado!');
+        toast.success('Produto encontrado com sucesso!');
       } else {
         toast.error('Produto não encontrado');
       }
-    } catch (error) {
-      console.error('Erro ao buscar produto:', error);
-      toast.error('Erro ao buscar produto');
+    } catch (error: any) {
+      console.error('Erro ao processar código de barras:', error);
+      toast.error(error.message || 'Erro ao processar código de barras');
     }
   };
 
