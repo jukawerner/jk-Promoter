@@ -232,13 +232,12 @@ export default function PontoVenda() {
           try {
             const cleanFileName = `${Date.now()}_${image.size}_${image.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-            const { error: uploadError } = await supabase.storage
-              .from('pdv-photos')
-              .upload(cleanFileName, image, {
-                cacheControl: '3600',
-                upsert: false,
-                contentType: 'image/jpeg'
-              });
+              const { error: uploadError } = await supabase.storage
+                .from('pdv-photos')
+                .upload(cleanFileName, image, {
+                  cacheControl: '3600',
+                  upsert: false
+                });
 
             if (uploadError) {
               console.error('Erro ao fazer upload da imagem:', uploadError);
@@ -300,12 +299,8 @@ export default function PontoVenda() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-gray-50"
     >
-      <div className="container mx-auto p-6 max-w-[800px]">
-        <div className="flex justify-end mb-4">
-          <WhatsappButton />
-        </div>
-
-        <div className="flex flex-col items-center text-center space-y-3 mb-8">
+      <div className="container mx-auto px-4 py-6 md:p-6 max-w-[800px]">
+        <div className="flex flex-col items-center text-center space-y-4 md:space-y-6 mb-6 md:mb-8">
           <motion.div 
             className="relative"
             initial={{ scale: 0 }}
@@ -326,7 +321,7 @@ export default function PontoVenda() {
         </div>
 
         <motion.div 
-          className="space-y-8 bg-white rounded-xl shadow-sm p-6 border"
+          className="space-y-6 md:space-y-8 bg-white rounded-xl shadow-sm p-4 md:p-6 border"
           initial={{ y: 20 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.1 }}
@@ -402,38 +397,40 @@ export default function PontoVenda() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-8 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
-                      <div className="flex flex-col items-center gap-4">
+                    <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-4 md:p-8 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
+                      <div className="flex flex-col items-center gap-3 md:gap-4">
                         <div className="text-center space-y-2">
                           <div className="text-gray-500 dark:text-gray-400">
-                            <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                            <p className="text-sm">Arraste e solte suas imagens aqui ou</p>
+                            <ImageIcon className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-xs md:text-sm">Arraste e solte suas imagens aqui ou</p>
                           </div>
-                          <div className="flex gap-3">
-                            <Button
-                              variant="outline"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="flex items-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
-                            >
-                              <ImageIcon className="w-4 h-4" />
-                              Galeria
-                            </Button>
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={handleImageUpload}
-                              className="hidden"
-                            />
-                            <Button
-                              variant="outline"
-                              onClick={() => setShowCamera(true)}
-                              className="flex items-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
-                            >
-                              <Camera className="w-4 h-4" />
-                              Câmera
-                            </Button>
+                          <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                            <div className="w-full flex flex-col sm:flex-row gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
+                              >
+                                <ImageIcon className="w-4 h-4" />
+                                Galeria
+                              </Button>
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleImageUpload}
+                                className="hidden"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowCamera(true)}
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors"
+                              >
+                                <Camera className="w-4 h-4" />
+                                Câmera
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -445,7 +442,7 @@ export default function PontoVenda() {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+                          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-4"
                         >
                           {imagens.map((image, index) => (
                             <motion.div
@@ -473,17 +470,17 @@ export default function PontoVenda() {
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex justify-between items-center pt-6 border-t">
+                  <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 pt-6 border-t">
                     <Button
                       variant="ghost"
                       onClick={() => router.push("/promotor")}
-                      className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900"
                     >
                       <ArrowLeft className="w-4 h-4" /> Voltar
                     </Button>
                     <Button
                       onClick={handleConfirm}
-                      className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2"
+                      className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4" />
                       {editingItem ? "Atualizar" : "Adicionar"}
@@ -499,24 +496,24 @@ export default function PontoVenda() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="bg-white rounded-xl shadow-sm border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Marca</TableHead>
-                        <TableHead>Imagens</TableHead>
-                        <TableHead>Ponto Extra</TableHead>
-                        <TableHead>Rede</TableHead>
-                        <TableHead>Loja</TableHead>
+                        <TableHead className="whitespace-nowrap">Marca</TableHead>
+                        <TableHead className="whitespace-nowrap">Imagens</TableHead>
+                        <TableHead className="whitespace-nowrap">Ponto Extra</TableHead>
+                        <TableHead className="hidden md:table-cell">Rede</TableHead>
+                        <TableHead className="hidden md:table-cell">Loja</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.marca_nome}</TableCell>
-                          <TableCell>{item.imagens.length} imagem(ns)</TableCell>
-                          <TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">{item.marca_nome}</TableCell>
+                          <TableCell className="whitespace-nowrap">{item.imagens.length} imagem(ns)</TableCell>
+                          <TableCell className="whitespace-nowrap">
                             {item.pontoExtra ? (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                 Sim
@@ -527,10 +524,10 @@ export default function PontoVenda() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>{item.rede}</TableCell>
-                          <TableCell>{item.loja}</TableCell>
+                          <TableCell className="hidden md:table-cell">{item.rede}</TableCell>
+                          <TableCell className="hidden md:table-cell">{item.loja}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1 md:gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -555,17 +552,17 @@ export default function PontoVenda() {
                   </Table>
                 </div>
 
-                <div className="flex justify-between mt-8">
+                <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 mt-6 md:mt-8">
                   <Button
                     variant="outline"
                     onClick={() => router.push("/promotor")}
-                    className="flex items-center gap-2"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2"
                   >
                     <ArrowLeft className="w-4 h-4" /> Voltar
                   </Button>
                   <Button
                     onClick={handleSave}
-                    className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2"
+                    className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white flex items-center justify-center gap-2"
                     disabled={items.length === 0}
                   >
                     Gravar

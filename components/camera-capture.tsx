@@ -33,9 +33,11 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
       const constraints = {
         video: {
           facingMode: { exact: "environment" },
-          width: { ideal: 4096 },
-          height: { ideal: 3072 },
-          frameRate: { ideal: 60 }
+          width: { ideal: 4096, min: 1920 },
+          height: { ideal: 3072, min: 1080 },
+          frameRate: { ideal: 60, min: 30 },
+          aspectRatio: { ideal: 4/3 },
+          resizeMode: "none"
         },
         audio: false
       };
@@ -67,10 +69,24 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
     setStream(mediaStream);
     if (videoRef.current) {
       videoRef.current.srcObject = mediaStream;
-      // Log camera capabilities
       const track = mediaStream.getVideoTracks()[0];
-      console.log('Camera capabilities:', track.getCapabilities());
-      console.log('Camera settings:', track.getSettings());
+      if (track) {
+        const capabilities = track.getCapabilities();
+        const settings = track.getSettings();
+        console.log('Camera capabilities:', capabilities);
+        console.log('Camera settings:', settings);
+
+        // Aplica as melhores configurações disponíveis
+        const constraints: MediaTrackConstraints = {
+          width: { ideal: Math.max(settings.width || 1920, 4096) },
+          height: { ideal: Math.max(settings.height || 1080, 3072) },
+          aspectRatio: { ideal: 4/3 },
+          frameRate: { max: 30, ideal: 24 }
+        };
+
+        track.applyConstraints(constraints)
+          .catch(err => console.warn('Failed to apply constraints:', err));
+      }
       
       videoRef.current.onloadedmetadata = () => {
         videoRef.current?.play();
@@ -112,6 +128,10 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
         throw new Error('Não foi possível criar contexto do canvas');
       }
 
+      // Configurações para melhor qualidade
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
       // Draw the video frame to canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
@@ -120,7 +140,7 @@ export function CameraCapture({ isOpen, onClose, onCapture }: CameraCaptureProps
         (blob) => {
           if (blob) {
             // Create file with original dimensions and quality
-            const file = new File([blob], `photo_${canvas.width}x${canvas.height}_${Date.now()}.jpg`, {
+            const file = new File([blob], `photo_${Date.now()}.jpg`, {
               type: 'image/jpeg',
               lastModified: Date.now()
             });
