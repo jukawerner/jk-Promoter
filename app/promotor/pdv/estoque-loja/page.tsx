@@ -312,9 +312,31 @@ export default function EstoqueLoja() {
       const product = await findProductByEAN(result);
       
       if (product) {
-        // Atualiza o formulário com os dados do produto
-        setMarca(product.marca);
-        setProduto(product.nome);
+        // Busca a marca correspondente
+        const marcaFound = marcas.find(m => m.id === product.marca);
+        if (marcaFound) {
+          setMarca(marcaFound.id);
+          
+          // Atualiza a lista de produtos da marca
+          const { data: produtosData } = await supabase
+            .from('produto')
+            .select('*')
+            .eq('marca', marcaFound.id)
+            .order('nome');
+          
+          if (produtosData) {
+            const formattedProdutos = produtosData.map(item => ({
+              id: item.id,
+              nome: item.nome.toUpperCase(),
+              marca: item.marca
+            }));
+            setProdutos(formattedProdutos);
+          }
+          
+          // Define o produto
+          setProduto(product.id);
+        }
+        
         toast.success("Produto encontrado!");
       } else {
         toast.error("Produto não encontrado no sistema");
