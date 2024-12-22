@@ -5,13 +5,20 @@ export interface Product {
   nome: string;
   marca: string;
   codigo_ean: string;
+  marca_nome?: string;
 }
 
 export async function findProductByEAN(ean: string): Promise<Product | null> {
   try {
     const { data, error } = await supabase
       .from('produto')
-      .select('id, nome, marca, codigo_ean')
+      .select(`
+        id, 
+        nome, 
+        marca,
+        codigo_ean,
+        marca:marca (nome)
+      `)
       .eq('codigo_ean', ean)
       .single();
 
@@ -20,7 +27,14 @@ export async function findProductByEAN(ean: string): Promise<Product | null> {
       throw error;
     }
 
-    return data;
+    if (data) {
+      return {
+        ...data,
+        marca_nome: data.marca?.nome || ''
+      };
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao buscar produto:', error);
     return null;
