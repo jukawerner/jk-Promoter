@@ -1,13 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "lib/utils";
+import { Button } from "components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "components/ui/tooltip";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Store,
@@ -20,7 +20,7 @@ import {
   Building2,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserAvatar } from "components/user-avatar";
 
 const menuItems = [
   {
@@ -59,7 +59,11 @@ export function Sidebar() {
       <motion.div 
         initial={{ x: -100 }}
         animate={{ x: 0 }}
-        className="flex flex-col h-full bg-white text-gray-700 w-16 fixed left-0 top-0 bottom-0 shadow-lg"
+        className={cn(
+          "flex flex-col h-full bg-white text-gray-700 w-16 fixed left-0 top-0 bottom-0 shadow-lg z-50",
+          "transform transition-transform duration-300",
+          "translate-x-[-100%] md:translate-x-0" // Esconde em mobile, mostra em desktop
+        )}
       >
         <div className="flex items-center justify-center p-4">
           <UserAvatar />

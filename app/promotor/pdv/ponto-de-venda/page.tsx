@@ -1,25 +1,25 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "components/ui/table";
+import { Checkbox } from "components/ui/checkbox";
+import { Input } from "components/ui/input";
+import { Label } from "components/ui/label";
 import { ArrowLeft, Pencil, Trash2, ImageIcon, Camera, Store, Plus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { WhatsappButton } from "@/components/whatsapp-button";
-import { supabase } from "@/lib/supabase";
-import { CameraCapture } from "@/components/camera-capture";
+import { WhatsappButton } from "components/whatsapp-button";
+import { supabase } from "lib/supabase";
+import { CameraCapture } from "components/camera-capture";
 
 interface PontoVendaItem {
   id: number;
@@ -44,7 +44,6 @@ export default function PontoVenda() {
   const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Carregar marcas do Supabase
   useEffect(() => {
     const fetchMarcas = async () => {
       try {
@@ -64,7 +63,6 @@ export default function PontoVenda() {
     fetchMarcas();
   }, []);
 
-  // Carregar rede e loja do localStorage quando o componente montar
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const redeSelected = localStorage.getItem("redeSelected") || "";
@@ -88,7 +86,6 @@ export default function PontoVenda() {
     }
 
     try {
-      // Buscar o nome da marca selecionada
       const marcaSelecionada = marcas.find(m => m.id === marca);
 
       if (!marcaSelecionada) {
@@ -122,7 +119,6 @@ export default function PontoVenda() {
         setItems([...items, newItem]);
       }
 
-      // Limpar formulário
       setMarca("");
       setImagens([]);
       setPontoExtra(false);
@@ -184,14 +180,12 @@ export default function PontoVenda() {
     }
 
     try {
-      // 1. Buscar o registro com as fotos
       const { data: pdvData } = await supabase
         .from('pdv')
         .select('fotos')
         .eq('id', id)
         .single();
 
-      // 2. Excluir as fotos do storage
       if (pdvData?.fotos) {
         const fileNames = pdvData.fotos.map(url => {
           const parts = url.split('pdv-photos/');
@@ -209,7 +203,6 @@ export default function PontoVenda() {
         }
       }
 
-      // 3. Excluir o registro
       const { error: deleteError } = await supabase
         .from('pdv')
         .delete()
@@ -217,7 +210,6 @@ export default function PontoVenda() {
 
       if (deleteError) throw deleteError;
 
-      // 4. Atualizar interface
       setItems(items.filter(item => item.id !== id));
       toast.success("Item excluído com sucesso!");
     } catch (error) {
@@ -233,23 +225,13 @@ export default function PontoVenda() {
         return;
       }
 
-      // Para cada item, precisamos primeiro fazer upload das imagens
       for (const item of items) {
         const uploadedUrls = [];
         
-        // Upload de cada imagem
         for (const image of item.imagens) {
           try {
-            // Limpar o nome do arquivo mantendo as dimensões originais
             const cleanFileName = `${Date.now()}_${image.size}_${image.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-            console.log('Uploading image:', {
-              name: cleanFileName,
-              size: image.size,
-              type: image.type
-            });
-
-            // Upload da imagem com configurações para alta qualidade
             const { error: uploadError } = await supabase.storage
               .from('pdv-photos')
               .upload(cleanFileName, image, {
@@ -264,12 +246,10 @@ export default function PontoVenda() {
               continue;
             }
 
-            // Obter URL pública da imagem
             const { data: { publicUrl } } = supabase.storage
               .from('pdv-photos')
               .getPublicUrl(cleanFileName);
 
-            console.log('Image uploaded successfully:', publicUrl);
             uploadedUrls.push(publicUrl);
           } catch (imageError) {
             console.error('Erro ao processar imagem:', imageError);
@@ -283,7 +263,6 @@ export default function PontoVenda() {
         }
 
         try {
-          // Salvar no banco de dados
           const { error: insertError } = await supabase
             .from('pdv')
             .insert({
@@ -299,24 +278,20 @@ export default function PontoVenda() {
             toast.error("Erro ao salvar os dados no banco");
             return;
           }
-
-          toast.success("Dados salvos com sucesso!");
-          setItems([]); // Limpar a lista de items após salvar
-          router.back(); // Voltar para a página anterior
         } catch (dbError) {
           console.error('Erro ao salvar no banco:', dbError);
           toast.error("Erro ao salvar os dados no banco");
           return;
         }
       }
+
+      toast.success("Dados salvos com sucesso!");
+      setItems([]);
+      setShowForm(true);
     } catch (error) {
       console.error('Erro ao salvar dados:', error);
       toast.error("Erro ao salvar os dados. Tente novamente.");
     }
-  };
-
-  const handleProximo = () => {
-    router.push("/promotor/pdv/data-curta");
   };
 
   return (
@@ -330,7 +305,6 @@ export default function PontoVenda() {
           <WhatsappButton />
         </div>
 
-        {/* Header com ícone e título */}
         <div className="flex flex-col items-center text-center space-y-3 mb-8">
           <motion.div 
             className="relative"
@@ -367,7 +341,6 @@ export default function PontoVenda() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="grid gap-4">
-                  {/* Campos Rede e Loja lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="rede">Rede</Label>
@@ -390,7 +363,6 @@ export default function PontoVenda() {
                     </div>
                   </div>
 
-                  {/* Marca e Ponto Extra lado a lado */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="marca">Marca</Label>
@@ -412,7 +384,7 @@ export default function PontoVenda() {
                     </div>
 
                     <div className="space-y-2">
-                      <div className="h-6" /> {/* Espaçador para alinhar com o label da Marca */}
+                      <div className="h-6" />
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="pontoExtra"
@@ -429,7 +401,6 @@ export default function PontoVenda() {
                     </div>
                   </div>
 
-                  {/* Área de upload de imagens */}
                   <div className="space-y-4">
                     <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-8 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
                       <div className="flex flex-col items-center gap-4">
@@ -468,7 +439,6 @@ export default function PontoVenda() {
                       </div>
                     </div>
 
-                    {/* Preview das imagens */}
                     <AnimatePresence>
                       {imagens.length > 0 && (
                         <motion.div 
@@ -503,17 +473,10 @@ export default function PontoVenda() {
                     </AnimatePresence>
                   </div>
 
-                  {/* Botões de ação */}
                   <div className="flex justify-between items-center pt-6 border-t">
                     <Button
                       variant="ghost"
-                      onClick={() => {
-                        if (items.length > 0) {
-                          setShowForm(false);
-                        } else {
-                          router.push("/promotor/pdv/estoque-loja");
-                        }
-                      }}
+                      onClick={() => router.push("/promotor")}
                       className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                     >
                       <ArrowLeft className="w-4 h-4" /> Voltar
@@ -536,7 +499,6 @@ export default function PontoVenda() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                {/* Lista de itens */}
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -596,7 +558,7 @@ export default function PontoVenda() {
                 <div className="flex justify-between mt-8">
                   <Button
                     variant="outline"
-                    onClick={() => router.back()}
+                    onClick={() => router.push("/promotor")}
                     className="flex items-center gap-2"
                   >
                     <ArrowLeft className="w-4 h-4" /> Voltar

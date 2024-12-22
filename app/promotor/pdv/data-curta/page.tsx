@@ -340,13 +340,7 @@ export default function DataCurtaPage() {
                 <div className="flex justify-between items-center pt-6">
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      if (items.length > 0) {
-                        setShowForm(false);
-                      } else {
-                        router.push("/promotor/pdv/ponto-de-venda");
-                      }
-                    }}
+                    onClick={() => router.push("/promotor")}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="w-4 h-4" />
