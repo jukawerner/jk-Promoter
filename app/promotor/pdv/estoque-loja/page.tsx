@@ -28,6 +28,7 @@ import { supabase } from "lib/supabase";
 import BarcodeScanner from "components/barcode-scanner";
 import { findProductByEAN } from "lib/utils/product-search";
 import { formatPromoterData, parseFormattedNumber } from "lib/utils/formatters";
+import { ConfirmModal } from "components/ConfirmModal";
 
 type FormattedData = {
   [key: string]: string | number | FormattedData | FormattedData[] | null;
@@ -67,6 +68,10 @@ export default function EstoqueLoja() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scannedBrand, setScannedBrand] = useState("");
+  const [scannedProduct, setScannedProduct] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -277,6 +282,12 @@ export default function EstoqueLoja() {
     toast.success("Item removido com sucesso!");
   };
 
+  const handleConfirmScan = () => {
+    setMarca(scannedBrand);
+    setProduto(scannedProduct);
+    setIsModalOpen(false);
+  };
+
   const handleGravar = async () => {
     try {
       for (const item of items) {
@@ -305,32 +316,30 @@ export default function EstoqueLoja() {
     }
   };
 
-  const handleBarcodeScan = async (result: string) => {
-    setIsScannerOpen(false);
-    console.log('Código de barras lido:', result);
-    
-    try {
-      const product = await findProductByEAN(result);
-      console.log('Produto retornado:', product);
-      
-      if (product) {
-        console.log('Atualizando campos com:', {
-          marca: product.marca_nome?.toUpperCase(),
-          produto: product.nome.toUpperCase()
-        });
+const handleBarcodeScan = async (result: string) => {
+  setIsScannerOpen(false);
+  
+  try {
+    const { data: product, error } = await supabase
+      .from('produto')
+      .select('nome, marca')
+      .eq('codigo_ean', result)
+      .single();
 
-        // Define a marca e produto diretamente
-        setMarca(product.marca_nome?.toUpperCase() || '');
-        setProduto(product.nome.toUpperCase());
-        toast.success("Produto encontrado!");
-      } else {
-        console.log('Nenhum produto encontrado para o código:', result);
-        toast.error("Produto não encontrado no sistema");
-      }
-    } catch (error) {
-      console.error('Erro ao processar código de barras:', error);
-      toast.error("Erro ao buscar produto. Tente novamente.");
+    if (error) throw error;
+    
+    if (product) {
+      setScannedBarcode(result);
+      setScannedBrand(product.marca.toUpperCase());
+      setScannedProduct(product.nome.toUpperCase());
+      setIsModalOpen(true);
+    } else {
+      toast.error("Produto não encontrado no sistema");
     }
+  } catch (error) {
+    console.error('Erro ao processar código de barras:', error);
+    toast.error("Erro ao buscar produto. Tente novamente.");
+  }
   };
 
   return (
@@ -617,6 +626,14 @@ export default function EstoqueLoja() {
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScan={handleBarcodeScan}
+      />
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmScan}
+        barcode={scannedBarcode}
+        brand={scannedBrand}
+        product={scannedProduct}
       />
     </motion.div>
   );
