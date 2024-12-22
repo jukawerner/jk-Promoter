@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { BarcodeScanner } from 'components/barcode-scanner';
+import BarcodeScanner from 'components/barcode-scanner';
 import { Button } from 'components/ui/button';
 
 export default function TestScanner() {

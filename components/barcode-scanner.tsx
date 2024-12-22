@@ -1,11 +1,15 @@
-"use client";
-
-import { useEffect, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode, Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Loader2 } from "lucide-react";
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -13,63 +17,101 @@ interface BarcodeScannerProps {
   onScan: (result: string) => void;
 }
 
-export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
+export default function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
   const [isInitializing, setIsInitializing] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
+  const handleScan = (decodedText: string) => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().then(() => {
+        onScan(decodedText);
+      }).catch(console.error);
+    }
+  };
 
-    const initializeScanner = async () => {
-      if (!isOpen) return;
-      setIsInitializing(true);
+  const handleError = (err: string | Error) => {
+    console.log("Erro de leitura:", err);
+  };
+
+  const initializeScanner = async () => {
+    if (!isOpen) return;
+    setIsInitializing(true);
+
+    try {
+      // Aguarda o DOM estar pronto
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const readerElement = document.getElementById("reader");
+      if (!readerElement) {
+        throw new Error("Elemento do scanner não encontrado");
+      }
+
+      // Limpa instância anterior
+      if (scannerRef.current) {
+        try {
+          await scannerRef.current.stop();
+        } catch (stopError) {
+          console.log("Erro ao parar scanner:", stopError);
+        }
+        scannerRef.current = null;
+      }
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13 ],
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      };
+
+      scannerRef.current = new Html5Qrcode("reader");
 
       try {
-        const readerElement = document.getElementById("reader");
-        if (!readerElement) {
-          throw new Error("Elemento do scanner não encontrado");
-        }
-
-        html5QrCode = new Html5Qrcode("reader");
-        
-        const constraints = {
-          facingMode: { exact: "environment" },
-          aspectRatio: 1
-        };
-
-        await html5QrCode.start(
-          { facingMode: constraints.facingMode },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: constraints.aspectRatio,
-          },
-          (decodedText) => {
-            html5QrCode?.stop();
-            onScan(decodedText);
-          },
-          (errorMessage) => {
-            console.log(errorMessage);
-          }
+        // Tenta primeiro com a câmera traseira
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          config,
+          handleScan,
+          handleError
         );
-
-        setIsInitializing(false);
       } catch (err) {
-        console.error("Erro ao inicializar scanner:", err);
-        toast.error("Erro ao inicializar câmera. Tente novamente.");
-        onClose();
+        console.log("Erro ao iniciar câmera traseira, tentando qualquer câmera:", err);
+        
+        // Tenta com qualquer câmera disponível
+        await scannerRef.current.start(
+          true,
+          config,
+          handleScan,
+          handleError
+        );
       }
-    };
+    } catch (error) {
+      console.error("Erro ao inicializar scanner:", error);
+      toast.error("Erro ao inicializar scanner: " + (error as Error).message);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
-    if (isOpen) {
+  useEffect(() => {
+    let mounted = true;
+
+    if (isOpen && mounted) {
       initializeScanner();
     }
 
     return () => {
-      if (html5QrCode) {
-        html5QrCode.stop().catch(console.error);
+      mounted = false;
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.stop().catch(console.error);
+        } catch (error) {
+          console.error("Erro ao limpar scanner:", error);
+        }
       }
     };
-  }, [isOpen, onClose, onScan]);
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -81,8 +123,12 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           </DialogDescription>
         </DialogHeader>
         
-        <div className="relative">
-          <div id="reader" className="w-full aspect-square"></div>
+        <div className="relative overflow-hidden rounded-lg bg-black">
+          <div 
+            id="reader" 
+            className="w-full h-64"
+            style={{ minHeight: '250px' }}
+          ></div>
           {isInitializing && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <Loader2 className="h-8 w-8 animate-spin text-white" />

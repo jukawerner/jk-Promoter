@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "components/whatsapp-button";
 import { supabase } from "lib/supabase";
-import { BarcodeScanner } from "components/barcode-scanner";
+import BarcodeScanner from "components/barcode-scanner";
 import { findProductByEAN } from "lib/utils/product-search";
 import { formatPromoterData, parseFormattedNumber } from "lib/utils/formatters";
 
