@@ -24,77 +24,45 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsInitializing(true);
 
       try {
-        // Wait for DOM element to be ready with retries
-        let retries = 3;
-        let readerElement = null;
-        
-        while (retries > 0 && !readerElement) {
-          readerElement = document.getElementById("reader");
-          if (!readerElement) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            retries--;
-          }
-        }
-
+        const readerElement = document.getElementById("reader");
         if (!readerElement) {
-          toast.error("Erro ao inicializar scanner. Tente novamente.");
-          onClose();
-          return;
+          throw new Error("Elemento do scanner não encontrado");
         }
 
-        html5QrCode = new Html5Qrcode("reader", { verbose: true });
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          toast.error("Seu dispositivo não suporta acesso à câmera");
-          onClose();
-          return;
-        }
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-          });
-          stream.getTracks().forEach(track => track.stop());
-        } catch (permissionError: any) {
-          if (permissionError.name === 'NotAllowedError') {
-            toast.error("Acesso à câmera negado. Por favor, permita o acesso nas configurações do navegador.");
-          } else if (permissionError.name === 'NotFoundError') {
-            toast.error("Nenhuma câmera encontrada no dispositivo");
-          } else {
-            toast.error("Erro ao acessar câmera");
-          }
-          onClose();
-          return;
-        }
-
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
+        html5QrCode = new Html5Qrcode("reader");
+        
+        const constraints = {
+          facingMode: { exact: "environment" },
+          aspectRatio: 1
         };
 
         await html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            onScan(decodedText);
-            html5QrCode?.stop().catch(console.error);
-            onClose();
+          { facingMode: constraints.facingMode },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 150 },
+            aspectRatio: constraints.aspectRatio,
           },
-          (error) => {
-            console.debug("Scan error:", error);
+          (decodedText) => {
+            html5QrCode?.stop();
+            onScan(decodedText);
+          },
+          (errorMessage) => {
+            console.log(errorMessage);
           }
         );
-      } catch (err: any) {
-        console.error("Scanner error:", err);
-        toast.error("Erro ao iniciar câmera. Tente novamente.");
-        onClose();
-      } finally {
+
         setIsInitializing(false);
+      } catch (err) {
+        console.error("Erro ao inicializar scanner:", err);
+        toast.error("Erro ao inicializar câmera. Tente novamente.");
+        onClose();
       }
     };
 
-    initializeScanner();
+    if (isOpen) {
+      initializeScanner();
+    }
 
     return () => {
       if (html5QrCode) {
@@ -107,25 +75,20 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Escanear Código</DialogTitle>
+          <DialogTitle>Leitor de Código de Barras</DialogTitle>
           <DialogDescription>
-            Posicione o código de barras no centro da câmera para escanear
+            Posicione o código de barras no centro da câmera
           </DialogDescription>
         </DialogHeader>
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+        
+        <div className="relative">
+          <div id="reader" className="w-full aspect-square"></div>
           {isInitializing && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
             </div>
           )}
-          <div id="reader" className="w-full h-full"></div>
-          <div className="absolute inset-0 border-2 border-dashed border-white/50 pointer-events-none">
-            <div className="absolute inset-8 border border-white/50"></div>
-          </div>
         </div>
-        <Button variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
       </DialogContent>
     </Dialog>
   );
