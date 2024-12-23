@@ -2,8 +2,11 @@
 CREATE TABLE roteiros (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   id_promotor BIGINT REFERENCES usuario(id) NOT NULL,
+  nome_roteiro TEXT NOT NULL,
   endereco_inicial TEXT NOT NULL,
   pontos_rota JSONB NOT NULL,
+  distancia_total TEXT NOT NULL,
+  tempo_estimado TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -304,27 +304,18 @@ export default function CadastroRoteiro() {
     calculateRoute([...locations, location]);
   };
 
-const handlePromoterSelect = async (value: string) => {
+  const handlePromoterSelect = async (value: string) => {
     console.log('Promotor selecionado:', value);
     const promoter = promoters.find(p => p.id === parseInt(value));
     console.log('Dados do promotor:', promoter);
     if (promoter) {
-        setSelectedPromoter(promoter);
-        setLocations([]);
-        setAvailableLocations([]);
-        setDirections(null);
-        await fetchStoresForPromoter(promoter.id);
-
-        // Geocodificar o endereço do promotor e atualizar o centro do mapa
-        const promoterLocation = await geocodeAddress(promoter.endereco);
-        if (promoterLocation) {
-            setCenter(promoterLocation); // Atualiza o centro do mapa
-            if (mapRef.current) {
-                mapRef.current.panTo(promoterLocation); // Move o mapa para o novo centro
-            }
-        }
+      setSelectedPromoter(promoter);
+      setLocations([]);
+      setAvailableLocations([]);
+      setDirections(null);
+      await fetchStoresForPromoter(promoter.id);
     }
-};
+  };
 
   const calculateRoute = useCallback(async (locations: Location[]) => {
     if (!selectedPromoter || locations.length === 0 || !isLoaded) {

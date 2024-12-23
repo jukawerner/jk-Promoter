@@ -3,17 +3,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase/client";
+import { Button } from "components/ui/button";
+import { Input } from "components/ui/input";
+import { Card } from "components/ui/card";
+import { supabase } from "lib/supabase/client";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "components/ui/select";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -304,27 +304,25 @@ export default function CadastroRoteiro() {
     calculateRoute([...locations, location]);
   };
 
-const handlePromoterSelect = async (value: string) => {
+  const handlePromoterSelect = async (value: string) => {
     console.log('Promotor selecionado:', value);
-    const promoter = promoters.find(p => p.id === parseInt(value));
+const promoter = promoters.find(p => p.id === parseInt(value));
+if (!promoter) {
+  console.error('Promotor não encontrado');
+  return; // Early return if promoter is not found
+}
     console.log('Dados do promotor:', promoter);
     if (promoter) {
-        setSelectedPromoter(promoter);
-        setLocations([]);
-        setAvailableLocations([]);
-        setDirections(null);
-        await fetchStoresForPromoter(promoter.id);
-
-        // Geocodificar o endereço do promotor e atualizar o centro do mapa
-        const promoterLocation = await geocodeAddress(promoter.endereco);
-        if (promoterLocation) {
-            setCenter(promoterLocation); // Atualiza o centro do mapa
-            if (mapRef.current) {
-                mapRef.current.panTo(promoterLocation); // Move o mapa para o novo centro
-            }
-        }
+setSelectedPromoter(promoter);
+const promoterLocation = await geocodeAddress(promoter.endereco);
+if (promoterLocation) {
+  setCenter(promoterLocation); // Center the map on the promoter's address
+} else {
+  console.error('Não foi possível geocodificar o endereço do promotor');
+}
+      await fetchStoresForPromoter(promoter.id);
     }
-};
+  };
 
   const calculateRoute = useCallback(async (locations: Location[]) => {
     if (!selectedPromoter || locations.length === 0 || !isLoaded) {
