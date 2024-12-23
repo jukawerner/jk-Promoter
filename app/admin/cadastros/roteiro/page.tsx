@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
-import { FileDown, Share2, Plus } from "lucide-react";
+import { FileDown, Share2, Plus, X } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { toast } from "@/components/ui/toast";
+import { toast } from 'sonner';
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 console.log('Google Maps API Key:', googleMapsApiKey ? 'Configurada' : 'Não configurada');
@@ -134,11 +134,12 @@ export default function CadastroRoteiro() {
   const onDragEnd = (result: any) => {
     if (!result.destination) return;
 
-    const items = Array.from(locations);
+    const items = Array.from(selectedLocations);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
 
-    setLocations(items);
+    setSelectedLocations(items);
+    // Recalcula a rota com a nova ordem
     calculateRoute(items);
   };
 
@@ -277,10 +278,7 @@ export default function CadastroRoteiro() {
 
   const handleAddRoute = async () => {
     if (!selectedUsuario || selectedLocations.length === 0) {
-      toast({
-        title: "Erro ao adicionar rota",
-        description: "Selecione um usuário e pelo menos uma loja",
-      });
+      toast.error("Selecione um usuário e pelo menos uma loja");
       return;
     }
 
@@ -309,20 +307,14 @@ export default function CadastroRoteiro() {
 
       if (error) {
         console.error('Erro ao adicionar rota:', error);
-        toast({
-          title: "Erro ao salvar rota",
-          description: error.message,
-        });
+        toast.error(error.message);
         return;
       }
 
       console.log('Rota adicionada com sucesso:', data);
       setRoutes([...routes, data]);
       
-      toast({
-        title: "Sucesso!",
-        description: "A rota foi salva com sucesso!",
-      });
+      toast.success("A rota foi salva com sucesso!");
 
       // Limpa a seleção atual
       setSelectedLocations([]);
@@ -330,10 +322,7 @@ export default function CadastroRoteiro() {
       setRouteInfo({ duration: "", distance: "" });
     } catch (error) {
       console.error('Erro ao adicionar rota:', error);
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao salvar a rota",
-      });
+      toast.error("Ocorreu um erro ao salvar a rota");
     }
   };
 
@@ -503,10 +492,7 @@ export default function CadastroRoteiro() {
 
   const handleExportPDF = async () => {
     if (!selectedUsuario || selectedLocations.length === 0) {
-      toast({
-        title: "Erro ao exportar",
-        description: "Selecione um usuário e pelo menos uma loja",
-      });
+      toast.error("Selecione um usuário e pelo menos uma loja");
       return;
     }
 
@@ -515,16 +501,16 @@ export default function CadastroRoteiro() {
       const element = document.getElementById('route-content');
       if (!element) return;
 
-      toast({
-        title: "Gerando PDF",
-        description: "Aguarde enquanto geramos o PDF...",
-      });
+      toast.loading("Gerando PDF...");
 
       const canvas = await html2canvas(element, {
         useCORS: true,
         allowTaint: true,
         scrollY: -window.scrollY,
         scale: 2, // Melhor qualidade
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+        backgroundColor: '#ffffff',
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -544,39 +530,36 @@ export default function CadastroRoteiro() {
       pdf.setFontSize(12);
       pdf.text(`Usuário: ${selectedUsuario.nome}`, 20, 23);
 
-      // Calcula as dimensões para manter a proporção
-      const imgWidth = pdf.internal.pageSize.width - 40;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Calcula as dimensões da página
+      const pageWidth = pdf.internal.pageSize.width;
+      const pageHeight = pdf.internal.pageSize.height;
+      const margin = 10;
+      const maxWidth = pageWidth - (margin * 2);
+      const maxHeight = pageHeight - 40; // Reduz a altura disponível por causa do cabeçalho
 
-      // Adiciona a imagem
-      pdf.addImage(imgData, 'PNG', 20, 40, imgWidth, imgHeight);
+      // Calcula as dimensões da imagem mantendo a proporção
+      let imgWidth = maxWidth;
+      let imgHeight = (canvas.height * maxWidth) / canvas.width;
 
-      // Adiciona informações da rota
-      const y = imgHeight + 50;
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(12);
-      pdf.text(`Tempo Estimado: ${routeInfo.duration} minutos`, 20, y);
-      pdf.text(`Distância Total: ${routeInfo.distance} km`, 20, y + 8);
+      // Se a altura for maior que o máximo, redimensiona pela altura
+      if (imgHeight > maxHeight) {
+        imgHeight = maxHeight;
+        imgWidth = (canvas.width * maxHeight) / canvas.height;
+      }
 
-      // Lista as lojas
-      pdf.text('Lojas no Roteiro:', 20, y + 20);
-      selectedLocations.forEach((location, index) => {
-        pdf.text(`${index + 1}. ${location.name}`, 30, y + 30 + (index * 8));
-      });
+      // Centraliza a imagem horizontalmente
+      const x = (pageWidth - imgWidth) / 2;
+      
+      // Adiciona a imagem logo abaixo do cabeçalho
+      pdf.addImage(imgData, 'PNG', x, 35, imgWidth, imgHeight);
 
       // Salva o PDF
       pdf.save(`roteiro_${selectedUsuario.nome}_${new Date().toISOString().split('T')[0]}.pdf`);
 
-      toast({
-        title: "Sucesso!",
-        description: "PDF gerado com sucesso!",
-      });
+      toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao gerar o PDF",
-      });
+      toast.error("Ocorreu um erro ao gerar o PDF");
     }
   };
 
@@ -665,73 +648,75 @@ export default function CadastroRoteiro() {
               </Card>
             )}
 
-            {/* Lojas Selecionadas */}
-            {selectedLocations.length > 0 && (
-              <Card className="p-4">
-                <h3 className="text-lg font-semibold mb-4">Lojas no Roteiro</h3>
-                <div className="space-y-3">
-                  {selectedLocations.map((location, index) => (
+            {/* Lojas no Roteiro */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-lg font-semibold mb-4">Lojas no Roteiro</h3>
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="selected-stores">
+                  {(provided) => (
                     <div
-                      key={location.id}
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300"
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-2"
                     >
-                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full font-semibold">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {location.name}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {location.address}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLocationRemove(location);
-                        }}
-                        className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
-                      >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      {selectedLocations.map((location, index) => (
+                        <Draggable
+                          key={location.id}
+                          draggableId={location.id.toString()}
+                          index={index}
+                        >
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="bg-gray-50 p-3 rounded-md flex items-center justify-between group hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-sm">
+                                  {index + 1}
+                                </span>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{location.name}</span>
+                                  <span className="text-sm text-gray-500">{location.address}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleLocationRemove(location)}
+                                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                  ))}
-                </div>
-              </Card>
-            )}
+                  )}
+                </Droppable>
+              </DragDropContext>
+            </div>
 
             {/* Lojas Disponíveis */}
-            {availableLocations.length > 0 && (
-              <Card className="p-4">
-                <h3 className="text-lg font-semibold mb-4">Lojas Disponíveis</h3>
-                <div className="space-y-3">
-                  {availableLocations.map((location) => (
-                    <div
-                      key={location.id}
-                      onClick={() => handleLocationSelect(location)}
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {location.name}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {location.address}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0 p-2 text-blue-500">
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-lg font-semibold mb-4">Lojas Disponíveis</h3>
+              <div className="space-y-2">
+                {availableLocations.map((location) => (
+                  <div
+                    key={location.id}
+                    className="bg-gray-50 p-3 rounded-md flex items-center justify-between group hover:bg-gray-100 transition-colors cursor-pointer"
+                    onClick={() => handleLocationSelect(location)}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{location.name}</span>
+                      <span className="text-sm text-gray-500">{location.address}</span>
                     </div>
-                  ))}
-                </div>
-              </Card>
-            )}
+                    <Plus className="h-4 w-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                ))}
+              </div>
+            </div>
             
             {/* Rotas Salvas */}
             {routes.length > 0 && (
