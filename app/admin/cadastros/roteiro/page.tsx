@@ -24,6 +24,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -45,17 +46,22 @@ interface Store {
 }
 
 interface Route {
-  id: string;
+  id: number;
   name: string;
   usuario_id: number;
   stores: {
     id: string;
+    name: string;
+    address: string;
+    position: {
+      lat: number;
+      lng: number;
+    };
     order: number;
   }[];
   estimated_time: number;
   distance: number;
   created_at: string;
-  updated_at: string;
 }
 
 interface Location {
@@ -299,6 +305,9 @@ export default function CadastroRoteiro() {
         usuario_id: selectedUsuario.id,
         stores: selectedLocations.map((loc, index) => ({
           id: loc.id,
+          name: loc.name,
+          address: loc.address,
+          position: loc.position,
           order: index
         })),
         estimated_time: parseInt(routeInfo.duration) || 0,
@@ -334,31 +343,53 @@ export default function CadastroRoteiro() {
     }
   };
 
-  const handleRouteClick = (route: Route) => {
-    setSelectedRoute(route);
-    setShowRouteDetails(true);
-    
-    // Busca as informações completas das lojas do array locations
-    const routeLocations = route.stores
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map(savedStore => {
-        const fullLocation = locations.find(loc => loc.id.toString() === savedStore.id);
-        if (!fullLocation) return null;
-        
-        return {
-          ...fullLocation,
-          name: savedStore.name,
-          address: savedStore.address
-        };
-      })
-      .filter(loc => loc !== null) as Location[];
+  const handleRouteClick = async (route: Route) => {
+    try {
+      setSelectedRoute(route);
+      setShowRouteDetails(true);
+      
+      // Define o centro do mapa como a posição inicial
+      if (route.stores[0].position) {
+        setCenter(route.stores[0].position);
+        setUserMarkerPosition(route.stores[0].position);
+      }
 
-    console.log('Route Locations:', routeLocations);
-    
-    if (routeLocations.length > 0) {
+      // Configura as locations a partir das lojas salvas
+      const routeLocations = route.stores
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(store => ({
+          id: parseInt(store.id),
+          name: store.name,
+          address: store.address,
+          position: store.position
+        }));
+
       setSelectedLocations(routeLocations);
-      setCenter(routeLocations[0].position);
-      calculateRoute(routeLocations);
+
+      // Reconstrói a rota usando as informações salvas
+      if (route.stores.length > 0) {
+        try {
+          const directionsService = new google.maps.DirectionsService();
+          const result = await directionsService.route({
+            origin: route.stores[0].position,
+            destination: route.stores[route.stores.length - 1].position,
+            waypoints: route.stores.slice(1, -1).map(loc => ({
+              location: loc.position,
+              stopover: true
+            })),
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING
+          });
+
+          setDirections(result);
+        } catch (error) {
+          console.error('Erro ao recalcular rota:', error);
+          toast.error('Erro ao mostrar rota no mapa');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar detalhes da rota:', error);
+      toast.error('Erro ao carregar detalhes da rota');
     }
   };
 
@@ -624,35 +655,65 @@ export default function CadastroRoteiro() {
     const loadingToast = toast.loading("Salvando roteiro...");
 
     try {
-      // Encontra o maior número entre as rotas existentes com nome similar
-      const baseRouteName = "Rota";
-      const existingRoutes = routes.filter(r => r.name.startsWith(baseRouteName));
-      const maxNumber = existingRoutes.reduce((max, route) => {
-        const num = parseInt(route.name.replace(baseRouteName, "")) || 0;
-        return Math.max(max, num);
-      }, 0);
+      // Pega as coordenadas do usuário
+      const userCoordinates = await geocodeAddress(selectedUsuario.endereco);
+      if (!userCoordinates) {
+        throw new Error("Não foi possível obter as coordenadas do usuário");
+      }
 
-      // Cria um novo nome incrementando o número
-      const newRouteName = `${baseRouteName} ${maxNumber + 1}`;
+      // Calcula a rota completa
+      const directionsService = new google.maps.DirectionsService();
+      const result = await directionsService.route({
+        origin: userCoordinates,
+        destination: userCoordinates,
+        waypoints: selectedLocations.map(loc => ({
+          location: loc.position,
+          stopover: true
+        })),
+        optimizeWaypoints: false,
+        travelMode: google.maps.TravelMode.DRIVING
+      });
 
-      const { data, error } = await supabase.from("routes").insert([
-        {
-          name: newRouteName,
-          stores: selectedLocations.map((loc, index) => ({
-            id: loc.id.toString(),
-            name: loc.name,
-            address: loc.address,
-            order: index
+      // Prepara os dados para salvar
+      const routeData = {
+        name: `Rota ${routes.length + 1}`,
+        start_address: selectedUsuario.endereco,
+        start_position: userCoordinates,
+        stores: selectedLocations.map((loc, index) => ({
+          id: loc.id.toString(),
+          name: loc.name,
+          address: loc.address,
+          position: loc.position,
+          order: index
+        })),
+        route_info: {
+          legs: result.routes[0].legs.map(leg => ({
+            start_address: leg.start_address,
+            end_address: leg.end_address,
+            distance: {
+              text: leg.distance?.text,
+              value: leg.distance?.value
+            },
+            duration: {
+              text: leg.duration?.text,
+              value: leg.duration?.value
+            }
           })),
-          estimated_time: parseInt(routeInfo.duration) || 0,
-          distance: parseFloat(routeInfo.distance) || 0,
-          usuario_id: selectedUsuario.id
-        }
-      ]).select();
+          waypoint_order: result.routes[0].waypoint_order,
+          overview_polyline: result.routes[0].overview_polyline
+        },
+        estimated_time: parseInt(routeInfo.duration),
+        distance: parseFloat(routeInfo.distance),
+        usuario_id: selectedUsuario.id
+      };
+
+      const { data, error } = await supabase
+        .from("routes")
+        .insert([routeData])
+        .select();
 
       if (error) throw error;
 
-      // Atualiza a lista de rotas
       if (data) {
         setRoutes([...routes, data[0]]);
         toast.success("Roteiro salvo com sucesso!");
@@ -683,7 +744,7 @@ export default function CadastroRoteiro() {
       }
 
       // Atualiza a lista de rotas
-      setRoutes(routes.filter(route => route.id !== routeId));
+      setRoutes(routes.filter(route => route.id !== parseInt(routeId)));
       setShowRouteDetails(false);
       toast.success("Rota excluída com sucesso!");
     } catch (error) {
@@ -979,102 +1040,108 @@ export default function CadastroRoteiro() {
         </Button>
       </div>
 
-      {/* Modal de Detalhes da Rota */}
-      <Dialog open={showRouteDetails} onOpenChange={setShowRouteDetails}>
-        <DialogContent className="max-w-6xl h-[80vh]">
-          <DialogHeader>
-            <div className="flex justify-between items-center">
-              <DialogTitle className="text-xl font-bold">{selectedRoute?.name}</DialogTitle>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => setShowRouteDetails(false)}>
-                  <X className="h-4 w-4 mr-2" />
-                  Fechar
-                </Button>
-                <Button onClick={() => handleExportPDF()}>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Exportar PDF
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={() => selectedRoute && handleDeleteRoute(selectedRoute.id)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir Rota
-                </Button>
+      {showRouteDetails && selectedRoute && (
+        <Dialog open={showRouteDetails} onOpenChange={setShowRouteDetails}>
+          <DialogContent className="max-w-5xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{selectedRoute.name}</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <h4 className="text-sm font-medium mb-1">Lojas</h4>
+                <p className="text-2xl font-bold">{selectedRoute.stores.length} lojas</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium mb-1">Tempo Estimado</h4>
+                <p className="text-2xl font-bold">{selectedRoute.estimated_time} minutos</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium mb-1">Distância Total</h4>
+                <p className="text-2xl font-bold">{selectedRoute.distance.toFixed(1)} km</p>
               </div>
             </div>
-          </DialogHeader>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full overflow-auto mt-4">
-            {/* Coluna da Esquerda - Informações e Lista */}
-            <div className="space-y-4">
-              {/* Informações da Rota */}
-              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <span className="text-sm text-gray-500">Lojas</span>
-                  <p className="font-medium">{selectedRoute?.stores.length} lojas</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Tempo Estimado</span>
-                  <p className="font-medium">{selectedRoute?.estimated_time} minutos</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Distância Total</span>
-                  <p className="font-medium">{selectedRoute?.distance} km</p>
-                </div>
-              </div>
 
-              {/* Lista de Lojas */}
-              <div className="space-y-2 overflow-auto max-h-[calc(80vh-300px)]">
-                <h4 className="font-medium">Lojas no Roteiro</h4>
-                {selectedRoute?.stores.map((store, index) => (
-                  <div key={store.id} className="p-3 bg-white border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+            <div className="grid grid-cols-2 gap-4 flex-grow">
+              <div className="space-y-4">
+                <h3 className="font-medium">Lojas no Roteiro</h3>
+                <div className="space-y-2">
+                  {selectedRoute.stores.map((store, index) => (
+                    <div key={store.id} className="flex items-center gap-2 p-2 rounded bg-secondary">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground font-medium">
                         {index + 1}
                       </span>
                       <div>
                         <p className="font-medium">{store.name}</p>
-                        <p className="text-sm text-gray-500">{store.address}</p>
+                        <p className="text-sm text-muted-foreground">{store.address}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-full min-h-[400px] rounded-lg overflow-hidden">
+                <GoogleMap
+                  zoom={13}
+                  center={center}
+                  mapContainerClassName="w-full h-full"
+                  options={{
+                    zoomControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                    fullscreenControl: true,
+                  }}
+                >
+                  {selectedRoute.stores.map((store, index) => (
+                    <Marker
+                      key={store.id}
+                      position={store.position}
+                      label={{
+                        text: (index + 1).toString(),
+                        color: "white",
+                        fontFamily: "system-ui",
+                        fontSize: "14px",
+                        fontWeight: "bold"
+                      }}
+                    />
+                  ))}
+
+                  {directions && (
+                    <DirectionsRenderer
+                      directions={directions}
+                      options={{
+                        suppressMarkers: true,
+                        polylineOptions: {
+                          strokeColor: "#1d4ed8",
+                          strokeWeight: 4
+                        }
+                      }}
+                    />
+                  )}
+                </GoogleMap>
               </div>
             </div>
 
-            {/* Coluna da Direita - Mapa */}
-            <div className="h-[calc(80vh-100px)] rounded-lg overflow-hidden">
-              <GoogleMap
-                zoom={13}
-                center={center}
-                mapContainerClassName="w-full h-full rounded-lg"
-                options={{
-                  zoomControl: true,
-                  streetViewControl: false,
-                  mapTypeControl: false,
-                  fullscreenControl: true,
-                }}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRouteDetails(false)}>
+                <X className="h-4 w-4 mr-2" />
+                Fechar
+              </Button>
+              <Button variant="default" onClick={() => handleExportPDF()}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Exportar PDF
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => selectedRoute && handleDeleteRoute(selectedRoute.id.toString())}
               >
-                {selectedLocations.map((location, index) => (
-                  <Marker
-                    key={location.id}
-                    position={location.position}
-                    label={{
-                      text: (index + 1).toString(),
-                      color: "white",
-                      className: "font-bold"
-                    }}
-                  />
-                ))}
-                {directions && (
-                  <DirectionsRenderer directions={directions} />
-                )}
-              </GoogleMap>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Rota
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
