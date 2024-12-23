@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from "@react-google-maps/api";
+import { GoogleMap, useLoadScript, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,25 +18,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { toast } from "@/components/ui/toast";
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 console.log('Google Maps API Key:', googleMapsApiKey ? 'Configurada' : 'Não configurada');
 
-interface Location {
-  id: string | number;
-  name: string;
-  address: string;
-  position: {
-    lat: number;
-    lng: number;
-  };
-  selected?: boolean;
-}
-
-interface Promoter {
+interface Usuario {
   id: number;
   nome: string;
-  apelido: string;
   endereco: string;
 }
 
@@ -47,6 +36,31 @@ interface Store {
   cep: string;
   latitude: number;
   longitude: number;
+}
+
+interface Route {
+  id: string;
+  name: string;
+  usuario_id: number;
+  stores: {
+    id: string;
+    order: number;
+  }[];
+  estimated_time: number;
+  distance: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Location {
+  id: string | number;
+  name: string;
+  address: string;
+  position: {
+    lat: number;
+    lng: number;
+  };
+  selected?: boolean;
 }
 
 interface RouteInfo {
@@ -67,51 +81,53 @@ const mapOptions = {
 };
 
 export default function CadastroRoteiro() {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: googleMapsApiKey || '',
-    version: "weekly"
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['places']
   });
 
   const mapRef = useRef<google.maps.Map | null> (null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
-  const [promoters, setPromoters] = useState<Promoter[]>([]);
-  const [selectedPromoter, setSelectedPromoter] = useState<Promoter | null>(null);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
-  const [center, setCenter] = useState<google.maps.LatLngLiteral>({
-    lat: -27.5969,
-    lng: -48.5495
+  const [center, setCenter] = useState<{ lat: number; lng: number }>({
+    lat: -28.4812,
+    lng: -49.0061 // Coordenadas de Criciúma
   });
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{ duration: string; distance: string }>({ duration: "", distance: "" });
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<Location[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     console.log('Iniciando componente...');
-    fetchPromoters();
+    fetchUsuarios();
   }, []);
 
-  const fetchPromoters = async () => {
+  const fetchUsuarios = async () => {
     try {
-      console.log('Buscando promotores...');
+      console.log('Buscando usuários...');
       const { data, error } = await supabase
         .from('usuario')
-        .select('id, nome, apelido, endereco')
+        .select('id, nome, endereco')
         .order('nome');
       
       if (error) {
-        console.error('Erro ao buscar promotores:', error);
+        console.error('Erro ao buscar usuários:', error);
         return;
       }
       
-      console.log('Promotores encontrados:', data);
+      console.log('Usuários encontrados:', data);
       if (data && data.length > 0) {
-        setPromoters(data);
+        setUsuarios(data);
       }
     } catch (error) {
-      console.error('Erro ao buscar promotores:', error);
+      console.error('Erro ao buscar usuários:', error);
     }
   };
 
@@ -151,153 +167,84 @@ export default function CadastroRoteiro() {
     }
   };
 
-  const geocodeAddress = async (address: string, cep?: string): Promise<google.maps.LatLngLiteral | null> => {
-    if (!window.google) return null;
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    if (!isLoaded) return null;
     
     try {
-      // Primeiro tenta buscar pelo CEP
-      if (cep) {
-        const cepData = await searchViaCep(cep.replace(/\D/g, ''));
-        if (cepData) {
-          const fullAddressFromCep = `${cepData.logradouro}, ${cepData.bairro}, ${cepData.localidade} - ${cepData.uf}, Brasil`;
-          console.log('Endereço encontrado via CEP:', fullAddressFromCep);
-          
-          const geocoder = new google.maps.Geocoder();
-          const result = await geocoder.geocode({ 
-            address: fullAddressFromCep,
-            region: 'BR'
-          });
-
-          if (result.results && result.results.length > 0) {
-            const coordinates = result.results[0].geometry.location.toJSON();
-            console.log('Coordenadas via CEP:', coordinates);
-            return coordinates;
-          }
-        }
-      }
-
-      // Se não encontrou pelo CEP, tenta pelo endereço completo
-      const normalizedAddress = address.trim()
-        .replace(/\s+/g, ' ')
-        .replace(/,/g, '');
-
-      const hasCityInAddress = /(florianópolis|são josé|palhoça|biguaçu|santo amaro da imperatriz)/i.test(normalizedAddress);
-      
-      const fullAddress = `${normalizedAddress}${
-        hasCityInAddress ? '' : ', São José'
-      }${
-        normalizedAddress.toLowerCase().includes('sc') || 
-        normalizedAddress.toLowerCase().includes('santa catarina') ? 
-        '' : ', Santa Catarina'
-      }, Brasil`;
-      
-      console.log('Geocodificando endereço completo:', fullAddress);
-      
-      const geocoder = new google.maps.Geocoder();
-      const result = await geocoder.geocode({ 
-        address: fullAddress,
+      console.log('Geocodificando endereço:', address);
+      const geocoder = new window.google.maps.Geocoder();
+      const result = await geocoder.geocode({
+        address: address,
         region: 'BR'
       });
-      
-      if (result.results && result.results.length > 0) {
-        const location = result.results[0];
-        const coordinates = location.geometry.location.toJSON();
-        console.log('Resultado da geocodificação:', {
-          input: fullAddress,
-          formatted_address: location.formatted_address,
-          location: coordinates
-        });
-        
+
+      if (result.results[0]?.geometry?.location) {
+        const location = result.results[0].geometry.location;
+        const coordinates = {
+          lat: location.lat(),
+          lng: location.lng()
+        };
+        console.log('Coordenadas encontradas:', coordinates);
         return coordinates;
       }
+      return null;
     } catch (error) {
-      console.error('Erro ao geocodificar:', error);
+      console.error('Erro ao geocodificar endereço:', error);
+      return null;
     }
-    return null;
   };
 
-  const fetchStoresForPromoter = async (promoterId: number) => {
+  const handleLocationSelect = (location: Location) => {
+    console.log('Selecionando loja:', location);
+    const newSelectedLocations = [...selectedLocations, location];
+    setSelectedLocations(newSelectedLocations);
+    setAvailableLocations(prev => prev.filter(loc => loc.id !== location.id));
+    calculateRoute(newSelectedLocations);
+  };
+
+  const handleLocationRemove = (location: Location) => {
+    console.log('Removendo loja:', location);
+    const newSelectedLocations = selectedLocations.filter(loc => loc.id !== location.id);
+    setSelectedLocations(newSelectedLocations);
+    setAvailableLocations(prev => [...prev, location].sort((a, b) => a.name.localeCompare(b.name)));
+    calculateRoute(newSelectedLocations);
+  };
+
+  const fetchStoresForUsuario = async (usuarioId: string) => {
     setIsLoading(true);
     try {
-      console.log('Buscando lojas do promotor:', promoterId);
+      console.log('Buscando lojas do usuário:', usuarioId);
       const { data, error } = await supabase
         .from('loja')
         .select('id, nome, endereco, cep, latitude, longitude')
-        .eq('promotor_id', promoterId)
+        .eq('promotor_id', usuarioId)
         .order('nome');
       
       if (error) {
         console.error('Erro ao buscar lojas:', error);
         return;
       }
-      
-      console.log('Lojas encontradas:', data);
-      if (data) {
-        const processedLocations: Location[] = [];
-        const availableStores: Location[] = [];
-        
-        for (const store of data) {
-          console.log('Processando loja:', store);
-          let position: google.maps.LatLngLiteral;
-          
-          // Sempre tenta geocodificar novamente usando o CEP
-          const geocoded = await geocodeAddress(store.endereco, store.cep);
-          if (geocoded) {
-            position = geocoded;
-            // Atualiza as coordenadas no banco
-            await supabase
-              .from('loja')
-              .update({ 
-                latitude: geocoded.lat, 
-                longitude: geocoded.lng 
-              })
-              .eq('id', store.id);
-            console.log('Coordenadas atualizadas no banco:', position);
-          } else {
-            console.error('Não foi possível geocodificar:', store.endereco);
-            continue;
-          }
-          
-          const locationData = {
-            id: store.id,
-            name: store.nome,
-            address: store.endereco,
-            position,
-            selected: false
-          };
 
-          if (processedLocations.length < 3) {
-            processedLocations.push({ ...locationData, selected: true });
-          } else {
-            availableStores.push(locationData);
+      if (data) {
+        console.log('Lojas encontradas:', data);
+        const processedLocations = data.map(store => ({
+          id: store.id,
+          name: store.nome,
+          address: store.endereco,
+          position: {
+            lat: store.latitude || 0,
+            lng: store.longitude || 0
           }
-        }
-        
-        console.log('Locations processadas:', processedLocations);
-        setLocations(processedLocations);
-        setAvailableLocations(availableStores);
-        
-        if (selectedPromoter && processedLocations.length > 0) {
-          calculateRoute(processedLocations);
-        }
+        }));
+
+        setLocations([]);
+        setSelectedLocations([]);
+        setAvailableLocations(processedLocations);
       }
     } catch (error) {
       console.error('Erro ao buscar lojas:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const removeLocation = (index: number) => {
-    const items = Array.from(locations);
-    const [removedItem] = items.splice(index, 1);
-    setLocations(items);
-    setAvailableLocations([...availableLocations, { ...removedItem, selected: false }]);
-    if (items.length > 0) {
-      calculateRoute(items);
-    } else {
-      setDirections(null);
-      setRouteInfo(null);
     }
   };
 
@@ -307,127 +254,241 @@ export default function CadastroRoteiro() {
     calculateRoute([...locations, location]);
   };
 
-const handlePromoterSelect = async (value: string) => {
-    console.log('Promotor selecionado:', value);
-    const promoter = promoters.find(p => p.id === parseInt(value));
-    console.log('Dados do promotor:', promoter);
-    if (promoter) {
-        setSelectedPromoter(promoter);
-        setLocations([]);
-        setAvailableLocations([]);
-        setDirections(null);
-        await fetchStoresForPromoter(promoter.id);
+  const fetchRoutes = async (usuarioId: string) => {
+    try {
+      console.log('Buscando rotas do usuário:', usuarioId);
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .eq('usuario_id', usuarioId);
 
-        // Geocodificar o endereço do promotor e atualizar o centro do mapa
-        const promoterLocation = await geocodeAddress(promoter.endereco);
-        if (promoterLocation) {
-            setCenter(promoterLocation); // Atualiza o centro do mapa
-            if (mapRef.current) {
-                mapRef.current.panTo(promoterLocation); // Move o mapa para o novo centro
-            }
-        }
+      if (error) {
+        console.error('Erro ao buscar rotas:', error);
+        throw error;
+      }
+
+      console.log('Rotas encontradas:', data);
+      setRoutes(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar rotas:', error);
+      setRoutes([]);
     }
-};
+  };
 
-  const calculateRoute = useCallback(async (locations: Location[]) => {
-    if (!selectedPromoter || locations.length === 0 || !isLoaded) {
-      console.log('Faltam dados para calcular a rota:', {
-        selectedPromoter: !!selectedPromoter,
-        locationsLength: locations.length,
-        isLoaded
+  const handleAddRoute = async () => {
+    if (!selectedUsuario || selectedLocations.length === 0) {
+      toast({
+        title: "Erro ao adicionar rota",
+        description: "Selecione um usuário e pelo menos uma loja",
       });
       return;
     }
 
     try {
-      console.log('Geocodificando endereço do promotor:', selectedPromoter.endereco);
-      const promoterLocation = await geocodeAddress(selectedPromoter.endereco);
-      if (!promoterLocation) {
-        console.error('Não foi possível geocodificar o endereço do promotor');
+      console.log('Adicionando nova rota para usuário:', selectedUsuario.id);
+      console.log('Lojas selecionadas:', selectedLocations);
+
+      const newRoute = {
+        name: `Rota ${routes.length + 1}`,
+        usuario_id: selectedUsuario.id,
+        stores: selectedLocations.map((loc, index) => ({
+          id: loc.id,
+          order: index
+        })),
+        estimated_time: parseInt(routeInfo.duration) || 0,
+        distance: parseFloat(routeInfo.distance) || 0
+      };
+
+      console.log('Dados da nova rota:', newRoute);
+
+      const { data, error } = await supabase
+        .from('routes')
+        .insert([newRoute])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao adicionar rota:', error);
+        toast({
+          title: "Erro ao salvar rota",
+          description: error.message,
+        });
         return;
       }
 
-      const waypoints = locations.map(loc => ({
-        location: new google.maps.LatLng(loc.position.lat, loc.position.lng),
+      console.log('Rota adicionada com sucesso:', data);
+      setRoutes([...routes, data]);
+      
+      toast({
+        title: "Sucesso!",
+        description: "A rota foi salva com sucesso!",
+      });
+
+      // Limpa a seleção atual
+      setSelectedLocations([]);
+      setDirections(null);
+      setRouteInfo({ duration: "", distance: "" });
+    } catch (error) {
+      console.error('Erro ao adicionar rota:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao salvar a rota",
+      });
+    }
+  };
+
+  const handleRouteClick = async (route: Route) => {
+    setSelectedRoute(route);
+    
+    const routeLocations = locations.filter(loc => 
+      route.stores.some(store => store.id === loc.id.toString())
+    ).sort((a, b) => {
+      const aOrder = route.stores.find(s => s.id === a.id.toString())?.order || 0;
+      const bOrder = route.stores.find(s => s.id === b.id.toString())?.order || 0;
+      return aOrder - bOrder;
+    });
+
+    setSelectedLocations(routeLocations);
+    await calculateRoute(routeLocations);
+  };
+
+  const handleUsuarioSelect = async (usuarioId: string) => {
+    setIsLoading(true);
+    try {
+      const usuario = usuarios.find(u => u.id.toString() === usuarioId);
+      if (usuario) {
+        console.log('Usuário selecionado:', usuario);
+        setSelectedUsuario(usuario);
+
+        // Geocodifica o endereço do usuário
+        const coordinates = await geocodeAddress(usuario.endereco);
+        if (coordinates) {
+          setCenter(coordinates);
+          map?.setCenter(coordinates);
+          map?.setZoom(13);
+        }
+
+        await fetchStoresForUsuario(usuarioId);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar usuário:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const calculateRoute = useCallback(async (locations: Location[]) => {
+    if (!selectedUsuario || !locations || locations.length < 1) {
+      setDirections(null);
+      setRouteInfo({ duration: "", distance: "" });
+      return;
+    }
+
+    try {
+      // Geocodifica o endereço do usuário
+      const userCoordinates = await geocodeAddress(selectedUsuario.endereco);
+      if (!userCoordinates) {
+        console.error('Não foi possível encontrar as coordenadas do usuário');
+        return;
+      }
+
+      const directionsService = new window.google.maps.DirectionsService();
+      console.log('Calculando rota para:', locations);
+      console.log('Endereço do usuário:', selectedUsuario.endereco);
+
+      // Usa o endereço do usuário como ponto de partida e chegada
+      const waypoints = locations.map(location => ({
+        location: { lat: location.position.lat, lng: location.position.lng },
         stopover: true
       }));
 
-      console.log('Calculando rota com waypoints:', waypoints);
-      
-      const directionsService = new google.maps.DirectionsService();
-      
-      return new Promise((resolve, reject) => {
-        directionsService.route(
-          {
-            origin: promoterLocation,
-            destination: promoterLocation, // Retorna ao ponto inicial (endereço do promotor)
-            waypoints: waypoints,
-            optimizeWaypoints: false,
-            travelMode: google.maps.TravelMode.DRIVING
-          },
-          (result, status) => {
-            console.log('Resposta do DirectionsService:', { status, result });
-            if (status === google.maps.DirectionsStatus.OK && result) {
-              setDirections(result);
-              
-              // Extrair informações da rota
-              const route = result.routes[0];
-              const legs = route.legs;
-              let totalDistance = 0;
-              let totalDuration = 0;
-              
-              legs.forEach(leg => {
-                totalDistance += leg.distance?.value || 0;
-                totalDuration += leg.duration?.value || 0;
-              });
-              
-              setRouteInfo({
-                duration: formatDuration(totalDuration),
-                distance: formatDistance(totalDistance),
-                steps: legs.flatMap(leg => leg.steps || [])
-              });
-              
-              // Adiciona um marcador para o ponto inicial/final (promotor)
-              if (map) {
-                new google.maps.Marker({
-                  position: promoterLocation,
-                  map: map,
-                  label: {
-                    text: "P",
-                    color: "white",
-                    fontWeight: "bold"
-                  },
-                  icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 10,
-                    fillColor: "#22c55e",
-                    fillOpacity: 1,
-                    strokeWeight: 2,
-                    strokeColor: "#ffffff"
-                  },
-                  title: "Ponto de Partida/Retorno (Promotor)"
-                });
-              }
-              
-              resolve(result);
-            } else {
-              console.error('Erro ao calcular rota:', status);
-              reject(status);
-            }
-          }
-        );
+      const result = await directionsService.route({
+        origin: userCoordinates,
+        destination: userCoordinates,
+        waypoints: waypoints,
+        optimizeWaypoints: true,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      });
+
+      console.log('Resultado da rota:', result);
+      setDirections(result);
+
+      // Calcula o tempo total e distância
+      let totalDuration = 0;
+      let totalDistance = 0;
+      result.routes[0].legs.forEach(leg => {
+        totalDuration += leg.duration?.value || 0;
+        totalDistance += leg.distance?.value || 0;
+      });
+
+      // Converte para minutos e quilômetros
+      const durationInMinutes = Math.round(totalDuration / 60);
+      const distanceInKm = (totalDistance / 1000).toFixed(1);
+
+      setRouteInfo({
+        duration: durationInMinutes.toString(),
+        distance: distanceInKm.toString()
       });
     } catch (error) {
       console.error('Erro ao calcular rota:', error);
+      setDirections(null);
+      setRouteInfo({ duration: "", distance: "" });
     }
-  }, [selectedPromoter, isLoaded, geocodeAddress, map]);
+  }, [selectedUsuario, isLoaded]);
+
+  useEffect(() => {
+    if (selectedUsuario) {
+      fetchRoutes(selectedUsuario.id);
+    }
+  }, [selectedUsuario]);
+
+  useEffect(() => {
+    calculateRoute(selectedLocations);
+  }, [selectedLocations, calculateRoute]);
 
   // Efeito para recalcular a rota quando as locations mudarem
   useEffect(() => {
-    if (locations.length > 0 && selectedPromoter) {
+    if (locations.length > 0 && selectedUsuario) {
       calculateRoute(locations);
     }
-  }, [locations, selectedPromoter, calculateRoute]);
+  }, [locations, selectedUsuario, calculateRoute]);
+
+  useEffect(() => {
+    if (selectedLocations.length > 0 && map) {
+      const bounds = new window.google.maps.LatLngBounds();
+      selectedLocations.forEach(location => {
+        bounds.extend(new window.google.maps.LatLng(location.position.lat, location.position.lng));
+      });
+      map.fitBounds(bounds);
+    }
+  }, [selectedLocations, map]);
+
+  useEffect(() => {
+    if (selectedLocations.length > 0) {
+      calculateRoute(selectedLocations);
+    }
+  }, [selectedLocations]);
+
+  useEffect(() => {
+    if (selectedLocations.length > 0 && map && isLoaded) {
+      const bounds = new window.google.maps.LatLngBounds();
+      selectedLocations.forEach(location => {
+        bounds.extend(new window.google.maps.LatLng(location.position.lat, location.position.lng));
+      });
+      map.fitBounds(bounds);
+    }
+  }, [selectedLocations, map, isLoaded]);
+
+  useEffect(() => {
+    if (selectedUsuario?.endereco && map && isLoaded) {
+      const coordinates = geocodeAddress(selectedUsuario.endereco);
+      if (coordinates) {
+        setCenter(coordinates);
+        map.setCenter(coordinates);
+        map.setZoom(13);
+      }
+    }
+  }, [selectedUsuario, map, isLoaded]);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -440,123 +501,85 @@ const handlePromoterSelect = async (value: string) => {
     return `${km.toFixed(1)} km`;
   };
 
-  const exportToPDF = async () => {
-    if (!mapRef.current || !routeInfo) return;
-    
+  const handleExportPDF = async () => {
+    if (!selectedUsuario || selectedLocations.length === 0) {
+      toast({
+        title: "Erro ao exportar",
+        description: "Selecione um usuário e pelo menos uma loja",
+      });
+      return;
+    }
+
     try {
-      setIsLoading(true);
-      const mapElement = mapRef.current.getDiv();
-  
-      // Salva o tamanho original do mapa
-      const originalWidth = mapElement.style.width;
-      const originalHeight = mapElement.style.height;
-  
-      // Reduz temporariamente o tamanho do mapa
-      mapElement.style.width = '600px';
-      mapElement.style.height = '400px';
-      
-      // Configurações otimizadas para html2canvas
-      const canvas = await html2canvas(mapElement, {
-        scale: 1,
+      // Captura a div que contém o mapa e a lista
+      const element = document.getElementById('route-content');
+      if (!element) return;
+
+      toast({
+        title: "Gerando PDF",
+        description: "Aguarde enquanto geramos o PDF...",
+      });
+
+      const canvas = await html2canvas(element, {
         useCORS: true,
-        logging: false,
         allowTaint: true,
-        backgroundColor: null,
-        imageTimeout: 15000,
-        removeContainer: true,
+        scrollY: -window.scrollY,
+        scale: 2, // Melhor qualidade
       });
-  
-      // Restaura o tamanho original do mapa
-      mapElement.style.width = originalWidth;
-      mapElement.style.height = originalHeight;
-  
-      // Comprime a qualidade da imagem
-      const imgData = canvas.toDataURL('image/jpeg', 0.7);
-  
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-  
-      // Adiciona título com estilo
-      pdf.setFillColor(51, 65, 85);
-      pdf.rect(0, 0, pageWidth, 50, 'F'); // Aumenta a altura do cabeçalho
-  
-     
-      // Adiciona o título principal
+
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Cria o PDF
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+      });
+
+      // Adiciona o cabeçalho
+      pdf.setFillColor(52, 144, 220);
+      pdf.rect(0, 0, pdf.internal.pageSize.width, 30, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(20);
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Roteiro de Visitas', pageWidth / 2, 35, { align: 'center' });
-  
- // Adiciona informações do promotor como subtítulo
-if (selectedPromoter) {
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(12);
-  pdf.setFont(undefined, 'normal');
-  pdf.text(`Promotor: ${selectedPromoter.apelido || selectedPromoter.nome}`, pageWidth / 2, 40, { align: 'center' });
-}
+      pdf.setFontSize(16);
+      pdf.text('Roteiro de Visitas', 20, 15);
+      pdf.setFontSize(12);
+      pdf.text(`Usuário: ${selectedUsuario.nome}`, 20, 23);
 
-
-
-      // Informações do roteiro com estilo
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(10);
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Informações do Roteiro:', margin, 60);
-      
-      pdf.setFont(undefined, 'normal');
-      pdf.setFontSize(8);
-      pdf.text(`Distância Total: ${routeInfo.distance}`, margin, 70);
-      pdf.text(`Tempo Total: ${routeInfo.duration}`, margin, 75);
-  
-      // Adiciona mapa com borda
-      const mapY = 85;
-      const imgWidth = pageWidth - (margin * 2);
+      // Calcula as dimensões para manter a proporção
+      const imgWidth = pdf.internal.pageSize.width - 40;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      pdf.setDrawColor(200, 200, 200);
-      pdf.rect(margin - 1, mapY - 1, imgWidth + 2, imgHeight + 2);
-      pdf.addImage(imgData, 'JPEG', margin, mapY, imgWidth, imgHeight);
-  
-      // Lista de lojas com estilo
-      const listY = mapY + imgHeight + 15;
-      pdf.setFont(undefined, 'bold');
-      pdf.setFontSize(8);
-      pdf.text('Lojas no Roteiro:', margin, listY);
-      
-      pdf.setFont(undefined, 'normal');
-      pdf.setFontSize(8);
-      locations.forEach((location, index) => {
-        const y = listY + 8 + (index * 6);
-        if (y > pageHeight - margin) {
-          pdf.addPage();
-          pdf.setFont(undefined, 'bold');
-          pdf.text('Lojas no Roteiro (continuação):', margin, margin);
-          pdf.setFont(undefined, 'normal');
-          return;
-        }
-        const letter = String.fromCharCode(65 + index);
-        pdf.setFont(undefined, 'bold');
-        pdf.text(`${letter}.`, margin, y);
-        pdf.setFont(undefined, 'normal');
-        pdf.text(`${location.name} - ${location.address}`, margin + 10, y);
+
+      // Adiciona a imagem
+      pdf.addImage(imgData, 'PNG', 20, 40, imgWidth, imgHeight);
+
+      // Adiciona informações da rota
+      const y = imgHeight + 50;
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(12);
+      pdf.text(`Tempo Estimado: ${routeInfo.duration} minutos`, 20, y);
+      pdf.text(`Distância Total: ${routeInfo.distance} km`, 20, y + 8);
+
+      // Lista as lojas
+      pdf.text('Lojas no Roteiro:', 20, y + 20);
+      selectedLocations.forEach((location, index) => {
+        pdf.text(`${index + 1}. ${location.name}`, 30, y + 30 + (index * 8));
       });
-  
-      // Adiciona rodapé
-      const currentDate = new Date().toLocaleDateString('pt-BR');
-      pdf.setFontSize(8);
-      pdf.setTextColor(128, 128, 128);
-      pdf.text(`Gerado em: ${currentDate}`, margin, pageHeight - 10);
-  
-      pdf.save('roteiro.pdf');
+
+      // Salva o PDF
+      pdf.save(`roteiro_${selectedUsuario.nome}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+      toast({
+        title: "Sucesso!",
+        description: "PDF gerado com sucesso!",
+      });
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao gerar o PDF",
+      });
     }
   };
-  
+
   const shareOnWhatsApp = () => {
     if (!routeInfo) return;
     
@@ -572,204 +595,245 @@ if (selectedPromoter) {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 space-y-4">
       <h1 className="text-2xl font-bold mb-6">Cadastro de Roteiro</h1>
-  {/* Botões */}
-  <div className="flex gap-4 mb-6">
-      <Button
-        variant="outline"
-        onClick={exportToPDF}
-        disabled={!routeInfo || isLoading}
-      >
-        <FileDown className="mr-2 h-4 w-4" />
-        Exportar PDF
-      </Button>
-      
-      <Button
-        variant="outline"
-        onClick={shareOnWhatsApp}
-        disabled={!routeInfo || isLoading}
-      >
-        <Share2 className="mr-2 h-4 w-4" />
-        Compartilhar
-      </Button>
-    </div>
+      {/* Botões */}
+      <div className="flex gap-4 mb-6">
+        <Button
+          variant="outline"
+          onClick={handleExportPDF}
+          disabled={!routeInfo || isLoading}
+        >
+          <FileDown className="mr-2 h-4 w-4" />
+          Exportar PDF
+        </Button>
+        
+        <Button
+          variant="outline"
+          onClick={shareOnWhatsApp}
+          disabled={!routeInfo || isLoading}
+        >
+          <Share2 className="mr-2 h-4 w-4" />
+          Compartilhar
+        </Button>
+        
+        <Button 
+          onClick={handleAddRoute}
+          disabled={!selectedUsuario || selectedLocations.length === 0}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Adicionar Rota
+        </Button>
+      </div>
 
-      {/* Seleção de Promotor */}
+      {/* Seleção de Usuário */}
       <div className="mb-6">
-        <Select onValueChange={handlePromoterSelect}>
+        <Select onValueChange={handleUsuarioSelect}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Selecione o Promotor" />
+            <SelectValue placeholder="Selecione o Usuário" />
           </SelectTrigger>
           <SelectContent>
-            {promoters.map((promoter) => (
-              <SelectItem key={promoter.id} value={promoter.id.toString()}>
-                {promoter.nome}
+            {usuarios.map((usuario) => (
+              <SelectItem key={usuario.id} value={usuario.id.toString()}>
+                {usuario.nome}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <div className="text-sm text-gray-500 mt-1">
-          {promoters.length} promotores encontrados
+          {usuarios.length} usuários encontrados
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div id="route-content" className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Coluna da Esquerda - Lista de Lojas */}
         <div className="md:col-span-1">
-          <Card className="p-4">
-            {routeInfo && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <div className="text-lg font-semibold">{routeInfo.duration}</div>
-                <div className="text-sm text-gray-600">{routeInfo.distance}</div>
-              </div>
+          <div className="w-full max-w-md space-y-4">
+            {/* Informações da Rota */}
+            {routeInfo.duration && routeInfo.distance && (
+              <Card className="p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-semibold">Tempo Estimado</h3>
+                    <p className="text-2xl font-bold text-blue-600">{routeInfo.duration} min</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Distância</h3>
+                    <p className="text-2xl font-bold text-blue-600">{routeInfo.distance} km</p>
+                  </div>
+                </div>
+              </Card>
             )}
-            <h2 className="text-lg font-semibold mb-4">Lojas no Roteiro</h2>
-            {isLoading ? (
-              <div className="text-center py-4">Carregando lojas...</div>
-            ) : (
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId="locations">
-                  {(provided) => (
+
+            {/* Lojas Selecionadas */}
+            {selectedLocations.length > 0 && (
+              <Card className="p-4">
+                <h3 className="text-lg font-semibold mb-4">Lojas no Roteiro</h3>
+                <div className="space-y-3">
+                  {selectedLocations.map((location, index) => (
                     <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
+                      key={location.id}
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300"
                     >
-                      {locations.map((location, index) => (
-                        <Draggable
-                          key={location.id.toString()}
-                          draggableId={location.id.toString()}
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`flex items-center gap-3 p-3 border rounded mb-2 bg-white ${
-                                snapshot.isDragging ? 'shadow-lg' : ''
-                              }`}
-                            >
-                              <div className="w-6 h-6 flex items-center justify-center bg-blue-500 text-white rounded-full text-sm flex-shrink-0">
-                                {String.fromCharCode(65 + index)}
-                              </div>
-                              <div className="flex-grow min-w-0">
-                                <h3 className="font-medium truncate">{location.name}</h3>
-                                <p className="text-sm text-gray-500 truncate">{location.address}</p>
-                              </div>
-                              <button
-                                onClick={() => removeLocation(index)}
-                                className="p-1 rounded text-red-500 hover:bg-red-50"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M18 6L6 18M6 6l12 12"/>
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {location.name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {location.address}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLocationRemove(location);
+                        }}
+                        className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+                  ))}
+                </div>
+              </Card>
             )}
 
             {/* Lojas Disponíveis */}
             {availableLocations.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-md font-semibold mb-3">Lojas Disponíveis</h3>
-                <div className="space-y-2">
+              <Card className="p-4">
+                <h3 className="text-lg font-semibold mb-4">Lojas Disponíveis</h3>
+                <div className="space-y-3">
                   {availableLocations.map((location) => (
-                    <Card 
-                      key={location.id.toString()}
-                      className="p-3 hover:shadow-md transition-shadow border-l-4 border-gray-300"
+                    <div
+                      key={location.id}
+                      onClick={() => handleLocationSelect(location)}
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex-grow min-w-0">
-                          <h3 className="font-medium truncate">{location.name}</h3>
-                          <p className="text-sm text-gray-500 truncate">{location.address}</p>
-                        </div>
-                        <button
-                          onClick={() => addLocation(location)}
-                          className="p-1 rounded text-green-500 hover:bg-green-50"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 5v14M5 12h14"/>
-                          </svg>
-                        </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {location.name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {location.address}
+                        </p>
                       </div>
-                    </Card>
+                      <div className="flex-shrink-0 p-2 text-blue-500">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
-          </Card>
+            
+            {/* Rotas Salvas */}
+            {routes.length > 0 && (
+              <Card className="p-4">
+                <h3 className="text-lg font-semibold mb-4">Rotas Salvas</h3>
+                <div className="space-y-3">
+                  {routes.map((route) => (
+                    <div
+                      key={route.id}
+                      onClick={() => handleRouteClick(route)}
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          {route.name}
+                        </h4>
+                        <div className="flex items-center space-x-3 mt-1">
+                          <span className="text-xs text-gray-500">
+                            {route.stores.length} lojas
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {route.estimated_time} min
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {route.distance} km
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-blue-500">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* Coluna da Direita - Mapa */}
-        <div className="md:col-span-2 h-[700px] relative">
-          {isLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-                <div className="mt-2">Carregando mapa...</div>
-              </div>
-            </div>
-          )}
-          {loadError && (
-            <div className="h-full flex items-center justify-center bg-red-50">
-              <div className="text-center text-red-600">
-                <p>Erro ao carregar o mapa</p>
-                <p className="text-sm">{loadError.message}</p>
-              </div>
-            </div>
-          )}
-          {isLoaded && !loadError && (
+        <div className="md:col-span-2 h-[calc(100vh-12rem)]">
+          {isLoaded ? (
             <GoogleMap
-              mapContainerStyle={{ width: '100%', height: '600px' }}
+              mapContainerStyle={{ width: '100%', height: '100%' }}
               center={center}
-              zoom={12}
-              onLoad={(map) => {
-                mapRef.current = map;
+              zoom={13}
+              options={{
+                zoomControl: true,
+                streetViewControl: false,
+                mapTypeControl: true,
+                fullscreenControl: true,
+              }}
+              onLoad={map => {
+                console.log('Mapa carregado');
                 setMap(map);
               }}
-              onUnmount={() => {
-                mapRef.current = undefined;
-                setMap(null);
-              }}
-              options={mapOptions}
             >
-              {locations.map((location, index) => (
+              {/* Marcador do usuário */}
+              {selectedUsuario && selectedUsuario.endereco && (
                 <Marker
-                  key={location.id.toString()}
+                  position={center}
+                  icon={{
+                    url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                    scaledSize: new window.google.maps.Size(32, 32)
+                  }}
+                  title={`Endereço de ${selectedUsuario.nome}`}
+                />
+              )}
+
+              {/* Marcadores das lojas */}
+              {selectedLocations.map((location, index) => (
+                <Marker
+                  key={location.id}
                   position={location.position}
                   label={{
-                    text: String.fromCharCode(65 + index),
-                    color: "white",
-                    fontWeight: "bold",
+                    text: (index + 1).toString(),
+                    color: 'white',
+                    className: 'font-semibold'
                   }}
-                  zIndex={1000 - index}
-                  optimized={false}
                 />
               ))}
+
               {directions && (
-                <DirectionsRenderer 
+                <DirectionsRenderer
                   directions={directions}
                   options={{
-                    zIndex: 1,
                     suppressMarkers: true,
-                    preserveViewport: true,
                     polylineOptions: {
-                      strokeColor: "#2563eb", // Azul
-                      strokeWeight: 4,
+                      strokeColor: '#2563EB',
+                      strokeWeight: 5,
                       strokeOpacity: 0.8
                     }
                   }}
                 />
               )}
             </GoogleMap>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+              <div className="text-gray-500">Carregando mapa...</div>
+            </div>
           )}
         </div>
       </div>
