@@ -6,11 +6,10 @@ export async function getLojas(): Promise<Store[]> {
     .from("loja")
     .select(`
       *,
-      usuario:promotor_id (
+      promotor:promotor_id (
         id,
         nome,
-        apelido,
-        avatar_url
+        apelido
       ),
       rede:rede_id (
         id,
@@ -172,17 +171,16 @@ export async function importLojas(lojas: StoreImportData[]): Promise<Store[]> {
       uf: "SC",  // Valor padrão
       cep: loja.cep.replace(/\D/g, ''),
       rede_id: Number(loja.rede_id),
-      promotor_id: loja.promotor_id === null ? null : Number(loja.promotor_id),
+      promotor_id: loja.promotor_id, // Não converter para número pois é UUID
       latitude: Number(loja.latitude) || -23.5505,
       longitude: Number(loja.longitude) || -46.6333,
     })))
     .select(`
       *,
-      usuario:promotor_id (
+      promotor:promotor_id (
         id,
         nome,
-        apelido,
-        avatar_url
+        apelido
       ),
       rede:rede_id (
         id,

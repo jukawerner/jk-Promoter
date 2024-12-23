@@ -25,11 +25,14 @@ const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   cnpj: z.string(),
   endereco: z.string().min(1, "Endereço é obrigatório"),
+  numero: z.string(),
+  bairro: z.string(),
+  cidade: z.string(),
+  uf: z.string(),
   cep: z.string().min(8, "CEP é obrigatório e deve ter 8 dígitos"),
   rede_id: z.number().min(1, "Rede é obrigatória"),
   promotor_id: z.number().nullable(),
-  latitude: z.number().min(-90).max(90, "Latitude inválida"),
-  longitude: z.number().min(-180).max(180, "Longitude inválida"),
+  // Remover validação de latitude e longitude
 });
 
 interface StoreFormProps {
@@ -65,16 +68,20 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
     watch,
   } = useForm<StoreFormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      nome: "",
-      cnpj: "",
-      endereco: "",
-      cep: "",
-      rede_id: undefined,
-      promotor_id: null,
-      latitude: undefined,
-      longitude: undefined,
-    },
+      defaultValues: {
+        nome: "",
+        cnpj: "",
+        endereco: "",
+        numero: "",
+        bairro: "",
+        cidade: "",
+        uf: "",
+        cep: "",
+        rede_id: undefined,
+        promotor_id: null,
+        latitude: undefined,
+        longitude: undefined,
+      },
   });
 
   const endereco = watch("endereco");
@@ -85,6 +92,10 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         nome: store.nome,
         cnpj: store.cnpj || "",
         endereco: store.endereco,
+        numero: store.numero || "",
+        bairro: store.bairro || "",
+        cidade: store.cidade || "",
+        uf: store.uf || "",
         cep: store.cep,
         rede_id: store.rede_id,
         promotor_id: store.promotor_id,
@@ -154,11 +165,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
     try {
       console.log('Enviando dados do formulário:', data);
       
-      // Validação adicional
-      if (!data.latitude || !data.longitude) {
-        toast.error("Por favor, selecione a localização no mapa");
-        return;
-      }
+      // Remover a validação de latitude e longitude
 
       if (!data.rede_id) {
         toast.error("Por favor, selecione uma rede");
@@ -170,6 +177,10 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
         nome: data.nome.trim(),
         cnpj: data.cnpj?.trim() || "",
         endereco: data.endereco.trim(),
+        numero: data.numero || "",
+        bairro: data.bairro || "",
+        cidade: data.cidade || "",
+        uf: data.uf || "",
         cep: data.cep.replace(/\D/g, ''), // Remove caracteres não numéricos
         rede_id: Number(data.rede_id),
         promotor_id: data.promotor_id === null ? null : Number(data.promotor_id),
@@ -292,7 +303,7 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
                 <SelectItem value="null">Nenhum</SelectItem>
                 {promotores.map((promotor) => (
                   <SelectItem key={promotor.id} value={promotor.id.toString()}>
-                    {promotor.nome}
+                    {promotor.apelido}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -305,13 +316,9 @@ export function StoreForm({ store, onSave, onCancel }: StoreFormProps) {
           <MapPicker
             address={endereco}
             onAddressChange={handleAddressChange}
-            onCepUpdate={handleCepUpdate}
-            onCoordinatesChange={(lat, lng) => {
-              setValue("latitude", lat);
-              setValue("longitude", lng);
-            }}
-            initialLatitude={watch("latitude")}
-            initialLongitude={watch("longitude")}
+            onCepChange={handleCepUpdate}
+            onLatChange={(lat: number) => setValue("latitude", lat)}
+            onLngChange={(lng: number) => setValue("longitude", lng)}
           />
           {(errors.latitude || errors.longitude) && (
             <p className="text-red-500 text-sm mt-1">Por favor, selecione a localização no mapa</p>

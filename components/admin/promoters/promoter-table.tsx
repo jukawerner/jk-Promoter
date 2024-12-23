@@ -9,11 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Usuario } from "@/lib/actions/usuario";
+import { formatPhoneNumber } from "@/lib/utils/format";
 import {
   ColumnDef,
   flexRender,
@@ -21,40 +21,31 @@ import {
   getSortedRowModel,
   SortingState,
   useReactTable,
-  RowSelectionState,
 } from "@tanstack/react-table";
 
-interface Store {
-  id: number;
-  nome: string;
-  cnpj: string;
-  endereco: string;
-  cep: string;
-  rede: { nome: string };
-  promotor: { apelido: string } | null;
-}
-
-interface StoreTableProps {
-  stores: Store[];
-  onEdit: (store: Store) => void;
+interface PromoterTableProps {
+  promoters: Usuario[];
+  onEdit: (promoter: Usuario) => void;
   onDelete: (id: number) => void;
   onDeleteSelected: (ids: number[]) => void;
 }
 
-export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: StoreTableProps) {
+export function PromoterTable({
+  promoters,
+  onEdit,
+  onDelete,
+  onDeleteSelected,
+}: PromoterTableProps) {
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  const columns = useMemo<ColumnDef<Store>[]>(
+  const columns = useMemo<ColumnDef<Usuario>[]>(
     () => [
       {
         id: "select",
         header: ({ table }) => (
           <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && "indeterminate")
-            }
+            checked={table.getIsAllPageRowsSelected()}
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
           />
@@ -88,14 +79,14 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
         ),
       },
       {
-        accessorKey: "cnpj",
+        accessorKey: "apelido",
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="hover:bg-transparent"
           >
-            CNPJ
+            Apelido
             {column.getIsSorted() === "asc" ? (
               <ChevronUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -107,14 +98,14 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
         ),
       },
       {
-        accessorKey: "endereco",
+        accessorKey: "email",
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="hover:bg-transparent"
           >
-            Endereço
+            Email
             {column.getIsSorted() === "asc" ? (
               <ChevronUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -126,14 +117,14 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
         ),
       },
       {
-        accessorKey: "cep",
+        accessorKey: "telefone",
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="hover:bg-transparent"
           >
-            CEP
+            Telefone
             {column.getIsSorted() === "asc" ? (
               <ChevronUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -143,16 +134,17 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
             )}
           </Button>
         ),
+        cell: ({ row }) => formatPhoneNumber(row.original.telefone),
       },
       {
-        accessorKey: "rede.nome",
+        accessorKey: "tipo",
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="hover:bg-transparent"
           >
-            Rede
+            Tipo
             {column.getIsSorted() === "asc" ? (
               <ChevronUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -162,26 +154,6 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
             )}
           </Button>
         ),
-      },
-      {
-        accessorKey: "promotor.apelido",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="hover:bg-transparent"
-          >
-            Promotor
-            {column.getIsSorted() === "asc" ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
-        ),
-        cell: ({ row }) => row.original.promotor?.apelido || "-",
       },
       {
         id: "actions",
@@ -211,45 +183,51 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
   );
 
   const table = useReactTable({
-    data: stores,
+    data: promoters,
     columns,
     state: {
       sorting,
-      rowSelection,
     },
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    enableMultiRowSelection: true,
+    onRowSelectionChange: (updater) => {
+      const newSelection = typeof updater === 'function'
+        ? updater(table.getState().rowSelection)
+        : updater;
+      
+      const selectedIds = Object.entries(newSelection)
+        .filter(([_, selected]) => selected)
+        .map(([index]) => promoters[parseInt(index)].id);
+      
+      setSelectedRows(selectedIds);
+    },
   });
 
   const handleDeleteSelected = () => {
-    const selectedIds = Object.keys(rowSelection).map(
-      (index) => stores[parseInt(index)].id
-    );
-    
-    if (selectedIds.length > 0) {
-      if (window.confirm(`Deseja excluir ${selectedIds.length} lojas selecionadas?`)) {
-        onDeleteSelected(selectedIds);
-        setRowSelection({});
+    if (selectedRows.length > 0) {
+      if (window.confirm(`Deseja excluir ${selectedRows.length} usuários selecionados?`)) {
+        onDeleteSelected(selectedRows);
+        setSelectedRows([]);
+        table.resetRowSelection();
       }
     }
   };
 
   return (
     <div className="space-y-4">
-      {Object.keys(rowSelection).length > 0 && (
+      {selectedRows.length > 0 && (
         <div className="flex items-center justify-between bg-muted p-2 rounded-md">
           <span className="text-sm text-muted-foreground">
-            {Object.keys(rowSelection).length} lojas selecionadas
+            {selectedRows.length} usuários selecionados
           </span>
           <Button
             variant="destructive"
             size="sm"
             onClick={handleDeleteSelected}
           >
-            Excluir Selecionadas
+            Excluir Selecionados
           </Button>
         </div>
       )}
@@ -295,7 +273,7 @@ export function StoreTable({ stores, onEdit, onDelete, onDeleteSelected }: Store
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhuma loja encontrada
+                  Nenhum usuário encontrado
                 </TableCell>
               </TableRow>
             )}

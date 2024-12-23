@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { StoreCard } from "@/components/admin/stores/store-card";
 import { StoreForm } from "@/components/admin/stores/store-form";
 import { ImportModal } from "@/components/admin/stores/import-modal";
+import { StoreTable } from "@/components/admin/stores/store-table";
 import { Plus, Upload, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Store } from "@/types/store";
 import { getLojas, createLoja, updateLoja, deleteLoja } from "@/lib/actions/loja";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function CadastroLojas() {
   const router = useRouter();
@@ -39,23 +40,19 @@ export default function CadastroLojas() {
     }
   };
 
-  const filteredStores = useMemo(() => {
-    if (!searchQuery) return stores;
-    
-    const searchTerm = searchQuery.toLowerCase();
-    return stores.filter(store => {
-      return (
-        store.rede?.nome?.toLowerCase().includes(searchTerm) ||
-        store.nome?.toLowerCase().includes(searchTerm) ||
-        store.usuario?.nome?.toLowerCase().includes(searchTerm)
-      );
-    });
-  }, [stores, searchQuery]);
-
   const handleSaveStore = async (storeData: any) => {
     try {
       setIsLoading(true);
       console.log('Dados recebidos do formulário:', storeData);
+
+      const lojaData = {
+        nome: storeData.nome,
+        cnpj: storeData.cnpj,
+        endereco: storeData.endereco,
+        cep: storeData.cep,
+        rede_id: Number(storeData.rede_id),
+        promotor_id: storeData.promotor_id === null ? null : Number(storeData.promotor_id),
+      };
 
       let savedStore: Store | null = null;
       if (selectedStore && selectedStore.id) {
@@ -84,7 +81,6 @@ export default function CadastroLojas() {
       setShowForm(false);
       setSelectedStore(null);
       
-      // Atualiza a página e redireciona
       router.refresh();
       router.push('/admin/cadastros/lojas');
     } catch (error) {
@@ -100,24 +96,16 @@ export default function CadastroLojas() {
     setShowForm(true);
   };
 
-  const handleDeleteStore = async (store: Store) => {
-    console.log('Tentando excluir loja:', store.id);
+  const handleDeleteStore = async (id: number) => {
+    console.log('Tentando excluir loja:', id);
     if (window.confirm("Tem certeza que deseja excluir esta loja?")) {
       try {
         setIsLoading(true);
         console.log('Iniciando exclusão da loja...');
-        if (!store.id) {
-          throw new Error('ID da loja não encontrado');
-        }
-        await deleteLoja(store.id);
+        await deleteLoja(id);
         console.log('Loja excluída do banco com sucesso');
         
-        // Remove a loja localmente para evitar reload
-        setStores(prev => {
-          console.log('Atualizando lista local de lojas');
-          return prev.filter(p => p.id !== store.id);
-        });
-        
+        setStores(prev => prev.filter(p => p.id !== id));
         toast.success("Loja excluída com sucesso!");
       } catch (error) {
         console.error('Erro detalhado ao excluir loja:', error);
@@ -127,6 +115,39 @@ export default function CadastroLojas() {
       }
     }
   };
+
+  const handleDeleteSelected = async (ids: number[]) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('loja')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+
+      setStores(prev => prev.filter(store => !ids.includes(store.id)));
+      toast.success(`${ids.length} lojas excluídas com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir lojas:', error);
+      toast.error('Erro ao excluir lojas selecionadas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredStores = stores.filter(store => {
+    if (!searchQuery) return true;
+    
+    const searchTerm = searchQuery.toLowerCase();
+    return (
+      store.nome?.toLowerCase().includes(searchTerm) ||
+      store.cnpj?.toLowerCase().includes(searchTerm) ||
+      store.endereco?.toLowerCase().includes(searchTerm) ||
+      store.rede?.nome?.toLowerCase().includes(searchTerm) ||
+      store.promotor?.apelido?.toLowerCase().includes(searchTerm)
+    );
+  });
 
   return (
     <motion.div
@@ -188,23 +209,12 @@ export default function CadastroLojas() {
               <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredStores.map((store) => (
-                <StoreCard
-                  key={store.id}
-                  store={store}
-                  onEdit={() => handleEditStore(store)}
-                  onDelete={() => handleDeleteStore(store)}
-                />
-              ))}
-              {filteredStores.length === 0 && (
-                <div className="col-span-full text-center py-8 text-gray-500">
-                  {searchQuery
-                    ? "Nenhuma loja encontrada com este filtro."
-                    : "Nenhuma loja cadastrada. Clique em \"Nova Loja\" para começar."}
-                </div>
-              )}
-            </div>
+            <StoreTable
+              stores={filteredStores}
+              onEdit={handleEditStore}
+              onDelete={handleDeleteStore}
+              onDeleteSelected={handleDeleteSelected}
+            />
           )}
         </>
       )}
@@ -212,7 +222,10 @@ export default function CadastroLojas() {
       <ImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onSuccess={loadStores}
+        onSuccess={() => {
+          setShowImportModal(false);
+          loadStores();
+        }}
       />
     </motion.div>
   );

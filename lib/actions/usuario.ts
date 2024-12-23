@@ -25,6 +25,9 @@ export async function createUsuario(data: CreateUsuarioInput): Promise<Usuario> 
 
   if (error) {
     console.error('Erro ao criar usuário:', error);
+    if (error.code === '23505' && error.message.includes('usuario_email_key')) {
+      throw new Error(`O email ${data.email} já está cadastrado para outro usuário`);
+    }
     throw error;
   }
 

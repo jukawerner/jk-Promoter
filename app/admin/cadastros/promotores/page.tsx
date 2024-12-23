@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromoterForm } from "@/components/admin/promoters/promoter-form";
-import { UserCard } from "@/components/admin/promoters/promoter-card";
+import { PromoterTable } from "@/components/admin/promoters/promoter-table";
 import { Input } from "@/components/ui/input";
 import { ImportModal } from "@/components/admin/promoters/import-modal";
 import { toast } from "sonner";
@@ -103,15 +103,44 @@ export default function CadastroPromotor() {
   const handleImportUsers = async (users: Partial<Usuario>[]) => {
     try {
       setIsLoading(true);
+      let processados = 0;
       for (const userData of users) {
-        const savedUser = await createUsuario(userData);
-        setPromoters(prev => [...prev, savedUser]);
+        try {
+          // Verifica se todos os campos obrigatórios estão presentes
+          if (!userData.nome || !userData.email || !userData.tipo) {
+            throw new Error(`Dados incompletos para o usuário ${userData.nome || 'sem nome'}: nome, email e tipo são obrigatórios`);
+          }
+
+          // Cria o usuário com os campos obrigatórios e opcionais
+          const userToCreate = {
+            nome: userData.nome,
+            email: userData.email,
+            tipo: userData.tipo,
+            apelido: userData.apelido || '',
+            telefone: userData.telefone || '',
+            endereco: userData.endereco || '',
+            cep: userData.cep || '',
+          };
+
+          const savedUser = await createUsuario(userToCreate);
+          setPromoters(prev => [...prev, savedUser]);
+          processados++;
+        } catch (error) {
+          const errorMessage = error instanceof Error 
+            ? `Erro ao importar ${userData.nome || 'usuário'} (${userData.email}): ${error.message}`
+            : `Erro ao importar usuário`;
+          toast.error(errorMessage);
+          console.error('Erro detalhado:', error);
+        }
       }
-      toast.success(`${users.length} usuários importados com sucesso!`);
+      if (processados > 0) {
+        toast.success(`${processados} usuário(s) importado(s) com sucesso!`);
+      }
       setShowImportModal(false);
     } catch (error) {
-      toast.error("Erro ao importar usuários");
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Erro ao importar usuários";
+      toast.error(errorMessage);
+      console.error('Erro detalhado:', error);
     } finally {
       setIsLoading(false);
     }
@@ -144,6 +173,22 @@ export default function CadastroPromotor() {
       } finally {
         setIsLoading(false);
       }
+    }
+  };
+
+  const handleDeleteSelected = async (ids: number[]) => {
+    try {
+      setIsLoading(true);
+      for (const id of ids) {
+        await deleteUsuario(id);
+        setPromoters(prev => prev.filter(p => p.id !== id));
+      }
+      toast.success(`${ids.length} usuários excluídos com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir usuários:', error);
+      toast.error("Erro ao excluir usuários");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -209,25 +254,12 @@ export default function CadastroPromotor() {
             <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPromoters.map((promoter) => (
-              <UserCard
-                key={promoter.id}
-                promoter={promoter}
-                onEdit={() => handleEditPromoter(promoter)}
-                onDelete={() => handleDeletePromoter(promoter.id)}
-              />
-            ))}
-            {filteredPromoters.length === 0 && (
-              <div className="col-span-full text-center py-12">
-                <p className="text-gray-500">
-                  {searchQuery
-                    ? "Nenhum usuário encontrado com este filtro."
-                    : "Nenhum usuário cadastrado. Clique em \"Adicionar Usuário\" para começar."}
-                </p>
-              </div>
-            )}
-          </div>
+          <PromoterTable
+            promoters={filteredPromoters}
+            onEdit={handleEditPromoter}
+            onDelete={handleDeletePromoter}
+            onDeleteSelected={handleDeleteSelected}
+          />
         </>
       )}
       {showImportModal && (

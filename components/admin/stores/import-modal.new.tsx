@@ -2,29 +2,15 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabase";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { Store, StoreImportData } from "@/types/store";
+import { StoreImportData } from "@/types/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ProgressModal } from "@/components/ui/progress-modal";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -38,55 +24,15 @@ interface ImportError {
   erro: string;
 }
 
+interface ExcelRow {
+  [key: string]: string;
+}
+
 export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [lojasParaImportar, setLojasParaImportar] = useState<StoreImportData[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'error'>('upload');
   const [errosImportacao, setErrosImportacao] = useState<ImportError[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [showProgress, setShowProgress] = useState(false);
-
-  const formatCNPJ = (cnpj: string) => {
-    if (!cnpj) return '';
-    // Remove tudo que não é número
-    const numbers = cnpj.replace(/\D/g, '').trim();
-    // Se não tiver números suficientes, retorna vazio
-    if (numbers.length < 14) return '';
-    // Pega apenas os primeiros 14 dígitos
-    const formatted = numbers.slice(0, 14);
-    // Formata como XX.XXX.XXX/XXXX-XX
-    return formatted.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-  };
-
-  const formatCEP = (cep: string) => {
-    if (!cep) return '';
-    // Remove tudo que não é número
-    const numbers = cep.replace(/\D/g, '').trim();
-    // Se não tiver números suficientes, retorna vazio
-    if (numbers.length < 8) return '';
-    // Pega apenas os primeiros 8 dígitos
-    const formatted = numbers.slice(0, 8);
-    // Formata como XXXXX-XXX
-    return formatted.replace(/^(\d{5})(\d{3})$/, "$1-$2");
-  };
-
-  const formatText = (text: string) => {
-    if (!text) return '';
-    return text.trim()
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/\s+/g, ' '); // Remove espaços extras
-  };
-
-  const formatApelido = (apelido: string): string => {
-    return apelido
-      .trim()
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^A-Z0-9]/g, ''); // Remove caracteres especiais
-  };
 
   const getRedeIdByNome = async (nome: string): Promise<number | null> => {
     const { data, error } = await supabase
@@ -103,46 +49,53 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
     return data.id;
   };
 
-  const getPromotorByApelido = async (apelido: string): Promise<{ id: string; apelido: string } | null> => {
-    const apelidoFormatado = formatApelido(apelido);
-    console.log('Buscando promotor. Original:', apelido, 'Formatado:', apelidoFormatado);
-    
+  const getPromotorIdByNome = async (nome: string): Promise<{ id: string; apelido: string } | null> => {
     const { data, error } = await supabase
       .from("usuario")
-      .select("id,apelido")
-      .ilike('apelido', `%${apelidoFormatado}%`);
+      .select("id, apelido")
+      .ilike("apelido", nome)
+      .single();
 
-    if (error) {
-      console.error(`Erro ao buscar usuário com apelido ${apelidoFormatado}:`, error);
+    if (error || !data) {
+      console.error(`Promotor não encontrado: ${nome}`, error);
       return null;
     }
 
-    console.log('Resultados encontrados:', data);
+    return { id: data.id, apelido: data.apelido };
+  };
 
-    if (!data || data.length === 0) {
-      console.log(`Nenhum usuário encontrado com apelido ${apelidoFormatado}`);
-      return null;
-    }
+  const formatCNPJ = (cnpj: string) => {
+    if (!cnpj) return '';
+    const numbers = cnpj.replace(/\D/g, '').trim();
+    if (numbers.length < 14) return '';
+    const formatted = numbers.slice(0, 14);
+    return formatted.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  };
 
-    // Se encontrou mais de um, usa o que tem o match mais próximo
-    if (data.length > 1) {
-      const matchExato = data.find(u => formatApelido(u.apelido) === apelidoFormatado);
-      if (matchExato) return matchExato;
-    }
+  const formatCEP = (cep: string) => {
+    if (!cep) return '';
+    const numbers = cep.replace(/\D/g, '').trim();
+    if (numbers.length < 8) return '';
+    const formatted = numbers.slice(0, 8);
+    return formatted.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+  };
 
-    return data[0];
+  const formatText = (text: string) => {
+    if (!text) return '';
+    return text.trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setIsLoading(true);
-      setShowProgress(true);
-      setProgress(0);
       toast.info("Processando arquivo...");
       const file = event.target.files?.[0];
       if (!file) {
         setIsLoading(false);
-        setShowProgress(false);
         return;
       }
 
@@ -152,97 +105,79 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
           if (!e.target?.result) {
             throw new Error("Erro ao ler arquivo");
           }
-          const data = e.target.result;
-          const workbook = XLSX.read(data, { type: "binary" });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          
-          // Força todos os valores como texto
-          const rows = XLSX.utils.sheet_to_json(worksheet, {
+
+          const workbook = XLSX.read(e.target.result as string, { type: "binary" });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, {
             raw: false,
-            defval: "",
-            blankrows: false
-          }) as Record<string, string>[];
+            defval: ""
+          });
 
           console.log('Dados brutos do Excel:', rows);
 
           const lojas: StoreImportData[] = [];
           const erros: ImportError[] = [];
-          const totalRows = rows.length;
 
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            // Atualiza o progresso
-            setProgress(Math.round(((i + 1) / totalRows) * 100));
-
+          for (const row of rows) {
             try {
-              // Função auxiliar para buscar valor em diferentes variações de nome de coluna
-              const getValue = (keys: string[]): string => {
-                for (const key of keys) {
-                  // Verifica o valor exato e também tenta encontrar como substring
-                  if (row[key] !== undefined && row[key] !== "") {
-                    return row[key];
-                  }
-                  // Procura por colunas que contenham a chave
-                  const matchingKey = Object.keys(row).find(k => 
-                    k.toUpperCase().includes(key.toUpperCase())
-                  );
-                  if (matchingKey && row[matchingKey] !== "") {
-                    return row[matchingKey];
+              const getValue = (names: string[]): string => {
+                for (const name of names) {
+                  const normalizedName = name.toLowerCase();
+                  for (const [key, value] of Object.entries(row)) {
+                    if (key.toLowerCase() === normalizedName && value) {
+                      return String(value).trim();
+                    }
                   }
                 }
-                return "";
+                return '';
               };
 
-              // Busca valores com diferentes possíveis nomes de coluna
-              const nome = getValue(["NOME DA LOJA", "Nome", "NOME", "nome", "LOJA"]);
-              const cnpj = getValue(["CNPJ", "Cnpj", "cnpj"]);
-              const endereco = getValue(["ENDERECO", "Endereço", "ENDEREÇO", "endereço"]);
-              const cep = getValue(["CEP", "Cep", "cep"]);
-              const rede = getValue(["REDE", "Rede", "rede"]);
-              const promotor = getValue(["PROMOTOR", "Promotor", "promotor"]);
+              const nome = getValue(['Nome', 'NOME DA LOJA', 'LOJA']);
+              const rede = getValue(['Rede', 'REDE', 'Nome da Rede']);
+              const cnpj = getValue(['CNPJ', 'Cnpj']);
+              const endereco = getValue(['Endereco', 'Endereço', 'ENDERECO']);
+              const cep = getValue(['CEP', 'Cep']);
+              const promotorNome = getValue(['Promotor', 'PROMOTOR', 'Nome do Promotor']);
 
-              // Validações básicas dos campos obrigatórios
-              if (!nome) throw new Error("Nome é obrigatório");
-              if (!cnpj) throw new Error("CNPJ é obrigatório");
-              if (!endereco) throw new Error("Endereço é obrigatório");
-              if (!cep) throw new Error("CEP é obrigatório");
-              if (!rede) throw new Error("Rede é obrigatória");
-
-              // Busca o ID da rede pelo nome
-              const rede_id = await getRedeIdByNome(rede);
-              if (!rede_id) {
-                throw new Error(`Rede "${rede}" não encontrada`);
-              }
-
-              // Busca o ID do promotor pelo apelido (opcional)
-              let promotor_id = null;
-              if (promotor) {
-                console.log('Tentando encontrar promotor:', promotor);
-                const promotorData = await getPromotorByApelido(promotor);
-                if (!promotorData) {
-                  throw new Error(`Promotor com apelido "${promotor}" não encontrado`);
+              let rede_id = null;
+              if (rede) {
+                rede_id = await getRedeIdByNome(rede);
+                if (!rede_id) {
+                  throw new Error(`Rede não encontrada: ${rede}`);
                 }
-                promotor_id = promotorData.id;
-                console.log('Promotor encontrado:', promotorData);
               }
 
-              const novaLoja: StoreImportData = {
+              let promotor_id: number | null = null;
+              let promotor_apelido: string | null = null;
+
+              if (promotorNome) {
+                promotor_apelido = formatText(promotorNome);
+                try {
+                  const promotor = await getPromotorIdByNome(promotorNome);
+                  if (promotor) {
+                    promotor_id = Number(promotor.id);
+                  }
+                } catch (error) {
+                  console.log(`Promotor não encontrado: ${promotorNome}`);
+                }
+              }
+
+              lojas.push({
                 nome: formatText(nome),
                 cnpj: formatCNPJ(String(cnpj)),
                 endereco: formatText(endereco),
                 cep: formatCEP(String(cep)),
-                rede_id: rede_id,
-                promotor_id: promotor_id,
-                promotor_apelido: promotor ? formatText(promotor) : null,
-                latitude: -23.5505, // Valores default
+                rede_id: rede_id || 0,
+                promotor_id,
+                promotor_apelido,
+                latitude: -23.5505,
                 longitude: -46.6333,
-              };
-
-              lojas.push(novaLoja);
+              });
             } catch (error) {
               erros.push({
                 linha: i + 2,
-                loja: row['Nome'] || `Linha ${i + 2}`,
+                loja: getValue(['Nome']) || `Linha ${i + 2}`,
                 erro: error instanceof Error ? error.message : 'Erro desconhecido',
               });
             }
@@ -251,7 +186,6 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
           if (erros.length > 0) {
             setErrosImportacao(erros);
             setStep('error');
-            setShowProgress(false);
             return;
           }
 
@@ -261,25 +195,23 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
           } else {
             toast.error("Nenhuma loja encontrada no arquivo");
           }
-          setShowProgress(false);
         } catch (error) {
           console.error("Erro ao processar arquivo:", error);
           toast.error("Erro ao processar arquivo Excel");
-          setShowProgress(false);
+        } finally {
+          setIsLoading(false);
         }
       };
 
       reader.onerror = () => {
         toast.error("Erro ao ler arquivo");
-        setShowProgress(false);
+        setIsLoading(false);
       };
 
       reader.readAsBinaryString(file);
     } catch (error) {
       console.error("Erro na importação:", error);
       toast.error("Erro na importação");
-      setShowProgress(false);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -287,34 +219,20 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const handleImport = async () => {
     try {
       setStep('importing');
-      setShowProgress(true);
-      setProgress(0);
+      const { data, error } = await supabase
+        .from("loja")
+        .insert(lojasParaImportar.map(({ promotor_apelido, ...loja }) => loja))
+        .select();
 
-      // Importa as lojas
-      for (let i = 0; i < lojasParaImportar.length; i++) {
-        const loja = lojasParaImportar[i];
-        
-        // Insere a loja no banco
-        const { error } = await supabase
-          .from("loja")
-          .insert([{
-            nome: loja.nome,
-            cnpj: loja.cnpj,
-            endereco: loja.endereco,
-            cep: loja.cep,
-            latitude: loja.latitude,
-            longitude: loja.longitude,
-            rede_id: loja.rede_id,
-            promotor_id: loja.promotor_id
-          }]);
-
-        if (error) {
-          console.error('Erro ao inserir loja:', error);
-          throw error;
-        }
-        
-        // Atualiza o progresso
-        setProgress(Math.round(((i + 1) / lojasParaImportar.length) * 100));
+      if (error) {
+        console.error("Erro ao importar lojas:", error);
+        setErrosImportacao([{
+          linha: 0,
+          loja: "Múltiplas lojas",
+          erro: "Erro ao salvar no banco de dados"
+        }]);
+        setStep('error');
+        return;
       }
 
       toast.success(`${lojasParaImportar.length} lojas importadas com sucesso!`);
@@ -326,8 +244,6 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
       console.error("Erro na importação:", error);
       toast.error("Erro na importação");
       setStep('preview');
-    } finally {
-      setShowProgress(false);
     }
   };
 
@@ -481,19 +397,10 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl">
-          {renderContent()}
-        </DialogContent>
-      </Dialog>
-
-      <ProgressModal
-        isOpen={showProgress}
-        title="Processando Importação"
-        description={step === 'importing' ? 'Salvando lojas no banco de dados...' : 'Processando arquivo Excel...'}
-        progress={progress}
-      />
-    </>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-7xl">
+        {renderContent()}
+      </DialogContent>
+    </Dialog>
   );
 }

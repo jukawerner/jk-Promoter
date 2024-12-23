@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { ImportModal } from "components/admin/redes/import-modal";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ export default function CadastroRedes() {
   const [loading, setLoading] = useState(true);
   const [editingRede, setEditingRede] = useState<Rede | null>(null);
   const [nome, setNome] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadRedes();
@@ -89,17 +91,27 @@ export default function CadastroRedes() {
           <h1 className="text-3xl font-bold text-gray-900">Cadastro de Redes</h1>
           <p className="text-sm text-gray-600 mt-1">Gerencie as redes do sistema</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingRede(null);
-            setNome("");
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Nova Rede
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowImportModal(true)}
+            variant="outline"
+            disabled={loading}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar Excel
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingRede(null);
+              setNome("");
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Rede
+          </Button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -195,6 +207,13 @@ export default function CadastroRedes() {
           </Table>
         )}
       </div>
+      {showImportModal && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={loadRedes}
+        />
+      )}
     </motion.div>
   );
 }

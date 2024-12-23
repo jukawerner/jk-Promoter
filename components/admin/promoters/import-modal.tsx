@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "components/ui/dialog";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -18,9 +18,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Usuario } from "@/types/usuario";
+} from "components/ui/table";
+import { ScrollArea } from "components/ui/scroll-area";
+import { Progress } from "components/ui/progress";
+import { Usuario } from "lib/actions/usuario";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -39,10 +40,10 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
   const [usuariosParaImportar, setUsuariosParaImportar] = useState<Partial<Usuario>[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing'>('upload');
   const [errosImportacao, setErrosImportacao] = useState<ImportError[]>([]);
+  const [progress, setProgress] = useState(0);
 
   const formatTelefone = (telefone: string) => {
     if (!telefone) return '';
-    // Remove tudo que não é número
     return telefone.replace(/\D/g, '').trim();
   };
 
@@ -56,6 +57,7 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setIsLoading(true);
+      setProgress(0);
       const file = event.target.files?.[0];
       if (!file) return;
 
@@ -72,78 +74,34 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
             defval: "",
           });
 
-          console.log('Dados brutos do Excel:', jsonData);
-
           const usuarios: Partial<Usuario>[] = [];
           const erros: ImportError[] = [];
+          const totalRows = jsonData.length;
 
           for (let i = 0; i < jsonData.length; i++) {
             const row: any = jsonData[i];
-            console.log('Processando linha:', row);
+            setProgress(Math.round((i / totalRows) * 100));
 
             try {
-              const getColumnValue = (baseNames: string[]): string => {
-                const variations = baseNames.reduce((acc: string[], base) => [
-                  ...acc,
-                  base,
-                  base.toUpperCase(),
-                  base.toLowerCase(),
-                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(),
-                  base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
-                ], []);
+              const nome = row['Nome'] || row['NOME'] || '';
+              const apelido = row['Apelido'] || row['APELIDO'] || '';
+              const email = (row['Email'] || row['EMAIL'] || '').toLowerCase();
+              const telefone = formatTelefone(row['Telefone'] || row['TELEFONE'] || '');
+              const cep = formatCEP(row['CEP'] || row['Cep'] || '');
+              const endereco = row['Endereco'] || row['ENDERECO'] || '';
+              const tipo = (row['Tipo'] || row['TIPO'] || 'promotor').toLowerCase();
 
-                for (const variant of variations) {
-                  if (row[variant] !== undefined && row[variant] !== null) {
-                    return String(row[variant]).trim();
-                  }
-                }
-                return '';
-              };
-
-              // Função para formatar texto em maiúsculo e remover acentos
-              const formatText = (text: string): string => {
-                if (!text) return '';
-                return text.trim()
-                  .toUpperCase()
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '')
-                  .replace(/\s+/g, ' ');
-              };
-
-              // Função para normalizar o tipo de usuário
-              const normalizeTipoUsuario = (tipo: string): string => {
-                const tipoNormalizado = formatText(tipo);
-                const tiposValidos = {
-                  'PROMOTOR': 'promotor',
-                  'ADMIN': 'admin',
-                  'ADMINISTRADOR': 'admin',
-                  'SUPERVISOR': 'supervisor',
-                  'COORDENADOR': 'coordenador'
-                };
-                
-                return tiposValidos[tipoNormalizado] || 'promotor'; // default para promotor
-              };
-
-              const nome = formatText(getColumnValue(['Nome', 'NOME COMPLETO', 'Nome Completo']));
-              const apelido = formatText(getColumnValue(['Apelido', 'APELIDO']));
-              const email = getColumnValue(['Email', 'EMAIL', 'E-mail', 'E-MAIL']).toLowerCase();
-              const telefone = formatTelefone(getColumnValue(['Telefone', 'TELEFONE', 'Celular', 'CELULAR']));
-              const cep = formatCEP(getColumnValue(['CEP', 'Cep']));
-              const endereco = formatText(getColumnValue(['Endereco', 'Endereço', 'ENDERECO', 'ENDEREÇO']));
-              const tipo = normalizeTipoUsuario(getColumnValue(['Tipo', 'TIPO', 'Tipo Usuario', 'TIPO USUARIO']));
-
-              console.log('Valores extraídos:', { nome, apelido, email, telefone, cep, endereco, tipo });
-
-              usuarios.push({
-                nome,
-                apelido,
-                email,
-                telefone,
-                cep,
-                endereco,
-                tipo,
-              });
+              if (nome && email) {
+                usuarios.push({
+                  nome: nome.trim().toUpperCase(),
+                  apelido: apelido.trim().toUpperCase(),
+                  email: email.trim(),
+                  telefone,
+                  cep,
+                  endereco: endereco.trim().toUpperCase(),
+                  tipo,
+                });
+              }
             } catch (error) {
               erros.push({
                 linha: i + 2,
@@ -152,6 +110,8 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
               });
             }
           }
+
+          setProgress(100);
 
           if (erros.length > 0) {
             setErrosImportacao(erros);
@@ -186,6 +146,20 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
 
   const handleConfirm = () => {
     setStep('importing');
+    setProgress(0);
+    
+    // Simula o progresso durante a importação
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    // Inicia a importação
     onConfirm(usuariosParaImportar);
   };
 
@@ -216,7 +190,7 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
                       <TableCell>{usuario.nome}</TableCell>
                       <TableCell>{usuario.apelido}</TableCell>
                       <TableCell>{usuario.email}</TableCell>
-                      <TableCell>{usuario.telefone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}</TableCell>
+                      <TableCell>{usuario.telefone?.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}</TableCell>
                       <TableCell>{usuario.cep}</TableCell>
                       <TableCell>{usuario.endereco}</TableCell>
                       <TableCell>{usuario.tipo}</TableCell>
@@ -245,7 +219,10 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
         return (
           <div className="flex flex-col items-center justify-center p-8">
             <div className="text-lg font-semibold mb-4">Importando usuários...</div>
-            <div className="text-sm text-gray-500">Por favor, aguarde...</div>
+            <Progress value={progress} className="w-[60%] mb-2" />
+            <div className="text-sm text-gray-500">
+              {progress < 100 ? "Por favor, aguarde..." : "Concluído!"}
+            </div>
           </div>
         );
       default:
@@ -285,7 +262,14 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
                     className="cursor-pointer"
                   >
                     <span>
-                      {isLoading ? "Processando..." : "Selecionar Arquivo"}
+                      {isLoading ? (
+                        <>
+                          <div className="mr-2">Processando...</div>
+                          <Progress value={progress} className="w-20" />
+                        </>
+                      ) : (
+                        "Selecionar Arquivo"
+                      )}
                     </span>
                   </Button>
                 </label>
