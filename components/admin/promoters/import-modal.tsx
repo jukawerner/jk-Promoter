@@ -88,8 +88,23 @@ export function ImportModal({ isOpen, onClose, onConfirm }: ImportModalProps) {
               const email = (row['Email'] || row['EMAIL'] || '').toLowerCase();
               const telefone = formatTelefone(row['Telefone'] || row['TELEFONE'] || '');
               const cep = formatCEP(row['CEP'] || row['Cep'] || '');
-              const endereco = row['Endereco'] || row['ENDERECO'] || '';
+              const endereco = row['Endereco'] || row['ENDERECO'] || row['endereço'] || row['ENDEREÇO'] || row['Endereço'] || '';
               const tipo = (row['Tipo'] || row['TIPO'] || 'promotor').toLowerCase();
+
+              // Validações básicas
+              if (!nome) throw new Error('Nome é obrigatório');
+              if (!email) throw new Error('Email é obrigatório');
+              
+              // Log para debug
+              console.log('Dados lidos do Excel:', {
+                nome,
+                apelido,
+                email,
+                telefone,
+                cep,
+                endereco,
+                tipo
+              });
 
               if (nome && email) {
                 usuarios.push({

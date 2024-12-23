@@ -99,7 +99,10 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
         
         if (!data.erro) {
           const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
-          setValue('endereco', endereco);
+          setValue('endereco', endereco, { shouldValidate: true });
+          // Dispara um evento de change para atualizar o formulário
+          const event = new Event('change', { bubbles: true });
+          document.getElementById('endereco')?.dispatchEvent(event);
         } else {
           toast.error("CEP não encontrado");
         }
@@ -116,13 +119,15 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
       console.log('Enviando dados do formulário:', {
         ...data,
         avatarFile,
-        avatarUrl
+        avatarUrl,
+        endereco: data.endereco // Garantindo que o endereço seja enviado
       });
       
       await onSave({
         ...data,
         avatarFile,
-        avatarUrl
+        avatarUrl,
+        endereco: data.endereco // Garantindo que o endereço seja enviado
       });
       toast.success("Usuário salvo com sucesso!");
     } catch (error) {

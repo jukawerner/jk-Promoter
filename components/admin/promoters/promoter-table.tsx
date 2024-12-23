@@ -187,11 +187,17 @@ export function PromoterTable({
     columns,
     state: {
       sorting,
+      rowSelection: Object.fromEntries(
+        selectedRows.map(id => [
+          promoters.findIndex(p => p.id === id),
+          true
+        ])
+      ),
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableMultiRowSelection: true,
+    enableRowSelection: true,
     onRowSelectionChange: (updater) => {
       const newSelection = typeof updater === 'function'
         ? updater(table.getState().rowSelection)
