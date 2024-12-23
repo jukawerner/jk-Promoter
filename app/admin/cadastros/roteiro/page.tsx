@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
-import { FileDown, Share2, Plus, X } from "lucide-react";
+import { FileDown, Share2, Plus, X, Trash2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
@@ -19,6 +19,12 @@ import {
 } from "@/components/ui/select";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 console.log('Google Maps API Key:', googleMapsApiKey ? 'Configurada' : 'Não configurada');
@@ -99,10 +105,12 @@ export default function CadastroRoteiro() {
   const [stores, setStores] = useState<Store[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [showRouteDetails, setShowRouteDetails] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<Location[]>([]);
   const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userMarkerPosition, setUserMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
 
   useEffect(() => {
     console.log('Iniciando componente...');
@@ -326,104 +334,94 @@ export default function CadastroRoteiro() {
     }
   };
 
-  const handleRouteClick = async (route: Route) => {
+  const handleRouteClick = (route: Route) => {
     setSelectedRoute(route);
+    setShowRouteDetails(true);
     
-    const routeLocations = locations.filter(loc => 
-      route.stores.some(store => store.id === loc.id.toString())
-    ).sort((a, b) => {
-      const aOrder = route.stores.find(s => s.id === a.id.toString())?.order || 0;
-      const bOrder = route.stores.find(s => s.id === b.id.toString())?.order || 0;
-      return aOrder - bOrder;
-    });
+    // Busca as informações completas das lojas do array locations
+    const routeLocations = route.stores
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(savedStore => {
+        const fullLocation = locations.find(loc => loc.id.toString() === savedStore.id);
+        if (!fullLocation) return null;
+        
+        return {
+          ...fullLocation,
+          name: savedStore.name,
+          address: savedStore.address
+        };
+      })
+      .filter(loc => loc !== null) as Location[];
 
-    setSelectedLocations(routeLocations);
-    await calculateRoute(routeLocations);
-  };
-
-  const handleUsuarioSelect = async (usuarioId: string) => {
-    setIsLoading(true);
-    try {
-      const usuario = usuarios.find(u => u.id.toString() === usuarioId);
-      if (usuario) {
-        console.log('Usuário selecionado:', usuario);
-        setSelectedUsuario(usuario);
-
-        // Geocodifica o endereço do usuário
-        const coordinates = await geocodeAddress(usuario.endereco);
-        if (coordinates) {
-          setCenter(coordinates);
-          map?.setCenter(coordinates);
-          map?.setZoom(13);
-        }
-
-        await fetchStoresForUsuario(usuarioId);
-      }
-    } catch (error) {
-      console.error('Erro ao selecionar usuário:', error);
-    } finally {
-      setIsLoading(false);
+    console.log('Route Locations:', routeLocations);
+    
+    if (routeLocations.length > 0) {
+      setSelectedLocations(routeLocations);
+      setCenter(routeLocations[0].position);
+      calculateRoute(routeLocations);
     }
   };
 
-  const calculateRoute = useCallback(async (locations: Location[]) => {
-    if (!selectedUsuario || !locations || locations.length < 1) {
-      setDirections(null);
-      setRouteInfo({ duration: "", distance: "" });
-      return;
-    }
+  const calculateRoute = async (locations: Location[]) => {
+    if (!selectedUsuario || locations.length < 1) return;
+    
+    console.log('Calculating route for locations:', locations);
 
+    const directionsService = new google.maps.DirectionsService();
+    
     try {
-      // Geocodifica o endereço do usuário
+      // Geocodifica o endereço do usuário para usar como ponto de partida/chegada
       const userCoordinates = await geocodeAddress(selectedUsuario.endereco);
       if (!userCoordinates) {
         console.error('Não foi possível encontrar as coordenadas do usuário');
         return;
       }
 
-      const directionsService = new window.google.maps.DirectionsService();
-      console.log('Calculando rota para:', locations);
-      console.log('Endereço do usuário:', selectedUsuario.endereco);
+      console.log('User coordinates:', userCoordinates);
 
       // Usa o endereço do usuário como ponto de partida e chegada
       const waypoints = locations.map(location => ({
-        location: { lat: location.position.lat, lng: location.position.lng },
+        location: location.position,
         stopover: true
       }));
+
+      console.log('Route params:', { origin: userCoordinates, destination: userCoordinates, waypoints });
 
       const result = await directionsService.route({
         origin: userCoordinates,
         destination: userCoordinates,
-        waypoints: waypoints,
-        optimizeWaypoints: true,
-        travelMode: window.google.maps.TravelMode.DRIVING,
+        waypoints,
+        optimizeWaypoints: false,
+        travelMode: google.maps.TravelMode.DRIVING
       });
 
-      console.log('Resultado da rota:', result);
+      console.log('Directions result:', result);
       setDirections(result);
 
-      // Calcula o tempo total e distância
-      let totalDuration = 0;
-      let totalDistance = 0;
-      result.routes[0].legs.forEach(leg => {
-        totalDuration += leg.duration?.value || 0;
-        totalDistance += leg.distance?.value || 0;
-      });
+      // Atualiza o tempo e distância total
+      if (result.routes[0]) {
+        let totalDistance = 0;
+        let totalDuration = 0;
 
-      // Converte para minutos e quilômetros
-      const durationInMinutes = Math.round(totalDuration / 60);
-      const distanceInKm = (totalDistance / 1000).toFixed(1);
+        result.routes[0].legs.forEach(leg => {
+          totalDistance += leg.distance?.value || 0;
+          totalDuration += leg.duration?.value || 0;
+        });
 
-      setRouteInfo({
-        duration: durationInMinutes.toString(),
-        distance: distanceInKm.toString()
-      });
+        // Converte para km e minutos
+        const distanceInKm = (totalDistance / 1000).toFixed(1);
+        const durationInMinutes = Math.round(totalDuration / 60);
+
+        setRouteInfo({
+          duration: durationInMinutes.toString(),
+          distance: distanceInKm.toString()
+        });
+      }
     } catch (error) {
-      console.error('Erro ao calcular rota:', error);
-      setDirections(null);
-      setRouteInfo({ duration: "", distance: "" });
+      console.error('Error calculating route:', error);
+      toast.error('Erro ao calcular a rota');
     }
-  }, [selectedUsuario, isLoaded]);
+  };
 
   useEffect(() => {
     if (selectedUsuario) {
@@ -433,14 +431,14 @@ export default function CadastroRoteiro() {
 
   useEffect(() => {
     calculateRoute(selectedLocations);
-  }, [selectedLocations, calculateRoute]);
+  }, [selectedLocations]);
 
   // Efeito para recalcular a rota quando as locations mudarem
   useEffect(() => {
     if (locations.length > 0 && selectedUsuario) {
       calculateRoute(locations);
     }
-  }, [locations, selectedUsuario, calculateRoute]);
+  }, [locations, selectedUsuario]);
 
   useEffect(() => {
     if (selectedLocations.length > 0 && map) {
@@ -473,6 +471,7 @@ export default function CadastroRoteiro() {
       const coordinates = geocodeAddress(selectedUsuario.endereco);
       if (coordinates) {
         setCenter(coordinates);
+        setUserMarkerPosition(coordinates);
         map.setCenter(coordinates);
         map.setZoom(13);
       }
@@ -617,46 +616,108 @@ export default function CadastroRoteiro() {
   };
 
   const handleSaveRoute = async () => {
-    if (!selectedUsuario || selectedLocations.length === 0) {
-      toast.error("Selecione um usuário e pelo menos uma loja");
+    if (selectedLocations.length === 0) {
+      toast.error("Adicione pelo menos uma loja ao roteiro");
       return;
     }
 
-    const loadingToast = toast.loading("Salvando rota...");
+    const loadingToast = toast.loading("Salvando roteiro...");
 
     try {
-      // Prepara os dados da rota
-      const routeData = {
-        name: `Rota ${routes.length + 1}`,
-        usuario_id: selectedUsuario.id,
-        stores: selectedLocations,
-        estimated_time: routeInfo.duration,
-        distance: routeInfo.distance
-      };
+      // Encontra o maior número entre as rotas existentes com nome similar
+      const baseRouteName = "Rota";
+      const existingRoutes = routes.filter(r => r.name.startsWith(baseRouteName));
+      const maxNumber = existingRoutes.reduce((max, route) => {
+        const num = parseInt(route.name.replace(baseRouteName, "")) || 0;
+        return Math.max(max, num);
+      }, 0);
 
-      console.log("Dados da nova rota:", routeData);
+      // Cria um novo nome incrementando o número
+      const newRouteName = `${baseRouteName} ${maxNumber + 1}`;
 
-      // Insere a nova rota
-      const { data, error } = await supabase
+      const { data, error } = await supabase.from("routes").insert([
+        {
+          name: newRouteName,
+          stores: selectedLocations.map((loc, index) => ({
+            id: loc.id.toString(),
+            name: loc.name,
+            address: loc.address,
+            order: index
+          })),
+          estimated_time: parseInt(routeInfo.duration) || 0,
+          distance: parseFloat(routeInfo.distance) || 0,
+          usuario_id: selectedUsuario.id
+        }
+      ]).select();
+
+      if (error) throw error;
+
+      // Atualiza a lista de rotas
+      if (data) {
+        setRoutes([...routes, data[0]]);
+        toast.success("Roteiro salvo com sucesso!");
+      }
+    } catch (error) {
+      console.error("Erro ao salvar roteiro:", error);
+      toast.error("Erro ao salvar o roteiro");
+    } finally {
+      toast.dismiss(loadingToast);
+    }
+  };
+
+  const handleDeleteRoute = async (routeId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta rota?")) {
+      return;
+    }
+
+    const loadingToast = toast.loading("Excluindo rota...");
+
+    try {
+      const { error } = await supabase
         .from('routes')
-        .insert([routeData])
-        .select('*')
-        .single();
+        .delete()
+        .eq('id', routeId);
 
       if (error) {
-        console.error("Erro ao adicionar rota:", error);
-        toast.error("Erro ao salvar a rota");
-        return;
+        throw error;
       }
 
       // Atualiza a lista de rotas
-      setRoutes([...routes, data]);
-      toast.success("Rota salva com sucesso!");
+      setRoutes(routes.filter(route => route.id !== routeId));
+      setShowRouteDetails(false);
+      toast.success("Rota excluída com sucesso!");
     } catch (error) {
-      console.error("Erro ao salvar rota:", error);
-      toast.error("Erro ao salvar a rota");
+      console.error("Erro ao excluir rota:", error);
+      toast.error("Erro ao excluir a rota");
     } finally {
       toast.dismiss(loadingToast);
+    }
+  };
+
+  const handleUsuarioSelect = async (usuarioId: string) => {
+    setIsLoading(true);
+    try {
+      const usuario = usuarios.find(u => u.id.toString() === usuarioId);
+      if (usuario) {
+        console.log('Usuário selecionado:', usuario);
+        setSelectedUsuario(usuario);
+
+        // Geocodifica o endereço do usuário
+        const coordinates = await geocodeAddress(usuario.endereco);
+        if (coordinates) {
+          setCenter(coordinates);
+          setUserMarkerPosition(coordinates);
+          map?.setCenter(coordinates);
+          map?.setZoom(13);
+        }
+
+        await fetchStoresForUsuario(usuarioId);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar usuário:', error);
+      toast.error('Erro ao carregar dados do usuário');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -810,7 +871,7 @@ export default function CadastroRoteiro() {
                     <div
                       key={route.id}
                       onClick={() => handleRouteClick(route)}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-500 cursor-pointer transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">
@@ -860,14 +921,17 @@ export default function CadastroRoteiro() {
               }}
             >
               {/* Marcador do usuário */}
-              {selectedUsuario && selectedUsuario.endereco && (
+              {userMarkerPosition && (
                 <Marker
-                  position={center}
+                  position={userMarkerPosition}
                   icon={{
-                    url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                    scaledSize: new window.google.maps.Size(32, 32)
+                    url: 'https://maps.google.com/mapfiles/ms/micons/yellow-dot.png',
+                    scaledSize: new google.maps.Size(48, 48),
+                    origin: new google.maps.Point(0, 0),
+                    anchor: new google.maps.Point(24, 48),
                   }}
-                  title={`Endereço de ${selectedUsuario.nome}`}
+                  title={selectedUsuario?.nome || 'Ponto de Partida'}
+                  zIndex={1000}
                 />
               )}
 
@@ -878,8 +942,8 @@ export default function CadastroRoteiro() {
                   position={location.position}
                   label={{
                     text: (index + 1).toString(),
-                    color: 'white',
-                    className: 'font-semibold'
+                    color: "white",
+                    className: "font-bold"
                   }}
                 />
               ))}
@@ -914,6 +978,103 @@ export default function CadastroRoteiro() {
           Salvar Roteiro
         </Button>
       </div>
+
+      {/* Modal de Detalhes da Rota */}
+      <Dialog open={showRouteDetails} onOpenChange={setShowRouteDetails}>
+        <DialogContent className="max-w-6xl h-[80vh]">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <DialogTitle className="text-xl font-bold">{selectedRoute?.name}</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setShowRouteDetails(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Fechar
+                </Button>
+                <Button onClick={() => handleExportPDF()}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Exportar PDF
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => selectedRoute && handleDeleteRoute(selectedRoute.id)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir Rota
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full overflow-auto mt-4">
+            {/* Coluna da Esquerda - Informações e Lista */}
+            <div className="space-y-4">
+              {/* Informações da Rota */}
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <span className="text-sm text-gray-500">Lojas</span>
+                  <p className="font-medium">{selectedRoute?.stores.length} lojas</p>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Tempo Estimado</span>
+                  <p className="font-medium">{selectedRoute?.estimated_time} minutos</p>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Distância Total</span>
+                  <p className="font-medium">{selectedRoute?.distance} km</p>
+                </div>
+              </div>
+
+              {/* Lista de Lojas */}
+              <div className="space-y-2 overflow-auto max-h-[calc(80vh-300px)]">
+                <h4 className="font-medium">Lojas no Roteiro</h4>
+                {selectedRoute?.stores.map((store, index) => (
+                  <div key={store.id} className="p-3 bg-white border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="font-medium">{store.name}</p>
+                        <p className="text-sm text-gray-500">{store.address}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Coluna da Direita - Mapa */}
+            <div className="h-[calc(80vh-100px)] rounded-lg overflow-hidden">
+              <GoogleMap
+                zoom={13}
+                center={center}
+                mapContainerClassName="w-full h-full rounded-lg"
+                options={{
+                  zoomControl: true,
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                  fullscreenControl: true,
+                }}
+              >
+                {selectedLocations.map((location, index) => (
+                  <Marker
+                    key={location.id}
+                    position={location.position}
+                    label={{
+                      text: (index + 1).toString(),
+                      color: "white",
+                      className: "font-bold"
+                    }}
+                  />
+                ))}
+                {directions && (
+                  <DirectionsRenderer directions={directions} />
+                )}
+              </GoogleMap>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
