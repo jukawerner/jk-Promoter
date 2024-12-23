@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
+import { FileDown, Share2, Plus } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import {
   Select,
   SelectContent,
@@ -70,7 +73,7 @@ export default function CadastroRoteiro() {
     version: "weekly"
   });
 
-  const mapRef = useRef<google.maps.Map>();
+  const mapRef = useRef<google.maps.Map | null> (null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
@@ -437,9 +440,160 @@ const handlePromoterSelect = async (value: string) => {
     return `${km.toFixed(1)} km`;
   };
 
+  const exportToPDF = async () => {
+    if (!mapRef.current || !routeInfo) return;
+    
+    try {
+      setIsLoading(true);
+      const mapElement = mapRef.current.getDiv();
+  
+      // Salva o tamanho original do mapa
+      const originalWidth = mapElement.style.width;
+      const originalHeight = mapElement.style.height;
+  
+      // Reduz temporariamente o tamanho do mapa
+      mapElement.style.width = '600px';
+      mapElement.style.height = '400px';
+      
+      // Configurações otimizadas para html2canvas
+      const canvas = await html2canvas(mapElement, {
+        scale: 1,
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+        backgroundColor: null,
+        imageTimeout: 15000,
+        removeContainer: true,
+      });
+  
+      // Restaura o tamanho original do mapa
+      mapElement.style.width = originalWidth;
+      mapElement.style.height = originalHeight;
+  
+      // Comprime a qualidade da imagem
+      const imgData = canvas.toDataURL('image/jpeg', 0.7);
+  
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+  
+      // Adiciona título com estilo
+      pdf.setFillColor(51, 65, 85);
+      pdf.rect(0, 0, pageWidth, 50, 'F'); // Aumenta a altura do cabeçalho
+  
+     
+      // Adiciona o título principal
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(20);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Roteiro de Visitas', pageWidth / 2, 35, { align: 'center' });
+  
+ // Adiciona informações do promotor como subtítulo
+if (selectedPromoter) {
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(12);
+  pdf.setFont(undefined, 'normal');
+  pdf.text(`Promotor: ${selectedPromoter.apelido || selectedPromoter.nome}`, pageWidth / 2, 40, { align: 'center' });
+}
+
+
+
+      // Informações do roteiro com estilo
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Informações do Roteiro:', margin, 60);
+      
+      pdf.setFont(undefined, 'normal');
+      pdf.setFontSize(8);
+      pdf.text(`Distância Total: ${routeInfo.distance}`, margin, 70);
+      pdf.text(`Tempo Total: ${routeInfo.duration}`, margin, 75);
+  
+      // Adiciona mapa com borda
+      const mapY = 85;
+      const imgWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.setDrawColor(200, 200, 200);
+      pdf.rect(margin - 1, mapY - 1, imgWidth + 2, imgHeight + 2);
+      pdf.addImage(imgData, 'JPEG', margin, mapY, imgWidth, imgHeight);
+  
+      // Lista de lojas com estilo
+      const listY = mapY + imgHeight + 15;
+      pdf.setFont(undefined, 'bold');
+      pdf.setFontSize(8);
+      pdf.text('Lojas no Roteiro:', margin, listY);
+      
+      pdf.setFont(undefined, 'normal');
+      pdf.setFontSize(8);
+      locations.forEach((location, index) => {
+        const y = listY + 8 + (index * 6);
+        if (y > pageHeight - margin) {
+          pdf.addPage();
+          pdf.setFont(undefined, 'bold');
+          pdf.text('Lojas no Roteiro (continuação):', margin, margin);
+          pdf.setFont(undefined, 'normal');
+          return;
+        }
+        const letter = String.fromCharCode(65 + index);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`${letter}.`, margin, y);
+        pdf.setFont(undefined, 'normal');
+        pdf.text(`${location.name} - ${location.address}`, margin + 10, y);
+      });
+  
+      // Adiciona rodapé
+      const currentDate = new Date().toLocaleDateString('pt-BR');
+      pdf.setFontSize(8);
+      pdf.setTextColor(128, 128, 128);
+      pdf.text(`Gerado em: ${currentDate}`, margin, pageHeight - 10);
+  
+      pdf.save('roteiro.pdf');
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const shareOnWhatsApp = () => {
+    if (!routeInfo) return;
+    
+    const message = encodeURIComponent(
+      `*Roteiro de Visitas*\n` +
+      `Distância Total: ${routeInfo.distance}\n` +
+      `Tempo Total: ${routeInfo.duration}\n\n` +
+      `*Lojas:*\n` +
+      locations.map((loc, i) => `${String.fromCharCode(65 + i)}. ${loc.name}`).join('\n')
+    );
+    
+    window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Cadastro de Roteiro</h1>
+  {/* Botões */}
+  <div className="flex gap-4 mb-6">
+      <Button
+        variant="outline"
+        onClick={exportToPDF}
+        disabled={!routeInfo || isLoading}
+      >
+        <FileDown className="mr-2 h-4 w-4" />
+        Exportar PDF
+      </Button>
+      
+      <Button
+        variant="outline"
+        onClick={shareOnWhatsApp}
+        disabled={!routeInfo || isLoading}
+      >
+        <Share2 className="mr-2 h-4 w-4" />
+        Compartilhar
+      </Button>
+    </div>
 
       {/* Seleção de Promotor */}
       <div className="mb-6">
