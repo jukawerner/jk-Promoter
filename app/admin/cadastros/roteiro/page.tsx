@@ -501,7 +501,15 @@ export default function CadastroRoteiro() {
       const element = document.getElementById('route-content');
       if (!element) return;
 
-      toast.loading("Gerando PDF...");
+      const loadingToast = toast.loading("Gerando PDF...");
+
+      // Aguarda mais tempo para garantir que o mapa e os marcadores estejam renderizados
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Força uma atualização do mapa antes da captura
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
 
       const canvas = await html2canvas(element, {
         useCORS: true,
@@ -511,6 +519,37 @@ export default function CadastroRoteiro() {
         width: element.offsetWidth,
         height: element.offsetHeight,
         backgroundColor: '#ffffff',
+        logging: true,
+        imageTimeout: 0,
+        onclone: (clonedDoc) => {
+          // Ajusta os elementos do mapa no clone
+          const mapContainer = clonedDoc.querySelector('.leaflet-container');
+          if (mapContainer) {
+            // Força o mapa a ocupar todo o espaço disponível
+            (mapContainer as HTMLElement).style.width = '100%';
+            (mapContainer as HTMLElement).style.height = '100%';
+          }
+
+          // Garante que os marcadores e outros elementos do mapa estejam visíveis
+          ['leaflet-marker-icon', 'leaflet-marker-shadow', 'leaflet-popup', 'leaflet-overlay-pane'].forEach(className => {
+            const elements = clonedDoc.getElementsByClassName(className);
+            Array.from(elements).forEach((el: any) => {
+              if (el.style) {
+                el.style.display = 'block';
+                el.style.visibility = 'visible';
+                // Remove transformações que podem causar desalinhamento
+                el.style.transform = 'none';
+              }
+            });
+          });
+
+          // Garante que as rotas (linhas azuis) estejam visíveis
+          const pathElements = clonedDoc.querySelectorAll('.leaflet-overlay-pane svg path');
+          pathElements.forEach((path: any) => {
+            path.style.strokeWidth = '3px';
+            path.style.stroke = '#3B82F6';
+          });
+        }
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -535,13 +574,12 @@ export default function CadastroRoteiro() {
       const pageHeight = pdf.internal.pageSize.height;
       const margin = 10;
       const maxWidth = pageWidth - (margin * 2);
-      const maxHeight = pageHeight - 40; // Reduz a altura disponível por causa do cabeçalho
+      const maxHeight = pageHeight - 40;
 
       // Calcula as dimensões da imagem mantendo a proporção
       let imgWidth = maxWidth;
       let imgHeight = (canvas.height * maxWidth) / canvas.width;
 
-      // Se a altura for maior que o máximo, redimensiona pela altura
       if (imgHeight > maxHeight) {
         imgHeight = maxHeight;
         imgWidth = (canvas.width * maxHeight) / canvas.height;
@@ -556,6 +594,7 @@ export default function CadastroRoteiro() {
       // Salva o PDF
       pdf.save(`roteiro_${selectedUsuario.nome}_${new Date().toISOString().split('T')[0]}.pdf`);
 
+      toast.dismiss(loadingToast);
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
@@ -575,6 +614,50 @@ export default function CadastroRoteiro() {
     );
     
     window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
+  const handleSaveRoute = async () => {
+    if (!selectedUsuario || selectedLocations.length === 0) {
+      toast.error("Selecione um usuário e pelo menos uma loja");
+      return;
+    }
+
+    const loadingToast = toast.loading("Salvando rota...");
+
+    try {
+      // Prepara os dados da rota
+      const routeData = {
+        name: `Rota ${routes.length + 1}`,
+        usuario_id: selectedUsuario.id,
+        stores: selectedLocations,
+        estimated_time: routeInfo.duration,
+        distance: routeInfo.distance
+      };
+
+      console.log("Dados da nova rota:", routeData);
+
+      // Insere a nova rota
+      const { data, error } = await supabase
+        .from('routes')
+        .insert([routeData])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error("Erro ao adicionar rota:", error);
+        toast.error("Erro ao salvar a rota");
+        return;
+      }
+
+      // Atualiza a lista de rotas
+      setRoutes([...routes, data]);
+      toast.success("Rota salva com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar rota:", error);
+      toast.error("Erro ao salvar a rota");
+    } finally {
+      toast.dismiss(loadingToast);
+    }
   };
 
   return (
@@ -826,9 +909,7 @@ export default function CadastroRoteiro() {
       <div className="mt-6">
         <Button 
           className="w-full"
-          onClick={() => {
-            // TODO: Salvar roteiro
-          }}
+          onClick={handleSaveRoute}
         >
           Salvar Roteiro
         </Button>
