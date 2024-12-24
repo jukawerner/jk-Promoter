@@ -190,21 +190,37 @@ export default function RNCPage() {
 
   const handleBarcodeScan = async (result: string) => {
     setIsScannerOpen(false);
+    console.log('Código lido:', result);
     
     try {
       const { data: product, error } = await supabase
         .from('produto')
-        .select('nome, marca')
+        .select('*') // Selecionar todos os campos para debug
         .eq('codigo_ean', result)
         .single();
+
+      console.log('Produto encontrado:', product);
+      console.log('Erro:', error);
 
       if (error) throw error;
       
       if (product) {
+        console.log('Setando estados:', {
+          barcode: result,
+          brand: product.marca,
+          product: product.nome
+        });
+        
         setScannedBarcode(result);
         setScannedBrand(product.marca.toUpperCase());
         setScannedProduct(product.nome.toUpperCase());
         setIsModalOpen(true);
+
+        console.log('Modal deve estar aberto:', {
+          isModalOpen: true,
+          scannedBrand: product.marca.toUpperCase(),
+          scannedProduct: product.nome.toUpperCase()
+        });
       } else {
         toast.error("Produto não encontrado no sistema");
       }
@@ -215,9 +231,17 @@ export default function RNCPage() {
   };
 
   const handleConfirmScan = () => {
+    console.log('Confirmando seleção:', {
+      marca: scannedBrand,
+      produto: scannedProduct
+    });
+
     form.setValue("marca", scannedBrand);
     form.setValue("produto", scannedProduct);
     setIsModalOpen(false);
+
+    // Forçar carregamento dos produtos
+    carregarProdutos(scannedBrand);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -676,10 +700,16 @@ export default function RNCPage() {
 
       <ConfirmModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConfirm={handleConfirmScan}
+        onClose={() => {
+          console.log('Fechando modal');
+          setIsModalOpen(false);
+        }}
+        onConfirm={() => {
+          console.log('Modal confirmado');
+          handleConfirmScan();
+        }}
         title="Produto Encontrado"
-        description={`Deseja selecionar o produto ${scannedProduct} da marca ${scannedBrand}?`}
+        description={`Deseja selecionar o produto "${scannedProduct}" da marca "${scannedBrand}"?`}
       />
     </motion.div>
   );
