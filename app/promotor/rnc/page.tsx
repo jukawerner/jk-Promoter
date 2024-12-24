@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import BarcodeScanner from '@/components/barcode-scanner';
 import { findProductByEAN } from '@/lib/utils/product-search';
 import { motion } from 'framer-motion';
+import { ConfirmModal } from '@/components/ui/modal';
 
 const formSchema = z.object({
   rede: z.string().min(1, "Selecione uma rede"),
@@ -64,6 +65,10 @@ export default function RNCPage() {
   const [endereco, setEndereco] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scannedBrand, setScannedBrand] = useState("");
+  const [scannedProduct, setScannedProduct] = useState("");
   const [imagens, setImagens] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -179,18 +184,36 @@ export default function RNCPage() {
     fetchLojaDetails();
   }, [form.getValues("loja")]);
 
-  const handleBarcodeScanned = async (barcode: string) => {
+  const handleBarcodeScanned = async (result: string) => {
     setIsScannerOpen(false);
-    const product = await findProductByEAN(barcode);
     
-    if (product) {
-      form.setValue("marca", product.marca);
-      await carregarProdutos(product.marca);
-      form.setValue("produto", product.nome);
-      toast.success("Produto encontrado!");
-    } else {
-      toast.error("Produto não encontrado");
+    try {
+      const { data: product, error } = await supabase
+        .from('produto')
+        .select('nome, marca')
+        .eq('codigo_ean', result)
+        .single();
+
+      if (error) throw error;
+      
+      if (product) {
+        setScannedBarcode(result);
+        setScannedBrand(product.marca.toUpperCase());
+        setScannedProduct(product.nome.toUpperCase());
+        setIsModalOpen(true);
+      } else {
+        toast.error("Produto não encontrado no sistema");
+      }
+    } catch (error) {
+      console.error('Erro ao processar código de barras:', error);
+      toast.error("Erro ao buscar produto. Tente novamente.");
     }
+  };
+
+  const handleConfirmScan = () => {
+    form.setValue("marca", scannedBrand);
+    form.setValue("produto", scannedProduct);
+    setIsModalOpen(false);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -646,6 +669,14 @@ export default function RNCPage() {
           onScan={handleBarcodeScanned}
         />
       )}
+
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmScan}
+        title="Produto Encontrado"
+        description={`Deseja selecionar o produto ${scannedProduct} da marca ${scannedBrand}?`}
+      />
     </motion.div>
   );
 }
