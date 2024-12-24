@@ -708,8 +708,9 @@ export default function RNCPage() {
           console.log('Modal confirmado');
           handleConfirmScan();
         }}
-        title="Produto Encontrado"
-        description={`Deseja selecionar o produto "${scannedProduct}" da marca "${scannedBrand}"?`}
+        barcode={scannedBarcode}
+        brand={scannedBrand}
+        product={scannedProduct}
       />
     </motion.div>
   );
