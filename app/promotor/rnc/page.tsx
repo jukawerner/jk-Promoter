@@ -123,11 +123,13 @@ export default function RNCPage() {
     fetchMarcas();
   }, []);
 
+  const selectedMarca = form.watch("marca");
+  
   useEffect(() => {
-    if (form.getValues("marca")) {
-      carregarProdutos(form.getValues("marca"));
+    if (selectedMarca) {
+      carregarProdutos(selectedMarca);
     }
-  }, [form.getValues("marca")]);
+  }, [selectedMarca]);
 
   const carregarProdutos = async (marcaNome: string) => {
     try {
@@ -236,12 +238,14 @@ export default function RNCPage() {
       produto: scannedProduct
     });
 
+    // Primeiro setamos a marca para disparar o carregamento dos produtos
     form.setValue("marca", scannedBrand);
-    form.setValue("produto", scannedProduct);
-    setIsModalOpen(false);
-
-    // Forçar carregamento dos produtos
-    carregarProdutos(scannedBrand);
+    
+    // Esperamos um momento para os produtos carregarem
+    setTimeout(() => {
+      form.setValue("produto", scannedProduct);
+      setIsModalOpen(false);
+    }, 100);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
