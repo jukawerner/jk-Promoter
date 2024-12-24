@@ -123,14 +123,6 @@ export default function RNCPage() {
     fetchMarcas();
   }, []);
 
-  const selectedMarca = form.watch("marca");
-  
-  useEffect(() => {
-    if (selectedMarca) {
-      carregarProdutos(selectedMarca);
-    }
-  }, [selectedMarca]);
-
   const carregarProdutos = async (marcaNome: string) => {
     try {
       const { data, error } = await supabase
@@ -152,17 +144,18 @@ export default function RNCPage() {
         marca: item.marca.toUpperCase()
       }));
 
-      // Remove duplicatas baseado no ID
-      const uniqueProducts = formattedData.filter((produto, index, self) =>
-        index === self.findIndex((p) => p.id === produto.id)
-      );
-
-      setProdutos(uniqueProducts || []);
+      setProdutos(formattedData || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
     }
   };
+
+  useEffect(() => {
+    if (form.getValues("marca")) {
+      carregarProdutos(form.getValues("marca"));
+    }
+  }, [form.getValues("marca")]);
 
   useEffect(() => {
     const fetchLojaDetails = async () => {
@@ -192,37 +185,21 @@ export default function RNCPage() {
 
   const handleBarcodeScan = async (result: string) => {
     setIsScannerOpen(false);
-    console.log('Código lido:', result);
     
     try {
       const { data: product, error } = await supabase
         .from('produto')
-        .select('*') // Selecionar todos os campos para debug
+        .select('nome, marca')
         .eq('codigo_ean', result)
         .single();
-
-      console.log('Produto encontrado:', product);
-      console.log('Erro:', error);
 
       if (error) throw error;
       
       if (product) {
-        console.log('Setando estados:', {
-          barcode: result,
-          brand: product.marca,
-          product: product.nome
-        });
-        
         setScannedBarcode(result);
         setScannedBrand(product.marca.toUpperCase());
         setScannedProduct(product.nome.toUpperCase());
         setIsModalOpen(true);
-
-        console.log('Modal deve estar aberto:', {
-          isModalOpen: true,
-          scannedBrand: product.marca.toUpperCase(),
-          scannedProduct: product.nome.toUpperCase()
-        });
       } else {
         toast.error("Produto não encontrado no sistema");
       }
@@ -233,19 +210,9 @@ export default function RNCPage() {
   };
 
   const handleConfirmScan = () => {
-    console.log('Confirmando seleção:', {
-      marca: scannedBrand,
-      produto: scannedProduct
-    });
-
-    // Primeiro setamos a marca para disparar o carregamento dos produtos
     form.setValue("marca", scannedBrand);
-    
-    // Esperamos um momento para os produtos carregarem
-    setTimeout(() => {
-      form.setValue("produto", scannedProduct);
-      setIsModalOpen(false);
-    }, 100);
+    form.setValue("produto", scannedProduct);
+    setIsModalOpen(false);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
