@@ -210,9 +210,14 @@ export default function RNCPage() {
   };
 
   const handleConfirmScan = () => {
+    // Primeiro setamos a marca
     form.setValue("marca", scannedBrand);
-    form.setValue("produto", scannedProduct);
-    setIsModalOpen(false);
+    
+    // Esperamos os produtos carregarem (500ms deve ser suficiente)
+    setTimeout(() => {
+      form.setValue("produto", scannedProduct);
+      setIsModalOpen(false);
+    }, 500);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
