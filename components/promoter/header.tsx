@@ -16,6 +16,7 @@ import {
   Tag,
   Package,
   Building2,
+  AlertTriangle
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { UserAvatar } from "components/user-avatar";
@@ -45,6 +46,11 @@ const menuItems = [
     icon: Tag,
     label: "Pesquisa Preço",
     href: "/promotor/pdv/pesquisa-preco",
+  },
+  {
+    icon: AlertTriangle,
+    label: "RNC",
+    href: "/promotor/rnc",
   },
 ];
 
