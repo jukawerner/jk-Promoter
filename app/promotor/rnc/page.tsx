@@ -123,6 +123,12 @@ export default function RNCPage() {
     fetchMarcas();
   }, []);
 
+  useEffect(() => {
+    if (form.getValues("marca")) {
+      carregarProdutos(form.getValues("marca"));
+    }
+  }, [form.getValues("marca")]);
+
   const carregarProdutos = async (marcaNome: string) => {
     try {
       const { data, error } = await supabase
@@ -182,7 +188,7 @@ export default function RNCPage() {
     fetchLojaDetails();
   }, [form.getValues("loja")]);
 
-  const handleBarcodeScanned = async (result: string) => {
+  const handleBarcodeScan = async (result: string) => {
     setIsScannerOpen(false);
     
     try {
@@ -210,7 +216,6 @@ export default function RNCPage() {
 
   const handleConfirmScan = () => {
     form.setValue("marca", scannedBrand);
-    carregarProdutos(scannedBrand);
     form.setValue("produto", scannedProduct);
     setIsModalOpen(false);
   };
@@ -665,7 +670,7 @@ export default function RNCPage() {
         <BarcodeScanner
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
-          onScan={handleBarcodeScanned}
+          onScan={handleBarcodeScan}
         />
       )}
 
