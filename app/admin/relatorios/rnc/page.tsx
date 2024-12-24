@@ -341,6 +341,41 @@ export default function RNCPage() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Tem certeza que deseja excluir este registro?")) {
+      return;
+    }
+
+    try {
+      const rncToDelete = rncData.find(rnc => rnc.id === id);
+      if (!rncToDelete) return;
+
+      // Excluir fotos do storage
+      if (rncToDelete.fotos && rncToDelete.fotos.length > 0) {
+        await Promise.all(rncToDelete.fotos.map(async (fotoUrl) => {
+          const fileName = fotoUrl.split('rnc_photos/')[1];
+          if (fileName) {
+            await supabase.storage.from('rnc_photos').remove([fileName]);
+          }
+        }));
+      }
+
+      // Excluir registro do banco
+      const { error } = await supabase
+        .from("rnc")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      
+      toast.success("Registro excluído com sucesso!");
+      loadRNC(); // Recarrega a lista
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      toast.error("Erro ao excluir registro");
+    }
+  };
+
   const limparFiltros = () => {
     setFiltros({
       busca: "",
@@ -355,41 +390,24 @@ export default function RNCPage() {
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => {
-            table.toggleAllPageRowsSelected(!!value);
-            const allPageRows = table.getRowModel().rows.map(row => row.original);
-            setSelectedRows(value ? allPageRows : []);
-          }}
-          aria-label="Select all"
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Selecionar tudo"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
-          checked={selectedRows.some(item => item.id === row.original.id)}
-          onCheckedChange={(value) => {
-            row.toggleSelected(!!value);
-            setSelectedRows(prev => {
-              if (value) {
-                return [...prev, row.original];
-              }
-              return prev.filter(item => item.id !== row.original.id);
-            });
-          }}
-          aria-label="Select row"
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Selecionar linha"
         />
       ),
+      enableSorting: false,
+      enableHiding: false,
     },
     {
       accessorKey: "data",
       header: "Data",
-      cell: ({ row }) => {
-        const date = new Date(row.getValue("data"));
-        return date.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-      },
+      cell: ({ row }) => new Date(row.getValue("data")).toLocaleDateString('pt-BR'),
     },
     {
       accessorKey: "rede_id",
@@ -427,52 +445,56 @@ export default function RNCPage() {
       },
     },
     {
-      accessorKey: "fotos",
+      id: "fotos",
       header: "Fotos",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Image className="w-4 h-4" />
-          <span className="font-medium">{row.getValue("fotos")?.length || 0} foto(s)</span>
-        </div>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Ações",
       cell: ({ row }) => {
-        const rnc = row.original;
+        const fotos = row.original.fotos;
         return (
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setDialogState({
-                isOpen: true,
-                fotos: rnc.fotos,
-                marca: rnc.marca_id,
-                data: rnc.data,
-              })}
+              onClick={() => {
+                setDialogState({
+                  isOpen: true,
+                  fotos: fotos,
+                  marca: row.original.marca_id,
+                  data: row.original.data,
+                });
+              }}
+              disabled={!fotos || fotos.length === 0}
             >
-              <Eye className="w-4 h-4" />
+              <Eye className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => exportToPresentation(rnc)}
-            >
-              <Presentation className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {/* TODO: Implementar exclusão */}}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <span className="text-sm text-muted-foreground">
+              {Array.isArray(fotos) ? fotos.length : 0} foto(s)
+            </span>
           </div>
         );
       },
     },
+    {
+      id: 'acoes',
+      header: 'Ações',
+      cell: ({ row }) => (
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => exportToPresentation(row.original)}
+          >
+            <Presentation className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDelete(row.original.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
   ];
 
   return (

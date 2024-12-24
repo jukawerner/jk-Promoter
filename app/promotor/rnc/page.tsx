@@ -123,6 +123,14 @@ export default function RNCPage() {
     fetchMarcas();
   }, []);
 
+  const selectedMarca = form.watch("marca");
+
+  useEffect(() => {
+    if (selectedMarca) {
+      carregarProdutos(selectedMarca);
+    }
+  }, [selectedMarca]);
+
   const carregarProdutos = async (marcaNome: string) => {
     try {
       const { data, error } = await supabase
@@ -150,12 +158,6 @@ export default function RNCPage() {
       toast.error('Erro ao carregar produtos');
     }
   };
-
-  useEffect(() => {
-    if (form.getValues("marca")) {
-      carregarProdutos(form.getValues("marca"));
-    }
-  }, [form.getValues("marca")]);
 
   useEffect(() => {
     const fetchLojaDetails = async () => {
@@ -213,7 +215,7 @@ export default function RNCPage() {
     // Primeiro setamos a marca
     form.setValue("marca", scannedBrand);
     
-    // Esperamos os produtos carregarem (500ms deve ser suficiente)
+    // Esperamos os produtos carregarem
     setTimeout(() => {
       form.setValue("produto", scannedProduct);
       setIsModalOpen(false);
