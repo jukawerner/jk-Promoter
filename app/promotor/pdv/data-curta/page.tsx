@@ -350,7 +350,6 @@ export default function DataCurtaPage() {
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
                           type="text"
-                          placeholder="Quantidade (un/kg)"
                           value={estoque}
                           onChange={(e) => {
                             const value = e.target.value.replace(/[^\d,]/g, '');
@@ -362,7 +361,9 @@ export default function DataCurtaPage() {
                               setEstoque(formatNumber(num));
                             }
                           }}
+                          placeholder="Quantidade (un/kg)"
                           className="pl-10"
+                          inputMode="decimal"
                         />
                       </div>
                     </div>

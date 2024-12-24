@@ -470,21 +470,20 @@ const handleBarcodeScan = async (result: string) => {
                       <div className="relative">
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
-                          id="estoque"
                           type="text"
                           value={estoque}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '');
-                            setEstoque(value);
-                          }}
-                          onBlur={(e) => {
-                            if (e.target.value) {
-                              const num = parseFormattedNumber(e.target.value);
-                              setEstoque(formatNumber(num));
+                            const value = e.target.value.replace(/[^\d]/g, '');
+                            if (value === '') {
+                              setEstoque('');
+                              return;
                             }
+                            const numberValue = Number(value) / 100;
+                            setEstoque(formatNumber(numberValue));
                           }}
-                          placeholder="Quantidade (un/kg)"
-                          className="pl-10"
+                          placeholder="Digite o estoque físico"
+                          className="h-9 pl-10"
+                          inputMode="decimal"
                         />
                       </div>
                     </div>
@@ -494,21 +493,20 @@ const handleBarcodeScan = async (result: string) => {
                       <div className="relative">
                         <Package2 className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <Input
-                          id="estoqueVirtual"
                           type="text"
                           value={estoqueVirtual}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '');
-                            setEstoqueVirtual(value);
-                          }}
-                          onBlur={(e) => {
-                            if (e.target.value) {
-                              const num = parseFormattedNumber(e.target.value);
-                              setEstoqueVirtual(formatNumber(num));
+                            const value = e.target.value.replace(/[^\d]/g, '');
+                            if (value === '') {
+                              setEstoqueVirtual('');
+                              return;
                             }
+                            const numberValue = Number(value) / 100;
+                            setEstoqueVirtual(formatNumber(numberValue));
                           }}
-                          placeholder="Quantidade (un/kg)"
-                          className="pl-10"
+                          placeholder="Digite o estoque virtual"
+                          className="h-9 pl-10"
+                          inputMode="decimal"
                         />
                       </div>
                     </div>

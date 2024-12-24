@@ -333,13 +333,24 @@ export default function PesquisaPreco() {
                     <div className="space-y-2">
                       <Label htmlFor="preco">Preço</Label>
                       <Input
-                        id="preco"
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
                         value={preco}
-                        onChange={(e) => setPreco(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          if (value === '') {
+                            setPreco('');
+                            return;
+                          }
+                          const numberValue = Number(value) / 100;
+                          const formatted = numberValue.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL'
+                          });
+                          setPreco(formatted);
+                        }}
                         placeholder="Digite o preço"
+                        className="h-9"
+                        inputMode="decimal"
                       />
                     </div>
 
