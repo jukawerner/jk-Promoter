@@ -9,7 +9,7 @@ import { Loader2, Save, QrCode, ImageIcon, Camera, X, ArrowLeft, FileText, Clipb
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import { Button } from 'components/ui/button';
 import {
   Form,
   FormControl,
@@ -28,7 +28,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import BarcodeScanner from '@/components/barcode-scanner';
-import { findProductByEAN } from '@/lib/utils/product-search';
 import { motion } from 'framer-motion';
 import { ConfirmModal } from 'components/ConfirmModal';
 
@@ -211,6 +210,7 @@ export default function RNCPage() {
 
   const handleConfirmScan = () => {
     form.setValue("marca", scannedBrand);
+    carregarProdutos(scannedBrand);
     form.setValue("produto", scannedProduct);
     setIsModalOpen(false);
   };
@@ -398,26 +398,36 @@ export default function RNCPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">Marca</FormLabel>
-                        <Select
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            carregarProdutos(value);
-                          }}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Selecione a marca" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {marcas.map((marca) => (
-                              <SelectItem key={marca.id} value={marca.nome}>
-                                {marca.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                          <Select
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              carregarProdutos(value);
+                            }}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Selecione a marca" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {marcas.map((marca) => (
+                                <SelectItem key={marca.id} value={marca.nome}>
+                                  {marca.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            type="button"
+                            onClick={() => setIsScannerOpen(true)}
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -428,18 +438,7 @@ export default function RNCPage() {
                     name="produto"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium flex justify-between">
-                          Produto
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setIsScannerOpen(true)}
-                            className="h-6 w-6"
-                          >
-                            <QrCode className="h-4 w-4" />
-                          </Button>
-                        </FormLabel>
+                        <FormLabel className="text-sm font-medium">Produto</FormLabel>
                         <Select
                           onValueChange={(value) => {
                             field.onChange(value);
@@ -664,6 +663,7 @@ export default function RNCPage() {
 
       {isScannerOpen && (
         <BarcodeScanner
+          isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
           onScan={handleBarcodeScanned}
         />
