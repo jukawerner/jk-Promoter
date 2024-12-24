@@ -508,7 +508,12 @@ export default function RNCPage() {
                       <FormItem>
                         <FormLabel className="text-sm font-medium">Número da Nota Fiscal</FormLabel>
                         <FormControl>
-                          <Input {...field} className="h-9" />
+                          <Input 
+                            {...field} 
+                            className="h-9"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -525,6 +530,7 @@ export default function RNCPage() {
                           <Input 
                             {...field} 
                             className="h-9"
+                            inputMode="decimal"
                             onChange={(e) => {
                               const value = e.target.value;
                               const numericValue = value.replace(/[^\d]/g, '');
