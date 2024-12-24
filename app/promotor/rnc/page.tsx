@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +10,6 @@ import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Form,
   FormControl,
@@ -31,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import BarcodeScanner from '@/components/barcode-scanner';
 import { findProductByEAN } from '@/lib/utils/product-search';
 import { motion } from 'framer-motion';
-import { ConfirmModal } from '@/components/ui/modal';
+import { ConfirmModal } from 'components/ConfirmModal';
 
 const formSchema = z.object({
   rede: z.string().min(1, "Selecione uma rede"),
