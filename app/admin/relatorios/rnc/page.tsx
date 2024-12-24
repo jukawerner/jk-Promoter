@@ -376,6 +376,27 @@ export default function RNCPage() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    try {
+      if (!selectedRows.length) return;
+
+      const { error } = await supabase
+        .from('rnc')
+        .delete()
+        .in('id', selectedRows.map(row => row.id));
+
+      if (error) throw error;
+
+      // Remover os itens excluídos do estado
+      setRncData(prev => prev.filter(item => !selectedRows.map(row => row.id).includes(item.id)));
+      setSelectedRows([]);
+      toast.success('Registros excluídos com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir registros:', error);
+      toast.error('Erro ao excluir registros');
+    }
+  };
+
   const limparFiltros = () => {
     setFiltros({
       busca: "",
@@ -390,15 +411,28 @@ export default function RNCPage() {
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Selecionar tudo"
+          onCheckedChange={(value) => {
+            table.toggleAllPageRowsSelected(!!value);
+            const rows = table.getRowModel().rows;
+            if (value) {
+              setSelectedRows(rows.map((row) => row.original));
+            } else {
+              setSelectedRows([]);
+            }
+          }}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Selecionar linha"
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value);
+            if (value) {
+              setSelectedRows(prev => [...prev, row.original]);
+            } else {
+              setSelectedRows(prev => prev.filter(item => item.id !== row.original.id));
+            }
+          }}
         />
       ),
       enableSorting: false,
@@ -499,82 +533,77 @@ export default function RNCPage() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">RNC - Relatório de Não Conformidade</h1>
         <div className="flex gap-2">
           <Button
-            variant="outline"
             onClick={exportToExcel}
-            disabled={isLoading}
+            variant="outline"
+            className="flex items-center gap-2"
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download className="w-4 h-4" />
             Exportar Excel
-            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
           </Button>
           <Button
+            onClick={exportToPresentation}
             variant="outline"
-            onClick={() => exportToPresentation()}
-            disabled={isLoading}
+            className="flex items-center gap-2"
           >
-            <Presentation className="w-4 h-4 mr-2" />
+            <Presentation className="w-4 h-4" />
             Exportar Apresentação
-            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
           </Button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Buscar</label>
-            <Input
-              placeholder="Buscar por marca..."
-              value={filtros.busca}
-              onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Período</label>
-            <DatePickerWithRange
-              onChange={(range) => {
-                setFiltros({
-                  ...filtros,
-                  dataInicio: range?.from || null,
-                  dataFim: range?.to || null,
-                });
-              }}
-              from={filtros.dataInicio}
-              to={filtros.dataFim}
-            />
-          </div>
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por marca..."
+            value={filtros.busca}
+            onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+            className="w-full"
+          />
         </div>
-        <div className="flex justify-between gap-2">
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                if (selectedRows.length === rncData.length) {
-                  setSelectedRows([]);
-                } else {
-                  setSelectedRows([...rncData]);
-                }
-              }}
+        <div className="flex-1">
+          <DatePickerWithRange
+            value={{
+              from: filtros.dataInicio,
+              to: filtros.dataFim,
+            }}
+            onChange={(range) => {
+              setFiltros({
+                ...filtros,
+                dataInicio: range?.from || null,
+                dataFim: range?.to || null,
+              });
+            }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedCount > 0 && (
+            <Button
+              onClick={handleDeleteSelected}
+              variant="destructive"
+              size="sm"
+              className="flex items-center gap-2"
             >
-              {selectedRows.length === rncData.length ? (
-                <>
-                  <X className="w-4 h-4 mr-2" />
-                  Desmarcar Todos
-                </>
-              ) : (
-                <>
-                  <Checkbox className="w-4 h-4 mr-2" />
-                  Selecionar Todos
-                </>
-              )}
+              <Trash2 className="w-4 h-4" />
+              Excluir Selecionados ({selectedCount})
             </Button>
-          </div>
-          <Button variant="outline" onClick={limparFiltros}>
-            <X className="w-4 h-4 mr-2" />
+          )}
+          <Button
+            onClick={() => {
+              setFiltros({
+                busca: "",
+                dataInicio: null,
+                dataFim: null,
+              });
+            }}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <X className="w-4 h-4" />
             Limpar Filtros
           </Button>
         </div>
@@ -585,11 +614,11 @@ export default function RNCPage() {
         data={rncData}
         loading={isLoading}
       />
-      
-      <FotoDialog 
-        isOpen={dialogState.isOpen}
-        onClose={() => setDialogState(prev => ({ ...prev, isOpen: false }))}
+
+      <FotoDialog
         fotos={dialogState.fotos}
+        isOpen={dialogState.isOpen}
+        onClose={() => setDialogState({ ...dialogState, isOpen: false })}
         marca={dialogState.marca}
         data={dialogState.data}
       />
