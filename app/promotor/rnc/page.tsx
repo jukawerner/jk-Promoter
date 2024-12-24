@@ -185,21 +185,27 @@ export default function RNCPage() {
   const handleBarcodeScanned = async (result: string) => {
     setIsScannerOpen(false);
     
+    // Limpa o código de barras (remove espaços e caracteres especiais)
+    const cleanBarcode = result.trim().replace(/[^0-9]/g, '');
+    
     try {
+      // Primeiro tenta buscar exatamente como está
       const { data: product, error } = await supabase
         .from('produto')
-        .select('nome, marca')
-        .eq('codigo_ean', result)
+        .select('nome, marca, codigo_ean')
+        .or(`codigo_ean.eq.${cleanBarcode},codigo_ean.ilike.%${cleanBarcode}%`)
         .single();
-
+  
       if (error) throw error;
       
       if (product) {
-        setScannedBarcode(result);
+        console.log('Produto encontrado:', product);
+        setScannedBarcode(cleanBarcode);
         setScannedBrand(product.marca.toUpperCase());
         setScannedProduct(product.nome.toUpperCase());
         setIsModalOpen(true);
       } else {
+        console.log('Código de barras não encontrado:', cleanBarcode);
         toast.error("Produto não encontrado no sistema");
       }
     } catch (error) {

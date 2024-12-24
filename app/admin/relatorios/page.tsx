@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Package, Calendar, Store, DollarSign } from "lucide-react";
+import { Package, Calendar, Store, DollarSign, AlertTriangle } from "lucide-react";
 
 export default function RelatoriosPage() {
   return (
@@ -65,6 +65,21 @@ export default function RelatoriosPage() {
             <div>
               <h2 className="text-xl font-semibold">Pesquisa de Preços</h2>
               <p className="text-gray-600">Acompanhe os preços dos produtos no mercado</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link 
+          href="/admin/relatorios/rnc"
+          className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-yellow-500 text-white rounded-lg">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">RNC</h2>
+              <p className="text-gray-600">Relatório de Não Conformidade</p>
             </div>
           </div>
         </Link>
