@@ -68,14 +68,7 @@ export default function RNCPage() {
   const [scannedBrand, setScannedBrand] = useState("");
   const [scannedProduct, setScannedProduct] = useState("");
   const [imagens, setImagens] = useState<File[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    return () => {
-      imageUrls.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [imageUrls]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -239,19 +232,7 @@ export default function RNCPage() {
       );
 
       if (validImageFiles.length > 0) {
-        // Limita o número total de imagens a 6
-        const totalImages = imagens.length + validImageFiles.length;
-        if (totalImages > 6) {
-          toast.error("Máximo de 6 imagens permitido");
-          return;
-        }
-
-        // Cria URLs para as novas imagens
-        const newUrls = validImageFiles.map(file => URL.createObjectURL(file));
-        
         setImagens(prev => [...prev, ...validImageFiles]);
-        setImageUrls(prev => [...prev, ...newUrls]);
-        
         toast.success("Imagens adicionadas com sucesso!");
       } else {
         toast.error("Por favor, selecione apenas arquivos de imagem");
@@ -260,20 +241,10 @@ export default function RNCPage() {
       console.error('Erro ao processar imagens:', error);
       toast.error("Erro ao processar as imagens");
     }
-
-    // Limpa o input para permitir selecionar o mesmo arquivo novamente
-    if (event.target) {
-      event.target.value = '';
-    }
   };
 
   const handleDeleteImage = (index: number) => {
-    // Revoga a URL da imagem removida
-    URL.revokeObjectURL(imageUrls[index]);
-    
     setImagens(prev => prev.filter((_, i) => i !== index));
-    setImageUrls(prev => prev.filter((_, i) => i !== index));
-    
     toast.success("Imagem removida com sucesso!");
   };
 
@@ -353,7 +324,6 @@ export default function RNCPage() {
       toast.success("RNC registrado com sucesso!");
       form.reset();
       setImagens([]);
-      setImageUrls([]);
     } catch (error) {
       console.error("Erro ao salvar RNC:", error);
       toast.error("Erro ao salvar RNC");
@@ -650,13 +620,13 @@ export default function RNCPage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-1.5 md:gap-4">
-                    {imageUrls.map((url, index) => (
+                    {imagens.map((image, index) => (
                       <div
                         key={index}
                         className="relative group aspect-square rounded-md overflow-hidden"
                       >
                         <img
-                          src={url}
+                          src={URL.createObjectURL(image)}
                           alt={`Preview ${index}`}
                           className="w-full h-full object-cover rounded-lg ring-1 ring-gray-200 dark:ring-gray-800"
                         />
