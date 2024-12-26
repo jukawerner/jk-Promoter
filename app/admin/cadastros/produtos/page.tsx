@@ -253,37 +253,37 @@ export default function ProdutosPage() {
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="table-auto w-full">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-4 py-2">
+      <div className="overflow-x-auto rounded-lg border bg-white">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b">
+              <th className="w-[40px] p-4">
                 <Checkbox
                   checked={selectedItems.length === filteredProdutos.length && filteredProdutos.length > 0}
                   onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                   aria-label="Selecionar todos"
                 />
               </th>
-              <th className="px-4 py-2">Código EAN</th>
-              <th className="px-4 py-2">Nome</th>
-              <th className="px-4 py-2">Marca</th>
-              <th className="px-4 py-2">Ações</th>
+              <th className="p-4 text-left font-medium text-gray-900">Código EAN</th>
+              <th className="p-4 text-left font-medium text-gray-900">Nome</th>
+              <th className="p-4 text-left font-medium text-gray-900">Marca</th>
+              <th className="w-[100px] p-4 text-left font-medium text-gray-900">Ações</th>
             </tr>
           </thead>
           <tbody>
             {filteredProdutos.map((produto) => (
-              <tr key={produto.id}>
-                <td className="border px-4 py-2">
+              <tr key={produto.id} className="border-b hover:bg-gray-50">
+                <td className="p-4">
                   <Checkbox
                     checked={selectedItems.includes(produto.id)}
                     onCheckedChange={(checked) => handleSelectItem(produto.id, checked as boolean)}
                     aria-label={`Selecionar ${produto.nome}`}
                   />
                 </td>
-                <td className="border px-4 py-2">{produto.codigo_ean}</td>
-                <td className="border px-4 py-2">{produto.nome.toUpperCase()}</td>
-                <td className="border px-4 py-2">{produto.marca.toUpperCase()}</td>
-                <td className="border px-4 py-2">
+                <td className="p-4 text-sm text-gray-600">{produto.codigo_ean}</td>
+                <td className="p-4 text-sm text-gray-900">{produto.nome}</td>
+                <td className="p-4 text-sm text-gray-600">{produto.marca}</td>
+                <td className="p-4">
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"

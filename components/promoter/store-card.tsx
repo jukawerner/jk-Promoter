@@ -55,14 +55,14 @@ export function StoreCard({ store, onClick }: StoreCardProps) {
   return (
     <motion.div
       whileTap={{ scale: 0.98 }}
-      className="relative touch-manipulation"
+      className="relative touch-pan-y"
     >
       <motion.div
         animate={{ scale: isPressed ? 0.98 : 1 }}
         className={cn(
           "bg-white p-3 md:p-4 rounded-xl border transition-all active:bg-gray-50",
           "hover:border-rose-100 hover:shadow-lg",
-          "touch-none select-none",
+          "select-none",
           "active:shadow-inner active:border-rose-200"
         )}
         onClick={handleCardClick}
