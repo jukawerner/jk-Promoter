@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromoterForm } from "@/components/admin/promoters/promoter-form";
-import { PromoterTable } from "@/components/admin/promoters/promoter-table";
+import { PromoterGrid } from "@/components/admin/promoters/promoter-grid";
 import { Input } from "@/components/ui/input";
 import { ImportModal } from "@/components/admin/promoters/import-modal";
 import { toast } from "sonner";
@@ -254,7 +254,7 @@ export default function CadastroPromotor() {
             <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
           </div>
 
-          <PromoterTable
+          <PromoterGrid
             promoters={filteredPromoters}
             onEdit={handleEditPromoter}
             onDelete={handleDeletePromoter}

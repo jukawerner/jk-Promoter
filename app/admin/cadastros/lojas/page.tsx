@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { StoreForm } from "@/components/admin/stores/store-form";
 import { ImportModal } from "@/components/admin/stores/import-modal";
-import { StoreTable } from "@/components/admin/stores/store-table";
-import { Plus, Upload, Loader2, Search } from "lucide-react";
+import { StoreGrid } from "@/components/admin/stores/store-grid";
+import { Plus, Upload, Loader2, Search, Building2, User2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Store } from "@/types/store";
 import { getLojas, createLoja, updateLoja, deleteLoja } from "@/lib/actions/loja";
@@ -17,7 +17,8 @@ import { supabase } from "@/lib/supabase";
 export default function CadastroLojas() {
   const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [storeSearchQuery, setStoreSearchQuery] = useState("");
+  const [promoterSearchQuery, setPromoterSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -136,17 +137,23 @@ export default function CadastroLojas() {
     }
   };
 
-  const filteredStores = stores.filter(store => {
-    if (!searchQuery) return true;
-    
-    const searchTerm = searchQuery.toLowerCase();
-    return (
-      store.nome?.toLowerCase().includes(searchTerm) ||
-      store.cnpj?.toLowerCase().includes(searchTerm) ||
-      store.endereco?.toLowerCase().includes(searchTerm) ||
-      store.rede?.nome?.toLowerCase().includes(searchTerm) ||
-      store.promotor?.apelido?.toLowerCase().includes(searchTerm)
+  const filteredStores = stores.filter((store) => {
+    const storeMatch = !storeSearchQuery || [
+      store.nome,
+      store.rede?.nome,
+      store.cidade,
+    ].some(field => 
+      field?.toLowerCase().includes(storeSearchQuery.toLowerCase())
     );
+
+    const promoterMatch = !promoterSearchQuery || [
+      store.promotor?.nome,
+      store.promotor?.apelido,
+    ].some(field => 
+      field?.toLowerCase().includes(promoterSearchQuery.toLowerCase())
+    );
+
+    return storeMatch && promoterMatch;
   });
 
   return (
@@ -182,7 +189,33 @@ export default function CadastroLojas() {
         </div>
       </div>
 
-      {showForm ? (
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por rede, loja ou cidade..."
+            value={storeSearchQuery}
+            onChange={(e) => setStoreSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex-1 relative">
+          <User2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por nome ou apelido do promotor..."
+            value={promoterSearchQuery}
+            onChange={(e) => setPromoterSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      ) : showForm ? (
         <StoreForm
           store={selectedStore}
           onSave={handleSaveStore}
@@ -192,31 +225,12 @@ export default function CadastroLojas() {
           }}
         />
       ) : (
-        <>
-          <div className="mb-6 relative">
-            <Input
-              type="text"
-              placeholder="Buscar por nome, rede ou promotor..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-            <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            </div>
-          ) : (
-            <StoreTable
-              stores={filteredStores}
-              onEdit={handleEditStore}
-              onDelete={handleDeleteStore}
-              onDeleteSelected={handleDeleteSelected}
-            />
-          )}
-        </>
+        <StoreGrid
+          stores={filteredStores}
+          onEdit={handleEditStore}
+          onDelete={handleDeleteStore}
+          onDeleteSelected={handleDeleteSelected}
+        />
       )}
 
       <ImportModal

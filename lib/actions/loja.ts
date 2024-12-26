@@ -9,7 +9,8 @@ export async function getLojas(): Promise<Store[]> {
       promotor:promotor_id (
         id,
         nome,
-        apelido
+        apelido,
+        avatar_url
       ),
       rede:rede_id (
         id,
@@ -48,7 +49,7 @@ export async function createLoja(data: StoreFormData): Promise<Store> {
     .insert([lojaData])
     .select(`
       *,
-      usuario:promotor_id (
+      promotor:promotor_id (
         id,
         nome,
         apelido,
@@ -62,21 +63,14 @@ export async function createLoja(data: StoreFormData): Promise<Store> {
     .single();
 
   if (error) {
-    console.error('Erro detalhado ao criar loja:', error);
-    
-    // Tratamento específico para erro de CNPJ duplicado
-    if (error.code === '23505' && error.message.includes('loja_cnpj_key')) {
-      throw new Error(`Já existe uma loja cadastrada com o CNPJ ${data.cnpj}`);
-    }
-    
-    throw new Error(`Erro ao criar loja: ${error.message}`);
+    console.error('Erro ao criar loja:', error);
+    throw error;
   }
 
   if (!loja) {
     throw new Error('Loja não foi criada - nenhum dado retornado');
   }
 
-  console.log('Loja criada com sucesso:', loja);
   return loja;
 }
 
@@ -87,7 +81,7 @@ export async function updateLoja(id: number, data: StoreFormData): Promise<Store
     .eq('id', id)
     .select(`
       *,
-      usuario:promotor_id (
+      promotor:promotor_id (
         id,
         nome,
         apelido,

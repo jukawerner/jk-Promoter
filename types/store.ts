@@ -16,15 +16,15 @@ export interface Store {
     id: number;
     nome: string;
   };
-  usuario?: {
+  promotor?: {
     id: number;
     nome: string;
     apelido: string;
-    avatar_url: string;
+    avatar_url?: string;
   } | null;
 }
 
-export type StoreFormData = Omit<Store, 'id' | 'rede' | 'usuario'>;
+export type StoreFormData = Omit<Store, 'id' | 'rede' | 'promotor'>;
 
 export interface StoreImportData {
   nome: string;
