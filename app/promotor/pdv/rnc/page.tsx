@@ -225,28 +225,29 @@ export default function RNCPage() {
     }
   };
 
-  const handleBarcodeScan = async (barcode: string) => {
+  const handleBarcodeScan = async (result: string) => {
+    setIsScannerOpen(false);
+    
     try {
-      const { data, error } = await supabase
+      const { data: product, error } = await supabase
         .from('produto')
-        .select('*')
-        .eq('codigo_barras', barcode);
+        .select('nome, marca')
+        .eq('codigo_ean', result)
+        .single();
 
       if (error) throw error;
-
-      if (!data || data.length === 0) {
-        toast.error('Nenhum produto encontrado com este código de barras');
-        return;
+      
+      if (product) {
+        setScannedBarcode(result);
+        setScannedBrand(product.marca.toUpperCase());
+        setScannedProduct(product.nome.toUpperCase());
+        setIsModalOpen(true);
+      } else {
+        toast.error("Produto não encontrado no sistema");
       }
-
-      const produto = data[0];
-      setScannedBarcode(barcode);
-      setScannedBrand(produto.marca);
-      setScannedProduct(produto.nome);
-      setIsModalOpen(true);
     } catch (error) {
-      console.error('Erro ao ler código de barras:', error);
-      toast.error('Erro ao ler código de barras');
+      console.error('Erro ao processar código de barras:', error);
+      toast.error("Erro ao buscar produto. Tente novamente.");
     }
   };
 
