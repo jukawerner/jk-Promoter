@@ -9,10 +9,12 @@ import { Checkbox } from "components/ui/checkbox";
 import { supabase } from "lib/supabase";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
-import { Trash2, Download, X, Image, Eye, Presentation } from "lucide-react";
+import { Trash2, Download, X, Image, Eye, Presentation, FileText, ClipboardList, QrCode } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "components/ui/dialog";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
+import { Label } from "components/ui/label";
+import BarcodeScanner from "@/components/barcode-scanner"; // Importação corrigida
 
 interface RNC {
   id: number;
@@ -43,6 +45,8 @@ interface Filtros {
   busca: string;
   dataInicio: Date | null;
   dataFim: Date | null;
+  rede: string;
+  loja: string;
 }
 
 function FotoDialog({ fotos, isOpen, onClose, marca, data }: { 
@@ -93,9 +97,12 @@ export default function RNCPage() {
     busca: "",
     dataInicio: null,
     dataFim: null,
+    rede: "",
+    loja: "",
   });
   const [selectedRows, setSelectedRows] = useState<RNC[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [isScannerOpen, setIsScannerOpen] = useState(false); // Adicionar estado para o scanner
 
   useEffect(() => {
     setSelectedCount(selectedRows.length);
@@ -165,6 +172,14 @@ export default function RNCPage() {
         const dataItem = new Date(item.data);
         return dataItem >= filtros.dataInicio! && dataItem <= filtros.dataFim!;
       });
+    }
+
+    if (filtros.rede) {
+      dadosFiltrados = dadosFiltrados.filter(item => item.rede_id === filtros.rede);
+    }
+
+    if (filtros.loja) {
+      dadosFiltrados = dadosFiltrados.filter(item => item.loja_id === filtros.loja);
     }
 
     setRncData(dadosFiltrados);
@@ -415,6 +430,8 @@ export default function RNCPage() {
       busca: "",
       dataInicio: null,
       dataFim: null,
+      rede: "",
+      loja: "",
     });
   };
 
@@ -545,88 +562,131 @@ export default function RNCPage() {
   ];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">RNC - Relatório de Não Conformidade</h1>
-        <div className="flex gap-2">
-          <Button
-            onClick={exportToExcel}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Exportar Excel
-          </Button>
-          <Button
-            onClick={exportToPresentation}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Presentation className="w-4 h-4" />
-            Exportar Apresentação
-          </Button>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto p-6">
+        <div className="flex flex-col items-center mb-8">
+          <div className="relative w-24 h-24 mb-6">
+            <div className="absolute inset-0 bg-red-100 rounded-full flex items-center justify-center">
+              <FileText className="h-12 w-12 text-rose-500" />
+            </div>
+            <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+              <ClipboardList className="h-6 w-6 text-rose-500" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Relatório de Não Conformidade</h1>
+          <p className="text-gray-500">Registre ocorrências e não conformidades encontradas nos produtos</p>
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="space-y-4">
+            {/* Rede */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Rede</Label>
+              <Input
+                value={filtros.rede || ""}
+                className="w-full bg-gray-50"
+                disabled
+              />
+            </div>
+
+            {/* Loja */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Loja</Label>
+              <Input
+                value={filtros.loja || ""}
+                className="w-full bg-gray-50"
+                disabled
+              />
+            </div>
+
+            {/* Marca com Código de Barras */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Marca</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Buscar por marca..."
+                  value={filtros.busca}
+                  onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+                  className="w-full bg-gray-50"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => setIsScannerOpen(true)}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Período */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Período</Label>
+              <DatePickerWithRange
+                value={{
+                  from: filtros.dataInicio,
+                  to: filtros.dataFim,
+                }}
+                onChange={(range) => {
+                  setFiltros({
+                    ...filtros,
+                    dataInicio: range?.from || null,
+                    dataFim: range?.to || null,
+                  });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                onClick={exportToExcel}
+                variant="outline"
+                className="w-full sm:w-auto flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Exportar Excel
+              </Button>
+              <Button
+                onClick={exportToPresentation}
+                variant="outline"
+                className="w-full sm:w-auto flex items-center gap-2"
+              >
+                <Presentation className="w-4 h-4" />
+                Exportar Apresentação
+              </Button>
+              {selectedCount > 0 && (
+                <Button
+                  onClick={handleDeleteSelected}
+                  variant="destructive"
+                  size="sm"
+                  className="w-full sm:w-auto flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir Selecionados ({selectedCount})
+                </Button>
+              )}
+              <Button
+                onClick={limparFiltros}
+                variant="ghost"
+                size="sm"
+                className="w-full sm:w-auto flex items-center gap-2 ml-auto"
+              >
+                <X className="w-4 h-4" />
+                Limpar Filtros
+              </Button>
+            </div>
+
+            <div className="mt-6">
+              <DataTable
+                columns={columns}
+                data={rncData}
+                loading={isLoading}
+              />
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1">
-          <Input
-            placeholder="Buscar por marca..."
-            value={filtros.busca}
-            onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1">
-          <DatePickerWithRange
-            value={{
-              from: filtros.dataInicio,
-              to: filtros.dataFim,
-            }}
-            onChange={(range) => {
-              setFiltros({
-                ...filtros,
-                dataInicio: range?.from || null,
-                dataFim: range?.to || null,
-              });
-            }}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedCount > 0 && (
-            <Button
-              onClick={handleDeleteSelected}
-              variant="destructive"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Excluir Selecionados ({selectedCount})
-            </Button>
-          )}
-          <Button
-            onClick={() => {
-              setFiltros({
-                busca: "",
-                dataInicio: null,
-                dataFim: null,
-              });
-            }}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <X className="w-4 h-4" />
-            Limpar Filtros
-          </Button>
-        </div>
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={rncData}
-        loading={isLoading}
-      />
 
       <FotoDialog
         fotos={dialogState.fotos}
@@ -635,6 +695,23 @@ export default function RNCPage() {
         marca={dialogState.marca}
         data={dialogState.data}
       />
+
+      {isScannerOpen && (
+        <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Escanear Código de Barras</DialogTitle>
+            </DialogHeader>
+            <BarcodeScanner
+              onResult={(result) => {
+                setIsScannerOpen(false);
+                // Aqui você pode processar o resultado do código de barras
+                // e atualizar o filtro de marca conforme necessário
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
