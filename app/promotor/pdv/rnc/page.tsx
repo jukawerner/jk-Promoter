@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import BarcodeScanner from '@/components/barcode-scanner';
-import { motion } from 'framer-motion';
 import { ConfirmModal } from 'components/ConfirmModal';
 import { formatCurrency } from '@/lib/utils';
 
@@ -131,16 +130,30 @@ export default function RNCPage() {
     carregarProdutos();
   }, [marca]);
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      const newImages = Array.from(files);
-      setImagens([...imagens, ...newImages]);
+    if (!files) return;
+
+    try {
+      const validImageFiles = Array.from(files).filter(file =>
+        file.type.startsWith('image/')
+      );
+
+      if (validImageFiles.length > 0) {
+        setImagens(prev => [...prev, ...validImageFiles]);
+        toast.success("Imagens adicionadas com sucesso!");
+      } else {
+        toast.error("Por favor, selecione apenas arquivos de imagem");
+      }
+    } catch (error) {
+      console.error('Erro ao processar imagens:', error);
+      toast.error("Erro ao processar as imagens");
     }
   };
 
-  const removeImage = (index: number) => {
-    setImagens(imagens.filter((_, i) => i !== index));
+  const handleDeleteImage = (index: number) => {
+    setImagens(prev => prev.filter((_, i) => i !== index));
+    toast.success("Imagem removida com sucesso!");
   };
 
   const handleBarcodeScan = async (result: string) => {
@@ -246,11 +259,7 @@ export default function RNCPage() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-50"
-    >
+    <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-6 max-w-[800px]">
         <Button
           variant="ghost"
@@ -404,39 +413,75 @@ export default function RNCPage() {
             {/* Upload de Fotos */}
             <div>
               <h2 className="text-sm font-medium text-gray-700 mb-2">Fotos</h2>
-              <div className="flex flex-wrap gap-4">
-                {imagens.map((file, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={`Preview ${index}`}
-                      className="w-24 h-24 object-cover rounded-lg"
-                    />
-                    <button
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+              <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-3 md:p-6 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
+                <div className="flex flex-col items-center gap-2 md:gap-4">
+                  <div className="text-center space-y-2">
+                    <div className="text-gray-500 dark:text-gray-400">
+                      <ImageIcon className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-[10px] md:text-sm">Adicione suas imagens</p>
+                    </div>
+                    <div className="flex flex-col gap-2 w-full">
+                      <div className="w-full grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                          Galeria
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById('camera-input')?.click()}
+                          className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Câmera
+                        </Button>
+                        <input
+                          id="camera-input"
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={handleImageSelect}
+                        />
+                      </div>
+                    </div>
                   </div>
-                ))}
-                <Button
-                  variant="outline"
-                  className="w-24 h-24 flex flex-col items-center justify-center gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera className="h-8 w-8" />
-                  <span className="text-xs">Adicionar Foto</span>
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageSelect}
-                />
+                </div>
               </div>
+
+              {imagens.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5 md:gap-4 mt-4">
+                  {imagens.map((image, index) => (
+                    <div
+                      key={index}
+                      className="relative group aspect-square rounded-md overflow-hidden"
+                    >
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index}`}
+                        className="w-full h-full object-cover rounded-lg ring-1 ring-gray-200 dark:ring-gray-800"
+                      />
+                      <button
+                        onClick={() => handleDeleteImage(index)}
+                        className="absolute -top-1 -right-1 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-rose-600 hover:scale-110"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Botão Salvar */}
@@ -490,6 +535,6 @@ export default function RNCPage() {
           description={`Marca: ${scannedBrand}\nProduto: ${scannedProduct}`}
         />
       )}
-    </motion.div>
+    </div>
   );
 }

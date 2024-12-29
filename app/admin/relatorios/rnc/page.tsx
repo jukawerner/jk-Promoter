@@ -119,12 +119,25 @@ export default function RNCPage() {
 
       if (error) throw error;
 
-      const formattedData = (rncData || []).map(item => ({
-        ...item,
-        rede_id: (item.rede_id || '').toUpperCase(),
-        loja_id: (item.loja_id || '').toUpperCase(),
-        marca_id: (item.marca_id || '').toUpperCase(),
-        produto_id: (item.produto_id || '').toUpperCase(),
+      const formattedData = await Promise.all((rncData || []).map(async item => {
+        // Processa as URLs das fotos
+        let fotosUrls = [];
+        if (Array.isArray(item.fotos)) {
+          fotosUrls = item.fotos.map((foto) => {
+            if (foto.startsWith('http')) return foto;
+            const { data } = supabase.storage.from('rnc_photos').getPublicUrl(foto);
+            return data.publicUrl;
+          });
+        }
+
+        return {
+          ...item,
+          rede_id: (item.rede_id || '').toUpperCase(),
+          loja_id: (item.loja_id || '').toUpperCase(),
+          marca_id: (item.marca_id || '').toUpperCase(),
+          produto_id: (item.produto_id || '').toUpperCase(),
+          fotos: fotosUrls,
+        };
       }));
 
       setRncCompleto(formattedData);
