@@ -9,12 +9,11 @@ import { Checkbox } from "components/ui/checkbox";
 import { supabase } from "lib/supabase";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
-import { Trash2, Download, X, Image, Eye, Presentation, FileText, ClipboardList, QrCode } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "components/ui/dialog";
+import { Trash2, Download, X, Image, Eye, Presentation, FileText, ClipboardList } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "components/ui/dialog";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import { Label } from "components/ui/label";
-import BarcodeScanner from "@/components/barcode-scanner"; // Importação corrigida
 
 interface RNC {
   id: number;
@@ -102,7 +101,6 @@ export default function RNCPage() {
   });
   const [selectedRows, setSelectedRows] = useState<RNC[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
-  const [isScannerOpen, setIsScannerOpen] = useState(false); // Adicionar estado para o scanner
 
   useEffect(() => {
     setSelectedCount(selectedRows.length);
@@ -566,10 +564,10 @@ export default function RNCPage() {
       <div className="container mx-auto p-6">
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-24 h-24 mb-6">
-            <div className="absolute inset-0 bg-red-100 rounded-full flex items-center justify-center">
+            <div className="absolute inset-0 bg-rose-100 rounded-full flex items-center justify-center">
               <FileText className="h-12 w-12 text-rose-500" />
             </div>
-            <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+            <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center">
               <ClipboardList className="h-6 w-6 text-rose-500" />
             </div>
           </div>
@@ -599,25 +597,15 @@ export default function RNCPage() {
               />
             </div>
 
-            {/* Marca com Código de Barras */}
+            {/* Marca */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-1.5">Marca</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Buscar por marca..."
-                  value={filtros.busca}
-                  onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-                  className="w-full bg-gray-50"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => setIsScannerOpen(true)}
-                >
-                  <QrCode className="h-4 w-4" />
-                </Button>
-              </div>
+              <Input
+                placeholder="Buscar por marca..."
+                value={filtros.busca}
+                onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+                className="w-full bg-gray-50"
+              />
             </div>
 
             {/* Período */}
@@ -695,23 +683,6 @@ export default function RNCPage() {
         marca={dialogState.marca}
         data={dialogState.data}
       />
-
-      {isScannerOpen && (
-        <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Escanear Código de Barras</DialogTitle>
-            </DialogHeader>
-            <BarcodeScanner
-              onResult={(result) => {
-                setIsScannerOpen(false);
-                // Aqui você pode processar o resultado do código de barras
-                // e atualizar o filtro de marca conforme necessário
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

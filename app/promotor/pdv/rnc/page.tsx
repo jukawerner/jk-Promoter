@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Save, QrCode, ImageIcon, Camera, X, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, ImageIcon, Camera, X, ArrowLeft, FileText, ClipboardList, QrCode } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from 'components/ui/button';
@@ -16,9 +16,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import BarcodeScanner from '@/components/barcode-scanner';
-import { ConfirmModal } from 'components/ConfirmModal';
 import { formatCurrency } from '@/lib/utils';
+import { motion } from "framer-motion";
+import BarcodeScanner from "components/barcode-scanner";
+import ConfirmModal from "components/confirm-modal";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "components/ui/dialog";
 
 interface Marca {
   id: string;
@@ -33,7 +35,7 @@ interface Produto {
 
 export default function RNCPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [rede, setRede] = useState("");
   const [loja, setLoja] = useState("");
   const [marca, setMarca] = useState("");
@@ -42,6 +44,8 @@ export default function RNCPage() {
   const [numeroNotaFiscal, setNumeroNotaFiscal] = useState("");
   const [valorTotal, setValorTotal] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [imagens, setImagens] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -49,10 +53,7 @@ export default function RNCPage() {
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [scannedBrand, setScannedBrand] = useState("");
   const [scannedProduct, setScannedProduct] = useState("");
-  const [imagens, setImagens] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Carrega rede e loja do localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const redeSelected = localStorage.getItem("redeSelected") || "";
@@ -69,7 +70,6 @@ export default function RNCPage() {
     }
   }, [router]);
 
-  // Carrega marcas
   useEffect(() => {
     const fetchMarcas = async () => {
       try {
@@ -93,42 +93,74 @@ export default function RNCPage() {
     fetchMarcas();
   }, []);
 
-  // Carrega produtos quando marca é selecionada
+  const carregarProdutos = async (marcaNome: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('produto')
+        .select('*')
+        .ilike('marca', marcaNome)
+        .order('nome');
+
+      if (error) {
+        console.error('Erro na consulta:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        toast.error('Nenhum produto encontrado para esta marca');
+      }
+
+      const formattedData = data?.map(item => ({
+        ...item,
+        nome: item.nome.toUpperCase(),
+        marca: item.marca.toUpperCase()
+      }));
+      setProdutos(formattedData || []);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      toast.error('Erro ao carregar produtos');
+    }
+  };
+
   useEffect(() => {
-    const carregarProdutos = async () => {
-      if (!marca) {
-        setProdutos([]);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('produto')
-          .select('*')
-          .ilike('marca', marca)
-          .order('nome');
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-          toast.error('Nenhum produto encontrado para esta marca');
-          return;
-        }
-
-        const formattedData = data?.map(item => ({
-          ...item,
-          nome: item.nome.toUpperCase(),
-          marca: item.marca.toUpperCase()
-        }));
-        setProdutos(formattedData || []);
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
-        toast.error('Erro ao carregar produtos');
-      }
-    };
-
-    carregarProdutos();
+    if (marca) {
+      carregarProdutos(marca);
+    } else {
+      setProdutos([]);
+    }
   }, [marca]);
+
+  const handleBarcodeScan = async (result: string) => {
+    setIsScannerOpen(false);
+    
+    try {
+      const { data: product, error } = await supabase
+        .from('produto')
+        .select('nome, marca')
+        .eq('codigo_ean', result)
+        .single();
+
+      if (error) throw error;
+      
+      if (product) {
+        setScannedBarcode(result);
+        setScannedBrand(product.marca.toUpperCase());
+        setScannedProduct(product.nome.toUpperCase());
+        setIsModalOpen(true);
+      } else {
+        toast.error("Produto não encontrado no sistema");
+      }
+    } catch (error) {
+      console.error('Erro ao processar código de barras:', error);
+      toast.error("Erro ao buscar produto. Tente novamente.");
+    }
+  };
+
+  const handleConfirmScan = () => {
+    setMarca(scannedBrand);
+    setProduto(scannedProduct);
+    setIsModalOpen(false);
+  };
 
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -154,39 +186,6 @@ export default function RNCPage() {
   const handleDeleteImage = (index: number) => {
     setImagens(prev => prev.filter((_, i) => i !== index));
     toast.success("Imagem removida com sucesso!");
-  };
-
-  const handleBarcodeScan = async (result: string) => {
-    setIsScannerOpen(false);
-    setScannedBarcode(result);
-    setIsModalOpen(true);
-
-    try {
-      const { data: produtos, error } = await supabase
-        .from('produto')
-        .select('*')
-        .eq('codigo_barras', result)
-        .single();
-
-      if (error || !produtos) {
-        toast.error('Produto não encontrado');
-        return;
-      }
-
-      setScannedBrand(produtos.marca);
-      setScannedProduct(produtos.nome);
-    } catch (error) {
-      console.error('Erro ao buscar produto:', error);
-      toast.error('Erro ao buscar produto');
-    }
-  };
-
-  const handleConfirmScan = () => {
-    setMarca(scannedBrand);
-    setTimeout(() => {
-      setProduto(scannedProduct);
-      setIsModalOpen(false);
-    }, 500);
   };
 
   const handleSubmit = async () => {
@@ -260,46 +259,61 @@ export default function RNCPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto p-6 max-w-[800px]">
+      <div className="container mx-auto px-3 py-4 md:p-6 max-w-[800px]">
         <Button
           variant="ghost"
-          className="mb-6"
-          onClick={() => router.push("/promotor/pdv")}
+          className="mb-4 md:mb-6"
+          onClick={() => router.push("/promotor")}
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
 
-        <div className="flex flex-col items-center mb-12">
-          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6">
-            <ImageIcon className="h-12 w-12 text-red-500" />
+        <div className="flex flex-col items-center text-center space-y-3 md:space-y-6 mb-4 md:mb-8">
+          <motion.div 
+            className="relative"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          >
+            <div className="bg-rose-100 p-4 rounded-full">
+              <FileText className="w-12 h-12 text-rose-500" />
+            </div>
+            <div className="absolute -right-2 -bottom-2 bg-rose-100 rounded-full p-2 shadow-sm border-2 border-white">
+              <ClipboardList className="w-6 h-6 text-rose-500" />
+            </div>
+          </motion.div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Relatório de Não Conformidade</h2>
+            <p className="text-gray-500 mt-1">Registre ocorrências e não conformidades encontradas nos produtos</p>
           </div>
-          <h1 className="text-3xl font-bold text-[#1f2937] mb-4">Relatório de Não Conformidade</h1>
-          <p className="text-xl text-gray-500">Registre ocorrências e não conformidades encontradas nos produtos</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          {/* Grid de Rede e Loja */}
-          <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-3 md:p-6 border space-y-3 md:space-y-6">
+          {/* Rede e Loja */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Rede</h2>
-              <div className="p-2.5 bg-gray-50 rounded-md text-gray-900">
-                {rede}
-              </div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Rede</Label>
+              <Input
+                value={rede}
+                disabled
+                className="bg-gray-50"
+              />
             </div>
             <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Loja</h2>
-              <div className="p-2.5 bg-gray-50 rounded-md text-gray-900">
-                {loja}
-              </div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Loja</Label>
+              <Input
+                value={loja}
+                disabled
+                className="bg-gray-50"
+              />
             </div>
           </div>
 
-          {/* Grid de Marca e Produto */}
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            {/* Seleção de Marca */}
+          {/* Marca e Produto */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Marca</h2>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Marca</Label>
               <div className="flex gap-2">
                 <Select value={marca} onValueChange={setMarca}>
                   <SelectTrigger className="bg-white">
@@ -318,17 +332,14 @@ export default function RNCPage() {
                   size="icon"
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="shrink-0"
                 >
                   <QrCode className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-
-            {/* Seleção de Produto */}
             <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Produto</h2>
-              <Select value={produto} onValueChange={setProduto}>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Produto</Label>
+              <Select value={produto} onValueChange={setProduto} disabled={!marca}>
                 <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Selecione o produto" />
                 </SelectTrigger>
@@ -343,162 +354,167 @@ export default function RNCPage() {
             </div>
           </div>
 
-          {/* Demais campos em uma coluna */}
-          <div className="space-y-6">
-            {/* Motivo */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Motivo</h2>
-              <Select value={motivo} onValueChange={setMotivo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o motivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PRODUTO_VENCIDO">Produto Vencido</SelectItem>
-                  <SelectItem value="PRODUTO_AVARIADO">Produto Avariado</SelectItem>
-                  <SelectItem value="PRODUTO_INCORRETO">Produto Incorreto</SelectItem>
-                  <SelectItem value="QUANTIDADE_INCORRETA">Quantidade Incorreta</SelectItem>
-                  <SelectItem value="OUTRO">Outro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Motivo */}
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-1.5">Motivo</Label>
+            <Select value={motivo} onValueChange={setMotivo}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Selecione o motivo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PRODUTO_VENCIDO">Produto vencido</SelectItem>
+                <SelectItem value="PRODUTO_AVARIADO">
+                  Produto avariado no transporte (pote quebrado, produto amassado)
+                </SelectItem>
+                <SelectItem value="PROBLEMA_QUALIDADE">
+                  Produto com problemas de qualidade (corpo estranho, mofo, fora do padrão de qualidade, divergência de data entre nota fiscal e embalagem)
+                </SelectItem>
+                <SelectItem value="DEGUSTACAO">Produto para uso em degustação</SelectItem>
+                <SelectItem value="AUSENCIA_PRODUTOS">
+                  Ausência do produtos em caixa (diferença de peso e/ou falta de unidade)
+                </SelectItem>
+                <SelectItem value="DIVERGENCIA_COMERCIAL">
+                  Divergência comercial (divergência de preço faturado x preço negociado, divergência de pedido x faturado, quantidade faturada errada, item faturado sem pedido)
+                </SelectItem>
+                <SelectItem value="DATA_CURTA">Produto com data curta</SelectItem>
+                <SelectItem value="INVERSAO_PRODUTO">
+                  Inversão do produto (produto faturado é diferente do produto entregue)
+                </SelectItem>
+                <SelectItem value="TEMPERATURA">Temperatura</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Nota Fiscal */}
+          {/* Nota Fiscal e Valor */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Número da Nota Fiscal</h2>
-              <Input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={numeroNotaFiscal}
-                onChange={(e) => setNumeroNotaFiscal(e.target.value)}
-                placeholder="Digite o número da nota fiscal"
-              />
-            </div>
-
-            {/* Valor Total */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Valor Total</h2>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Número da Nota Fiscal</Label>
               <Input
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]*"
+                value={numeroNotaFiscal}
+                onChange={(e) => setNumeroNotaFiscal(e.target.value)}
+                placeholder="Digite o número da NF"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-1.5">Valor Total</Label>
+              <Input
+                type="text"
                 value={valorTotal}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '');
-                  if (value === '') {
-                    setValorTotal('');
-                    return;
+                  const value = e.target.value.replace(/[^\d,]/g, '');
+                  setValorTotal(value);
+                }}
+                onBlur={(e) => {
+                  if (e.target.value) {
+                    const num = parseFloat(e.target.value.replace(',', '.'));
+                    setValorTotal(formatCurrency(num));
                   }
-                  const numberValue = parseInt(value);
-                  const formattedValue = new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  }).format(numberValue / 100);
-                  setValorTotal(formattedValue);
                 }}
                 placeholder="R$ 0,00"
               />
             </div>
+          </div>
 
-            {/* Observações */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Observações</h2>
-              <Textarea
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Digite observações adicionais"
-              />
-            </div>
+          {/* Observações */}
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-1.5">Observações (opcional)</Label>
+            <Textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              className="min-h-[80px]"
+              placeholder="Observações adicionais"
+            />
+          </div>
 
-            {/* Upload de Fotos */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 mb-2">Fotos</h2>
-              <div className="border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 p-3 md:p-6 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-900/80">
-                <div className="flex flex-col items-center gap-2 md:gap-4">
-                  <div className="text-center space-y-2">
-                    <div className="text-gray-500 dark:text-gray-400">
-                      <ImageIcon className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-[10px] md:text-sm">Adicione suas imagens</p>
-                    </div>
-                    <div className="flex flex-col gap-2 w-full">
-                      <div className="w-full grid grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
-                        >
-                          <ImageIcon className="w-4 h-4" />
-                          Galeria
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleImageSelect}
-                          className="hidden"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={() => document.getElementById('camera-input')?.click()}
-                          className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
-                        >
-                          <Camera className="w-4 h-4" />
-                          Câmera
-                        </Button>
-                        <input
-                          id="camera-input"
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={handleImageSelect}
-                        />
-                      </div>
-                    </div>
+          {/* Upload de Fotos */}
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-1.5">Fotos</Label>
+            <div className="border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 p-4 transition-colors hover:bg-gray-50/80">
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-center space-y-2">
+                  <div className="text-gray-500">
+                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">Adicione suas imagens</p>
+                  </div>
+                  <div className="flex gap-2 w-full">
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Galeria
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById('camera-input')?.click()}
+                      className="w-full flex items-center justify-center gap-2"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Câmera
+                    </Button>
+                    <input
+                      id="camera-input"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
                   </div>
                 </div>
               </div>
-
-              {imagens.length > 0 && (
-                <div className="grid grid-cols-3 gap-1.5 md:gap-4 mt-4">
-                  {imagens.map((image, index) => (
-                    <div
-                      key={index}
-                      className="relative group aspect-square rounded-md overflow-hidden"
-                    >
-                      <img
-                        src={URL.createObjectURL(image)}
-                        alt={`Preview ${index}`}
-                        className="w-full h-full object-cover rounded-lg ring-1 ring-gray-200 dark:ring-gray-800"
-                      />
-                      <button
-                        onClick={() => handleDeleteImage(index)}
-                        className="absolute -top-1 -right-1 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-rose-600 hover:scale-110"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Botão Salvar */}
+            {imagens.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                {imagens.map((image, index) => (
+                  <div
+                    key={index}
+                    className="relative group aspect-square rounded-md overflow-hidden"
+                  >
+                    <img
+                      src={URL.createObjectURL(image)}
+                      alt={`Preview ${index}`}
+                      className="w-full h-full object-cover rounded-lg ring-1 ring-gray-200"
+                    />
+                    <button
+                      onClick={() => handleDeleteImage(index)}
+                      className="absolute -top-1 -right-1 bg-rose-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-rose-600 hover:scale-110"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botão de Enviar */}
+          <div className="pt-4">
             <Button
-              className="w-full"
               onClick={handleSubmit}
+              className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white"
               disabled={isLoading}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salvar RNC
+                  <Save className="w-4 h-4 mr-2" />
+                  Enviar
                 </>
               )}
             </Button>
@@ -506,35 +522,65 @@ export default function RNCPage() {
         </div>
       </div>
 
-      {/* Scanner Modal */}
-      {isScannerOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg w-full max-w-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Scanner de Código de Barras</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsScannerOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leitor de Código de Barras</DialogTitle>
+            <DialogDescription>
+              Posicione o código de barras no centro da câmera
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <div className="grid flex-1 gap-2">
+              <BarcodeScanner
+                onUpdate={(err, result) => {
+                  if (result) {
+                    handleBarcodeScan(result.getText());
+                  }
+                }}
+              />
             </div>
-            <BarcodeScanner onResult={handleBarcodeScan} />
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Confirm Modal */}
-      {isModalOpen && (
-        <ConfirmModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onConfirm={handleConfirmScan}
-          title="Produto Encontrado"
-          description={`Marca: ${scannedBrand}\nProduto: ${scannedProduct}`}
-        />
-      )}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar produto</DialogTitle>
+            <DialogDescription>
+              Produto encontrado com o código: {scannedBarcode}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Marca</Label>
+                <Input value={scannedBrand} disabled />
+              </div>
+              <div>
+                <Label>Produto</Label>
+                <Input value={scannedProduct} disabled />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-start">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmScan}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
