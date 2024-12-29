@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
 import BarcodeScanner from "components/barcode-scanner";
-import ConfirmModal from "components/confirm-modal";
+import { ConfirmModal } from "components/ConfirmModal";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "components/ui/dialog";
 
 interface Marca {
@@ -130,38 +130,6 @@ export default function RNCPage() {
     }
   }, [marca]);
 
-  const handleBarcodeScan = async (result: string) => {
-    setIsScannerOpen(false);
-    
-    try {
-      const { data: product, error } = await supabase
-        .from('produto')
-        .select('nome, marca')
-        .eq('codigo_ean', result)
-        .single();
-
-      if (error) throw error;
-      
-      if (product) {
-        setScannedBarcode(result);
-        setScannedBrand(product.marca.toUpperCase());
-        setScannedProduct(product.nome.toUpperCase());
-        setIsModalOpen(true);
-      } else {
-        toast.error("Produto não encontrado no sistema");
-      }
-    } catch (error) {
-      console.error('Erro ao processar código de barras:', error);
-      toast.error("Erro ao buscar produto. Tente novamente.");
-    }
-  };
-
-  const handleConfirmScan = () => {
-    setMarca(scannedBrand);
-    setProduto(scannedProduct);
-    setIsModalOpen(false);
-  };
-
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -255,6 +223,37 @@ export default function RNCPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBarcodeScan = async (barcode: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('produto')
+        .select('*')
+        .eq('codigo_barras', barcode);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.error('Nenhum produto encontrado com este código de barras');
+        return;
+      }
+
+      const produto = data[0];
+      setScannedBarcode(barcode);
+      setScannedBrand(produto.marca);
+      setScannedProduct(produto.nome);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error('Erro ao ler código de barras:', error);
+      toast.error('Erro ao ler código de barras');
+    }
+  };
+
+  const handleConfirmScan = async () => {
+    setMarca(scannedBrand);
+    setProduto(scannedProduct);
+    setIsModalOpen(false);
   };
 
   return (
@@ -393,7 +392,9 @@ export default function RNCPage() {
                 type="text"
                 value={numeroNotaFiscal}
                 onChange={(e) => setNumeroNotaFiscal(e.target.value)}
-                placeholder="Digite o número da NF"
+                className="pl-10"
+                placeholder="Digite o número da nota fiscal"
+                inputMode="numeric"
               />
             </div>
             <div>
@@ -401,17 +402,10 @@ export default function RNCPage() {
               <Input
                 type="text"
                 value={valorTotal}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^\d,]/g, '');
-                  setValorTotal(value);
-                }}
-                onBlur={(e) => {
-                  if (e.target.value) {
-                    const num = parseFloat(e.target.value.replace(',', '.'));
-                    setValorTotal(formatCurrency(num));
-                  }
-                }}
-                placeholder="R$ 0,00"
+                onChange={(e) => setValorTotal(e.target.value)}
+                className="pl-10"
+                placeholder="Digite o valor total"
+                inputMode="numeric"
               />
             </div>
           </div>
@@ -521,66 +515,19 @@ export default function RNCPage() {
           </div>
         </div>
       </div>
-
-      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leitor de Código de Barras</DialogTitle>
-            <DialogDescription>
-              Posicione o código de barras no centro da câmera
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-x-2">
-            <div className="grid flex-1 gap-2">
-              <BarcodeScanner
-                onUpdate={(err, result) => {
-                  if (result) {
-                    handleBarcodeScan(result.getText());
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirmar produto</DialogTitle>
-            <DialogDescription>
-              Produto encontrado com o código: {scannedBarcode}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Marca</Label>
-                <Input value={scannedBrand} disabled />
-              </div>
-              <div>
-                <Label>Produto</Label>
-                <Input value={scannedProduct} disabled />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="sm:justify-start">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmScan}
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmScan}
+        barcode={scannedBarcode}
+        brand={scannedBrand}
+        product={scannedProduct}
+      />
     </div>
   );
 }
