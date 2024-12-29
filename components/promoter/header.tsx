@@ -50,7 +50,7 @@ const menuItems = [
   {
     icon: AlertTriangle,
     label: "RNC",
-    href: "/promotor/rnc",
+    href: "/promotor/pdv/rnc",
   },
 ];
 

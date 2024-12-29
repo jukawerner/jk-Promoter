@@ -127,9 +127,12 @@ export default function RNCPage() {
 
   useEffect(() => {
     if (selectedMarca) {
+      form.setValue("produto", ""); // Limpa o produto selecionado
       carregarProdutos(selectedMarca);
+    } else {
+      setProdutos([]); // Limpa a lista de produtos se não houver marca selecionada
     }
-  }, [selectedMarca]);
+  }, [selectedMarca, form]);
 
   const carregarProdutos = async (marcaNome: string) => {
     try {
@@ -143,7 +146,6 @@ export default function RNCPage() {
 
       if (!data || data.length === 0) {
         toast.error('Nenhum produto encontrado para esta marca');
-        return;
       }
 
       const formattedData = data?.map(item => ({
@@ -151,7 +153,6 @@ export default function RNCPage() {
         nome: item.nome.toUpperCase(),
         marca: item.marca.toUpperCase()
       }));
-
       setProdutos(formattedData || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
@@ -191,7 +192,7 @@ export default function RNCPage() {
     try {
       const { data: product, error } = await supabase
         .from('produto')
-        .select('nome, marca')
+        .select('id, nome, marca')
         .eq('codigo_ean', result)
         .single();
 
@@ -199,27 +200,22 @@ export default function RNCPage() {
       
       if (product) {
         setScannedBarcode(result);
-        setScannedBrand(product.marca.toUpperCase());
-        setScannedProduct(product.nome.toUpperCase());
-        setIsModalOpen(true);
+        setScannedBrand(product.marca);
+        form.setValue("marca", product.marca);
+        await carregarProdutos(product.marca);
+        form.setValue("produto", product.id);
+        setScannedProduct(product.nome);
       } else {
-        toast.error("Produto não encontrado no sistema");
+        toast.error("Produto não encontrado");
       }
     } catch (error) {
       console.error('Erro ao processar código de barras:', error);
-      toast.error("Erro ao buscar produto. Tente novamente.");
+      toast.error('Erro ao processar código de barras');
     }
   };
 
   const handleConfirmScan = () => {
-    // Primeiro setamos a marca
-    form.setValue("marca", scannedBrand);
-    
-    // Esperamos os produtos carregarem
-    setTimeout(() => {
-      form.setValue("produto", scannedProduct);
-      setIsModalOpen(false);
-    }, 500);
+    setIsModalOpen(false);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,9 +423,9 @@ export default function RNCPage() {
                             </SelectContent>
                           </Select>
                           <Button
-                            variant="outline"
-                            size="icon"
                             type="button"
+                            variant="outline"
+                            className="h-9 w-9 p-0"
                             onClick={() => setIsScannerOpen(true)}
                           >
                             <QrCode className="h-4 w-4" />
@@ -448,18 +444,23 @@ export default function RNCPage() {
                         <FormLabel className="text-sm font-medium">Produto</FormLabel>
                         <Select
                           onValueChange={(value) => {
-                            field.onChange(value);
+                            const selectedProduct = produtos.find(p => p.id === value);
+                            if (selectedProduct) {
+                              field.onChange(String(value));
+                            }
                           }}
                           value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Selecione o produto" />
+                              <SelectValue>
+                                {produtos.find(p => p.id === field.value)?.nome || "Selecione o produto"}
+                              </SelectValue>
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {produtos.map((produto) => (
-                              <SelectItem key={produto.id} value={produto.nome}>
+                              <SelectItem key={produto.id} value={produto.id}>
                                 {produto.nome}
                               </SelectItem>
                             ))}
@@ -584,7 +585,7 @@ export default function RNCPage() {
                             <Button
                               variant="outline"
                               onClick={() => fileInputRef.current?.click()}
-                              className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm h-9"
+                              className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
                             >
                               <ImageIcon className="w-4 h-4" />
                               Galeria
@@ -600,7 +601,7 @@ export default function RNCPage() {
                             <Button
                               variant="outline"
                               onClick={() => document.getElementById('camera-input')?.click()}
-                              className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm h-9"
+                              className="w-full flex items-center justify-center gap-2 hover:border-rose-500 hover:text-rose-500 transition-colors text-sm"
                             >
                               <Camera className="w-4 h-4" />
                               Câmera
