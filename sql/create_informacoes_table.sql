@@ -1,0 +1,6 @@
+CREATE TABLE informacoes (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER REFERENCES usuario(id),
+    acao TEXT NOT NULL,
+    data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

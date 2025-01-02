@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { supabase } from "@/lib/supabase";
+import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
+import { supabase } from "lib/supabase/client";
 import { User } from "lucide-react";
 
 export function UserAvatar() {

@@ -120,14 +120,13 @@ export default function PontoVenda() {
 
       const { error: insertError } = await supabase
         .from('pdv')
-          .insert({
-            marca_id: marcaSelecionada.id,
-            marca: marcaSelecionada.nome.toUpperCase(),
-            ponto_extra_conquistado: pontoExtra,
-            fotos: uploadedUrls,
-            rede: rede.toUpperCase(),
-            loja: loja.toUpperCase()
-          });
+        .insert({
+          marca: marcaSelecionada.nome.toUpperCase(),
+          ponto_extra_conquistado: pontoExtra,
+          fotos: uploadedUrls,
+          rede: rede.toUpperCase(),
+          loja: loja.toUpperCase()
+        });
 
       if (insertError) {
         console.error('Erro ao salvar no banco:', insertError);

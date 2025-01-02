@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Home,
   ClipboardList,
   Search,
   ShoppingCart,
@@ -24,6 +25,11 @@ import { toast } from "sonner";
 export function Sidebar() {
   const router = useRouter();
   const menuItems = [
+    {
+      icon: <Home className="h-5 w-5" />,
+      title: "Admin",
+      href: "/admin",
+    },
     {
       icon: <ClipboardList className="h-5 w-5" />,
       title: "Cadastros",
