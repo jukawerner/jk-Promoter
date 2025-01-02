@@ -1,192 +1,38 @@
-import { supabase } from '@/lib/supabase';
-import { Store, StoreFormData, StoreImportData } from '@/types/store';
+import { supabase } from "lib/supabase/client";
 
-export async function getLojas(): Promise<Store[]> {
-  const { data, error } = await supabase
-    .from("loja")
-    .select(`
-      *,
-      promotor:promotor_id (
-        id,
-        nome,
-        apelido,
-        avatar_url
-      ),
-      rede:rede_id (
-        id,
-        nome
-      )
-    `)
-    .order("nome");
+export async function getLojasPorMarca() {
+  const { data: lojas, error } = await supabase
+    .from("lojas")
+    .select("id, nome, marca, preenchida");
 
   if (error) {
-    console.error('Erro ao buscar lojas:', error);
-    throw error;
+    console.error("Erro ao buscar lojas:", error);
+    return [];
   }
 
-  return data || [];
-}
+  // Agrupar lojas por marca
+  const lojasPorMarca = lojas.reduce<Record<string, { total: number; preenchidas: number }>>((acc, loja) => {
+    if (!loja?.marca) return acc;
+    
+    if (!acc[loja.marca]) {
+      acc[loja.marca] = {
+        total: 0,
+        preenchidas: 0
+      };
+    }
+    
+    acc[loja.marca]!.total++;
+    if (loja.preenchida) {
+      acc[loja.marca]!.preenchidas++;
+    }
 
-export async function createLoja(data: StoreFormData): Promise<Store> {
-  console.log('Dados recebidos em createLoja:', data);
-  
-  // Garantir que os dados estão no formato correto
-  const lojaData = {
-    nome: data.nome,
-    cnpj: data.cnpj,
-    endereco: data.endereco,
-    cep: data.cep,
-    rede_id: Number(data.rede_id),
-    promotor_id: data.promotor_id === null ? null : Number(data.promotor_id),
-    latitude: Number(data.latitude),
-    longitude: Number(data.longitude),
-  };
+    return acc;
+  }, {});
 
-  console.log('Dados formatados para inserção:', lojaData);
-
-  const { data: loja, error } = await supabase
-    .from("loja")
-    .insert([lojaData])
-    .select(`
-      *,
-      promotor:promotor_id (
-        id,
-        nome,
-        apelido,
-        avatar_url
-      ),
-      rede:rede_id (
-        id,
-        nome
-      )
-    `)
-    .single();
-
-  if (error) {
-    console.error('Erro ao criar loja:', error);
-    throw error;
-  }
-
-  if (!loja) {
-    throw new Error('Loja não foi criada - nenhum dado retornado');
-  }
-
-  return loja;
-}
-
-export async function updateLoja(id: number, data: StoreFormData): Promise<Store | null> {
-  const { data: loja, error } = await supabase
-    .from("loja")
-    .update(data)
-    .eq('id', id)
-    .select(`
-      *,
-      promotor:promotor_id (
-        id,
-        nome,
-        apelido,
-        avatar_url
-      ),
-      rede:rede_id (
-        id,
-        nome
-      )
-    `)
-    .single();
-
-  if (error) {
-    console.error('Erro ao atualizar loja:', error);
-    throw error;
-  }
-
-  if (!loja) {
-    throw new Error('Loja não foi atualizada - nenhum dado retornado');
-  }
-
-  return loja;
-}
-
-export async function deleteLoja(id: number): Promise<void> {
-  console.log('Iniciando exclusão da loja no Supabase, ID:', id);
-  
-  const { error } = await supabase
-    .from("loja")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error('Erro detalhado ao deletar loja no Supabase:', error);
-    throw error;
-  }
-  
-  console.log('Loja excluída com sucesso do Supabase');
-}
-
-export async function getRedes(): Promise<{ id: number; nome: string; }[]> {
-  const { data, error } = await supabase
-    .from("rede")
-    .select("id, nome")
-    .order("nome");
-
-  if (error) {
-    console.error('Erro ao buscar redes:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-export async function getPromotores(): Promise<{ id: number; nome: string; apelido: string; }[]> {
-  const { data, error } = await supabase
-    .from("usuario")
-    .select("id, nome, apelido")
-    .order("nome");
-
-  if (error) {
-    console.error('Erro ao buscar promotores:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-export async function importLojas(lojas: StoreImportData[]): Promise<Store[]> {
-  console.log('Iniciando importação de lojas:', lojas);
-  
-  const { data, error } = await supabase
-    .from("loja")
-    .insert(lojas.map(loja => ({
-      nome: String(loja.nome).trim().toUpperCase(),
-      cnpj: loja.cnpj,
-      endereco: String(loja.endereco).trim().toUpperCase(),
-      numero: "S/N",  // Valor padrão
-      bairro: "NÃO INFORMADO",  // Valor padrão
-      cidade: "NÃO INFORMADO",  // Valor padrão
-      uf: "SC",  // Valor padrão
-      cep: loja.cep.replace(/\D/g, ''),
-      rede_id: Number(loja.rede_id),
-      promotor_id: loja.promotor_id, // Não converter para número pois é UUID
-      latitude: Number(loja.latitude) || -23.5505,
-      longitude: Number(loja.longitude) || -46.6333,
-    })))
-    .select(`
-      *,
-      promotor:promotor_id (
-        id,
-        nome,
-        apelido
-      ),
-      rede:rede_id (
-        id,
-        nome
-      )
-    `);
-
-  if (error) {
-    console.error('Erro ao importar lojas:', error);
-    throw new Error(`Erro ao importar lojas: ${error.message}`);
-  }
-
-  console.log('Lojas importadas com sucesso:', data);
-  return data || [];
+  // Transformar em array para o gráfico
+  return Object.entries(lojasPorMarca).map(([marca, dados]) => ({
+    marca,
+    total: dados?.total || 0,
+    preenchidas: dados?.preenchidas || 0
+  }));
 }

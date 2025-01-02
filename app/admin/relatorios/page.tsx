@@ -83,6 +83,21 @@ export default function RelatoriosPage() {
             </div>
           </div>
         </Link>
+
+        <Link 
+          href="/admin/relatorios/lojas-marcas"
+          className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500 text-white rounded-lg">
+              <Store className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Lojas por Marca</h2>
+              <p className="text-gray-600">Distribuição de lojas por marca</p>
+            </div>
+          </div>
+        </Link>
       </div>
     </div>
   );

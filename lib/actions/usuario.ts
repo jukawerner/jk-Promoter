@@ -3,10 +3,11 @@ import { supabase } from 'lib/supabase/client';
 export async function getTotalUsuarios(): Promise<number> {
   const { count, error } = await supabase
     .from('usuario')
-    .select('*', { count: 'exact', head: true });
+    .select('*', { count: 'exact', head: true })
+    .eq('tipo', 'promotor');
 
   if (error) {
-    console.error('Erro ao buscar total de usuários:', error);
+    console.error('Erro ao buscar total de promotores:', error);
     throw error;
   }
 

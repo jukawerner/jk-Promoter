@@ -1,144 +1,227 @@
 "use client";
 
-import { motion } from "framer-motion";
+import Link from "next/link";
+import { Calendar, DollarSign, AlertTriangle } from "lucide-react";
+import { Chart } from "components/ui/chart"; // Corrigindo a importação para usar a exportação nomeada
 import { useEffect, useState } from "react";
-import { getUsuarios, getUserActivity, Usuario, getTotalUsuarios, getTotalUsuariosAtivos } from "lib/actions/usuario";
+import { supabase } from "lib/supabase";
+
+interface EstoqueData {
+  marca: string;
+  estoque_fisico: number;
+  estoque_virtual: number;
+}
+
+interface DataCurta {
+  marca: string;
+  quantidade: number;
+}
 
 export default function AdminPage() {
-  const [totalUsuarios, setTotalUsuarios] = useState(0);
-  const [totalUsuariosAtivos, setTotalUsuariosAtivos] = useState(0);
-  const [usuariosAtivos, setUsuariosAtivos] = useState<Usuario[]>([]);
-  const [usuariosMenosAtivos, setUsuariosMenosAtivos] = useState<Usuario[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [estoqueData, setEstoqueData] = useState<EstoqueData[]>([]);
+  const [dataCurta, setDataCurta] = useState<DataCurta[]>([]);
+  const [pdvData, setPdvData] = useState<{marca: string, fotos: number}[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log("Buscando dados do dashboard...");
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const [total, ativos] = await Promise.all([
-          getTotalUsuarios(),
-          getTotalUsuariosAtivos()
-        ]);
-        setTotalUsuarios(total);
-        setTotalUsuariosAtivos(ativos);
+      const { data, error } = await supabase
+        .from("estoque")
+        .select("marca, estoque_fisico, estoque_virtual")
+        .order("marca");
 
-        const userActivity = await getUserActivity();
-        setUsuariosAtivos(userActivity.slice(0, 5)); // Top 5 mais ativos
-        setUsuariosMenosAtivos(userActivity.slice(-5).reverse()); // Top 5 menos ativos
-      } catch (error) {
-        console.error("Erro ao buscar dados do dashboard:", error);
-        setError("Erro ao carregar dados do dashboard. Tente novamente mais tarde.");
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error("Erro ao buscar dados:", error);
+      } else if (data) {
+        // Agrupa os estoques por marca
+        const groupedData = data.reduce((acc: Record<string, {fisico: number, virtual: number}>, item) => {
+          if (item.marca) {
+            const current = acc[item.marca] || { fisico: 0, virtual: 0 };
+            const fisico = typeof item.estoque_fisico === 'number' ? item.estoque_fisico : 0;
+            const virtual = typeof item.estoque_virtual === 'number' ? item.estoque_virtual : 0;
+            
+            acc[item.marca] = {
+              fisico: current.fisico + fisico,
+              virtual: current.virtual + virtual
+            };
+          }
+          return acc;
+        }, {} as Record<string, {fisico: number, virtual: number}>);
+
+        // Converte o objeto agrupado em array
+        const formattedData = Object.entries(groupedData).map(([marca, estoques]) => ({
+          marca,
+          estoque_fisico: estoques.fisico,
+          estoque_virtual: estoques.virtual
+        }));
+
+        setEstoqueData(formattedData);
       }
     };
 
+    const fetchDataCurta = async () => {
+      const { data, error } = await supabase
+        .from("data_curta")
+        .select("marca, quantidade")
+        .order("marca");
+
+      if (error) {
+        console.error("Erro ao buscar dados de data curta:", error);
+      } else if (data) {
+        // Agrupa as quantidades por marca
+        const groupedData = data.reduce((acc: Record<string, number>, item) => {
+          acc[item.marca] = (acc[item.marca] || 0) + item.quantidade;
+          return acc;
+        }, {});
+
+        // Converte o objeto agrupado em array
+        const formattedData = Object.entries(groupedData).map(([marca, quantidade]) => ({
+          marca,
+          quantidade
+        }));
+
+        setDataCurta(formattedData);
+      }
+    };
+
+    const fetchPdvData = async () => {
+      console.log("Iniciando busca de dados PDV...");
+      const { data, error } = await supabase
+        .from("pdv")
+        .select("marca, fotos")
+        .order("marca");
+
+      if (error) {
+        console.error("Erro ao buscar dados de PDV:", error);
+        return;
+      }
+
+      console.log("Dados brutos retornados:", data);
+      
+      if (!data || data.length === 0) {
+        console.warn("Nenhum dado encontrado na tabela PDV");
+        return;
+      }
+
+      // Conta as fotos por marca
+      const countByMarca = data.reduce((acc: Record<string, number>, item: { marca: string, fotos: string[] }) => {
+        if (item.marca && item.fotos) {
+          const numFotos = Array.isArray(item.fotos) ? item.fotos.length : 0;
+          acc[item.marca] = (acc[item.marca] || 0) + numFotos;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const formattedData = Object.entries(countByMarca).map(([marca, count]) => ({
+        marca,
+        fotos: count
+      }));
+
+      console.log("Dados formatados para o gráfico:", formattedData);
+      console.log("Labels:", formattedData.map(item => item.marca));
+      console.log("Valores:", formattedData.map(item => item.fotos));
+      setPdvData(formattedData);
+    };
+
     fetchData();
+    fetchDataCurta();
+    fetchPdvData();
   }, []);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-7xl mx-auto p-6"
-    >
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <p className="text-gray-700">Carregando dados do dashboard...</p>
-          </div>
-        </div>
-      )}
-      
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-          {error}
-          <p className="mt-2 text-sm">
-            Se o problema persistir, verifique:
-            <ul className="list-disc list-inside ml-4">
-              <li>Se a tabela 'informacoes' existe e está populada</li>
-              <li>Se a tabela 'usuario' existe e está populada</li>
-              <li>Se o relacionamento entre as tabelas está configurado corretamente</li>
-              <li>Se as permissões de acesso ao banco de dados estão configuradas</li>
-              <li>Se as tabelas possuem as colunas necessárias</li>
-            </ul>
-            <p className="mt-2">
-              Para mais detalhes, consulte o console do navegador (F12) e verifique os logs de erro.
-            </p>
-          </p>
-        </div>
-      )}
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">
-        Painel do Administrador
-      </h1>
+    <div className="container mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-8">Administração</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Usuários Totais vs Ativos */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Usuários</h2>
-          <div className="space-y-2">
-            {totalUsuarios > 0 ? (
-              <>
-                <p className="text-gray-600">
-                  Total: <span className="font-medium">{totalUsuarios}</span>
-                </p>
-                <p className="text-gray-600">
-                  Ativos hoje: <span className="font-medium">{totalUsuariosAtivos}</span>
-                </p>
-                {usuariosAtivos.length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    Nenhuma atividade registrada hoje
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-gray-500">Nenhum usuário cadastrado</p>
-            )}
+        {/* Gráficos de Análise Rápida */}
+        <div className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+          <h2 className="text-xl font-semibold">Relatório de Estoque</h2>
+          <Chart 
+            type="bar" 
+            data={{
+              labels: estoqueData.map(item => item.marca),
+              datasets: [
+                {
+                  label: 'Estoque Físico',
+                  data: estoqueData.map(item => item.estoque_fisico),
+                  backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                  borderColor: 'rgba(54, 162, 235, 1)',
+                  borderWidth: 1,
+                },
+                {
+                  label: 'Estoque Virtual',
+                  data: estoqueData.map(item => item.estoque_virtual),
+                  backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                  borderColor: 'rgba(255, 99, 132, 1)',
+                  borderWidth: 1,
+                },
+              ],
+            }} 
+            options={{ responsive: true }} 
+          />
+          <div className="flex justify-center mt-4">
+            <Link 
+              href="/admin/relatorios/estoque"
+              className="bg-blue-500 text-white py-2 px-4 rounded"
+            >
+              Ver Detalhes
+            </Link>
           </div>
         </div>
 
-        {/* Top 5 Usuários com Mais Interação */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Top 5 Mais Ativos</h2>
-          <div className="space-y-2">
-            {usuariosAtivos.length > 0 ? (
-              usuariosAtivos.map((usuario, index) => (
-                <div key={usuario.id} className="flex items-center justify-between">
-                  <p className="text-gray-600">
-                    {index + 1}. {usuario.nome}
-                  </p>
-                  <span className="text-sm text-gray-500">{usuario.interacoes} interações</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500">Nenhum usuário ativo encontrado</p>
-            )}
+        <div className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+          <h2 className="text-xl font-semibold">Data Curta</h2>
+          <Chart 
+            type="bar" 
+            data={{
+              labels: dataCurta.map(item => item.marca),
+              datasets: [{
+                label: 'Quantidade',
+                data: dataCurta.map(item => item.quantidade),
+                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1,
+              }]
+            }} 
+            options={{ responsive: true }} 
+          />
+          <div className="flex justify-center mt-4">
+            <Link 
+              href="/admin/relatorios/data-curta"
+              className="bg-blue-500 text-white py-2 px-4 rounded"
+            >
+              Ver Detalhes
+            </Link>
           </div>
         </div>
 
-        {/* Top 5 Usuários com Menos Interação */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Top 5 Menos Ativos</h2>
-          <div className="space-y-2">
-            {usuariosMenosAtivos.length > 0 ? (
-              usuariosMenosAtivos.map((usuario, index) => (
-                <div key={usuario.id} className="flex items-center justify-between">
-                  <p className="text-gray-600">
-                    {index + 1}. {usuario.nome}
-                  </p>
-                  <span className="text-sm text-gray-500">{usuario.interacoes} interações</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500">Nenhum usuário menos ativo encontrado</p>
-            )}
+        <div className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+          <h2 className="text-xl font-semibold">Fotos por Marca</h2>
+          <Chart 
+            type="bar" 
+            data={{
+              labels: pdvData.map(item => item.marca),
+              datasets: [{
+                label: 'Fotos',
+                data: pdvData.map(item => item.fotos),
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+              }]
+            }} 
+            options={{ responsive: true }} 
+          />
+          <div className="flex justify-center mt-4">
+            <Link 
+              href="/admin/relatorios/pdv"
+              className="bg-blue-500 text-white py-2 px-4 rounded"
+            >
+              Ver Detalhes
+            </Link>
           </div>
         </div>
+
+        {/* Outros links de relatórios... */}
       </div>
-    </motion.div>
+    </div>
   );
 }
