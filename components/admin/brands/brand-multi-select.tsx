@@ -33,43 +33,33 @@ export function BrandMultiSelect({ value = [], onChange, promoterId, readOnly = 
         const supabase = createClient();
         console.log('Buscando marcas...');
         
-        let query;
-        
+        // Sempre busca todas as marcas disponíveis
+        const { data: allBrands, error: brandsError } = await supabase
+          .from('marca')
+          .select('id, nome')
+          .order('nome');
+
+        if (brandsError) throw brandsError;
+
+        // Se for readOnly e tiver promoterId, filtra apenas as marcas vinculadas
         if (readOnly && promoterId) {
-          // Se for somente leitura e tiver promoterId, busca apenas as marcas vinculadas
-          const { data, error } = await supabase
+          const { data: promoterBrands, error: promoterError } = await supabase
             .from('promoter_marca')
-            .select(`
-              marca:marca_id (
-                id,
-                nome
-              )
-            `)
+            .select('marca_id')
             .eq('promoter_id', promoterId);
 
-          if (error) throw error;
-          
-          // Transforma os dados para o formato esperado
-          const brandsData = data
-            .map(item => item.marca)
-            .filter(brand => brand !== null);
-            
-          setBrands(brandsData);
+          if (promoterError) throw promoterError;
+
+          const promoterBrandIds = promoterBrands.map(pb => pb.marca_id);
+          setBrands(allBrands.filter(brand => promoterBrandIds.includes(brand.id)));
         } else {
-          // Caso contrário, busca todas as marcas
-          const { data, error } = await supabase
-            .from('marca')
-            .select('id, nome')
-            .order('nome');
-
-          if (error) throw error;
-          setBrands(data || []);
+          setBrands(allBrands || []);
         }
-
       } catch (error) {
         console.error("Erro ao buscar marcas:", error);
         setError("Erro ao carregar as marcas. Por favor, tente novamente.");
         toast.error("Erro ao carregar as marcas");
+        setBrands([]); // Garante que brands seja um array vazio em caso de erro
       } finally {
         setIsLoading(false);
       }
@@ -99,24 +89,24 @@ export function BrandMultiSelect({ value = [], onChange, promoterId, readOnly = 
 
   if (error) {
     return (
-      <div className="p-4 text-red-500 text-center">
+      <div className="text-red-500 p-4 text-center">
         {error}
       </div>
     );
   }
 
-  if (brands.length === 0) {
+  if (!brands.length) {
     return (
-      <div className="p-4 text-gray-500 text-center">
-        Nenhuma marca encontrada
+      <div className="text-gray-500 p-4 text-center">
+        Nenhuma marca disponível.
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 p-2 border rounded-md">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       {brands.map((brand) => (
-        <div key={brand.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50">
+        <div key={brand.id} className="flex items-center space-x-2">
           <Checkbox
             id={`brand-${brand.id}`}
             checked={value.includes(brand.id)}

@@ -36,7 +36,6 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.avatar_url || "");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
-  const [selectedBrands, setSelectedBrands] = useState<number[]>(initialData?.marcas || []);
 
   const {
     register,
@@ -47,20 +46,22 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof promoterSchema>>({
     resolver: zodResolver(promoterSchema),
-    defaultValues: initialData,
+    defaultValues: {
+      ...initialData,
+      marcas: initialData?.marcas || [],
+    },
   });
 
   useEffect(() => {
     if (initialData) {
       console.log('Dados iniciais recebidos:', initialData);
-      reset(initialData);
+      reset({
+        ...initialData,
+        marcas: initialData.marcas || [],
+      });
       setAvatarUrl(initialData.avatar_url || "");
-      if (initialData.marcas) {
-        setSelectedBrands(initialData.marcas);
-        setValue('marcas', initialData.marcas);
-      }
     }
-  }, [initialData, reset, setValue]);
+  }, [initialData, reset]);
 
   useEffect(() => {
     if (initialData?.id) {
@@ -79,7 +80,6 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
 
         if (marcas) {
           const marcaIds = marcas.map(m => m.marca_id);
-          setSelectedBrands(marcaIds);
           setValue('marcas', marcaIds);
         }
       };
@@ -144,60 +144,23 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
     }
   };
 
+  const handleBrandChange = (brands: number[]) => {
+    setValue('marcas', brands, { shouldValidate: true });
+  };
+
   const onSubmit = async (data: z.infer<typeof promoterSchema>) => {
     try {
-      // Primeiro, salva os dados do promotor
-      const promoterData = await onSave({
+      await onSave({
         ...data,
         avatarFile,
         avatarUrl,
-        endereco: data.endereco,
-        marcas: selectedBrands // Enviando as marcas selecionadas
       });
 
-      // Se o promotor foi salvo com sucesso
-      if (promoterData?.id) {
-        const supabase = createClient();
-        console.log('Salvando marcas para o promoter:', promoterData.id);
-        console.log('Marcas selecionadas:', selectedBrands);
-        
-        // Remove relacionamentos antigos
-        const { error: deleteError } = await supabase
-          .from('promoter_marca')
-          .delete()
-          .eq('promoter_id', promoterData.id);
-
-        if (deleteError) {
-          console.error('Erro ao remover marcas antigas:', deleteError);
-          throw deleteError;
-        }
-
-        // Se houver marcas selecionadas, insere os novos relacionamentos
-        if (selectedBrands.length > 0) {
-          const relationshipData = selectedBrands.map(marcaId => ({
-            promoter_id: promoterData.id,
-            marca_id: marcaId
-          }));
-
-          console.log('Inserindo novas marcas:', relationshipData);
-
-          const { error: insertError } = await supabase
-            .from('promoter_marca')
-            .insert(relationshipData);
-
-          if (insertError) {
-            console.error('Erro ao inserir novas marcas:', insertError);
-            throw insertError;
-          }
-        }
-
-        toast.success("Usuário e marcas salvos com sucesso!");
-      }
-
+      toast.success("Usuário salvo com sucesso!");
       onCancel();
     } catch (error) {
-      console.error("Erro ao salvar usuário ou marcas:", error);
-      toast.error("Erro ao salvar usuário ou marcas");
+      console.error("Erro ao salvar usuário:", error);
+      toast.error("Erro ao salvar usuário");
     }
   };
 
@@ -290,8 +253,8 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
             <div className="space-y-2">
               <Label>Marcas</Label>
               <BrandMultiSelect
-                value={selectedBrands}
-                onChange={setSelectedBrands}
+                value={watch('marcas')}
+                onChange={handleBrandChange}
                 promoterId={initialData?.id}
                 readOnly={false}
               />

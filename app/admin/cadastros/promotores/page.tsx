@@ -65,7 +65,8 @@ export default function CadastroPromotor() {
         endereco: data.endereco,
         cep: data.cep,
         tipo: data.tipo,
-        avatar_url
+        avatar_url,
+        marcas: data.marcas // Incluindo as marcas aqui
       };
       
       console.log('Dados para salvar:', userData);

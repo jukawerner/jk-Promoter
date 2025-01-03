@@ -172,10 +172,13 @@ export async function getUsuarios(): Promise<Usuario[]> {
   }
 }
 
-export async function createUsuario(data: CreateUsuarioInput): Promise<Usuario> {
+export async function createUsuario(data: CreateUsuarioInput & { marcas?: number[] }): Promise<Usuario> {
+  const { marcas, ...userData } = data;
+  
+  // Primeiro cria o usuário
   const { data: newUser, error } = await supabase
     .from('usuario')
-    .insert([data])
+    .insert([userData])
     .select()
     .single();
 
@@ -184,13 +187,35 @@ export async function createUsuario(data: CreateUsuarioInput): Promise<Usuario> 
     throw error;
   }
 
-  return newUser;
+  // Se houver marcas, cria os relacionamentos
+  if (marcas && marcas.length > 0) {
+    const relationshipData = marcas.map(marcaId => ({
+      promoter_id: newUser.id,
+      marca_id: marcaId
+    }));
+
+    const { error: marcasError } = await supabase
+      .from('promoter_marca')
+      .insert(relationshipData);
+
+    if (marcasError) {
+      console.error('Erro ao inserir marcas:', marcasError);
+      // Se falhar ao inserir as marcas, exclui o usuário criado
+      await supabase.from('usuario').delete().eq('id', newUser.id);
+      throw marcasError;
+    }
+  }
+
+  return { ...newUser, marcas: marcas || [] };
 }
 
-export async function updateUsuario(id: number, data: Partial<CreateUsuarioInput>): Promise<Usuario> {
+export async function updateUsuario(id: number, data: Partial<CreateUsuarioInput> & { marcas?: number[] }): Promise<Usuario> {
+  const { marcas, ...userData } = data;
+  
+  // Atualiza o usuário
   const { data: usuario, error } = await supabase
     .from('usuario')
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update({ ...userData, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single();
@@ -200,7 +225,30 @@ export async function updateUsuario(id: number, data: Partial<CreateUsuarioInput
     throw error;
   }
 
-  return usuario;
+  // Atualiza as marcas se foram fornecidas
+  if (marcas !== undefined) {
+    // Remove todas as marcas existentes
+    const { error: deleteError } = await supabase
+      .from('promoter_marca')
+      .delete()
+      .eq('promoter_id', id);
+
+    if (deleteError) throw deleteError;
+
+    // Insere as novas marcas se houver alguma
+    if (marcas && marcas.length > 0) {
+      const { error: insertError } = await supabase
+        .from('promoter_marca')
+        .insert(marcas.map(marca_id => ({
+          promoter_id: id,
+          marca_id
+        })));
+
+      if (insertError) throw insertError;
+    }
+  }
+
+  return { ...usuario, marcas };
 }
 
 export async function deleteUsuario(id: number): Promise<void> {

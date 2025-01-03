@@ -30,6 +30,8 @@ const options = {
   gestureHandling: 'greedy' as const
 };
 
+const libraries: ("places")[] = ['places'];
+
 export function MapPicker({ address, onAddressChange, onCepChange, onLatChange, onLngChange }: MapPickerProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [marker, setMarker] = useState<google.maps.Marker | null>(null);
@@ -37,7 +39,7 @@ export function MapPicker({ address, onAddressChange, onCepChange, onLatChange, 
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places'],
+    libraries,
   });
 
   const updateAddressAndCep = useCallback(async (results: google.maps.GeocoderResult[]) => {
