@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -30,7 +30,6 @@ export function BrandMultiSelect({ value = [], onChange, promoterId, readOnly = 
       setError(null);
       
       try {
-        const supabase = createClient();
         console.log('Buscando marcas...');
         
         // Sempre busca todas as marcas disponíveis
@@ -104,7 +103,7 @@ export function BrandMultiSelect({ value = [], onChange, promoterId, readOnly = 
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="space-y-2">
       {brands.map((brand) => (
         <div key={brand.id} className="flex items-center space-x-2">
           <Checkbox
@@ -115,7 +114,7 @@ export function BrandMultiSelect({ value = [], onChange, promoterId, readOnly = 
           />
           <Label
             htmlFor={`brand-${brand.id}`}
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className={`cursor-pointer ${readOnly ? 'cursor-default' : ''}`}
           >
             {brand.nome}
           </Label>

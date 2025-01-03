@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
 import { supabase } from "lib/supabase/client";
 import { User } from "lucide-react";
+import { getCookie } from "@/lib/cookies";
 
 export function UserAvatar() {
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -12,7 +13,7 @@ export function UserAvatar() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const phone = localStorage.getItem("userPhone");
+        const phone = getCookie("userPhone");
         if (!phone) return;
 
         const { data, error } = await supabase
@@ -24,11 +25,11 @@ export function UserAvatar() {
         if (error) throw error;
 
         if (data) {
-          setUserName(data.nome);
+          setUserName(data.nome || "");
           setAvatarUrl(data.avatar_url || "");
         }
       } catch (error) {
-        console.error("Erro ao carregar dados do usuário:", error);
+        console.error("Error loading user data:", error);
       }
     };
 
@@ -36,11 +37,14 @@ export function UserAvatar() {
   }, []);
 
   return (
-    <Avatar className="h-10 w-10">
-      <AvatarImage src={avatarUrl} alt={userName} />
-      <AvatarFallback>
-        <User className="h-6 w-6 text-gray-400" />
-      </AvatarFallback>
+    <Avatar>
+      {avatarUrl ? (
+        <AvatarImage src={avatarUrl} alt={userName} />
+      ) : (
+        <AvatarFallback>
+          <User className="h-4 w-4" />
+        </AvatarFallback>
+      )}
     </Avatar>
   );
 }

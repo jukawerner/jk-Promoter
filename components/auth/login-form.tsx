@@ -33,14 +33,62 @@ export default function LoginForm() {
       // Remove todos os caracteres não numéricos do telefone
       const cleanPhone = phone.replace(/\D/g, '');
       
+      console.log('Tentando login com telefone:', cleanPhone);
+      
       const { data, error } = await supabase
         .from('usuario')
-        .select('tipo')
+        .select('tipo, id')
         .eq('telefone', cleanPhone)
         .single();
 
-      if (error) throw error;
-      return data?.tipo;
+      console.log('Resposta do banco:', data, error);
+
+      if (error) {
+        console.error('Erro ao buscar usuário:', error);
+        return null;
+      }
+      
+      if (!data) {
+        console.log('Usuário não encontrado');
+        return null;
+      }
+
+      console.log('Tipo do usuário:', data.tipo);
+      
+      // Se for admin, verifica as marcas
+      if (data.tipo === 'Admin') {
+        const { data: marcas } = await supabase
+          .from('promoter_marca')
+          .select('marca_id')
+          .eq('promoter_id', data.id);
+
+        const { data: totalMarcas } = await supabase
+          .from('marca')
+          .select('id', { count: 'exact' });
+
+        const isFullAdmin = !marcas || marcas.length === 0 || (totalMarcas && marcas.length === totalMarcas.length);
+        return { 
+          tipo: data.tipo, 
+          isFullAdmin, 
+          marcas: marcas?.map(m => m.marca_id) || [] 
+        };
+      }
+
+      // Se for promotor, retorna as informações básicas
+      if (data.tipo === 'Promotor') {
+        const { data: marcas } = await supabase
+          .from('promoter_marca')
+          .select('marca_id')
+          .eq('promoter_id', data.id);
+
+        return { 
+          tipo: 'Promotor', 
+          isFullAdmin: false, 
+          marcas: marcas?.map(m => m.marca_id) || [] 
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('Erro ao verificar tipo de usuário:', error);
       return null;
@@ -52,26 +100,42 @@ export default function LoginForm() {
       setIsLoading(true);
       
       const { phone } = data;
-      const userType = await checkUserType(phone);
+      const userInfo = await checkUserType(phone);
 
-      if (!userType) {
+      console.log('Informações do usuário:', userInfo);
+
+      if (!userInfo) {
         toast.error("Telefone não encontrado no sistema");
         return;
       }
 
-      // Salva o telefone no localStorage
+      // Salva o telefone e as marcas nos cookies e localStorage
       const cleanPhone = phone.replace(/\D/g, '');
+      document.cookie = `userPhone=${cleanPhone}; path=/`;
+      document.cookie = `userMarcas=${JSON.stringify(userInfo.marcas)}; path=/`;
       localStorage.setItem("userPhone", cleanPhone);
+      localStorage.setItem("userMarcas", JSON.stringify(userInfo.marcas));
 
-      if (userType?.toUpperCase() === 'ADMIN') {
+      console.log('Tipo do usuário para redirecionamento:', userInfo.tipo);
+
+      if (userInfo.tipo === 'Admin') {
         toast.success("Login realizado com sucesso! Redirecionando...");
-        router.push("/admin");
-      } else if (userType?.toUpperCase() === 'PROMOTOR') {
+        if (!userInfo.isFullAdmin) {
+          router.push("/admin/relatorios");
+        } else {
+          router.push("/admin");
+        }
+        return;
+      } 
+      
+      if (userInfo.tipo === 'Promotor') {
         toast.success("Login realizado com sucesso! Redirecionando...");
         router.push("/promotor");
-      } else {
-        toast.error("Tipo de usuário não reconhecido");
+        return;
       }
+
+      toast.error("Tipo de usuário não reconhecido");
+      
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       toast.error("Erro ao fazer login. Tente novamente.");

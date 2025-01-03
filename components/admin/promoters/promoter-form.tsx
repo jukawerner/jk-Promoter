@@ -13,7 +13,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { User, Loader2 } from "lucide-react";
 import { MapPicker } from "./map-picker";
 import { BrandMultiSelect } from "@/components/admin/brands/brand-multi-select";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 
 const promoterSchema = z.object({
   nome: z.string().min(2, "O nome deve ter pelo menos 2 caracteres"),
@@ -66,7 +66,6 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
   useEffect(() => {
     if (initialData?.id) {
       const loadPromoterMarcas = async () => {
-        const supabase = createClient();
         const { data: marcas, error } = await supabase
           .from('promoter_marca')
           .select('marca_id')
@@ -150,17 +149,96 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
 
   const onSubmit = async (data: z.infer<typeof promoterSchema>) => {
     try {
-      await onSave({
-        ...data,
-        avatarFile,
-        avatarUrl,
-      });
+      // Se tiver um arquivo de avatar, faz o upload
+      let avatar_url = initialData?.avatar_url || null;
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `avatars/${Date.now()}.${fileExt}`;
 
-      toast.success("Usuário salvo com sucesso!");
+        const { error: uploadError } = await supabase
+          .from('avatars')
+          .upload(filePath, avatarFile);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        // Gera URL pública do avatar
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        avatar_url = publicUrl;
+      }
+
+      const promoterData = {
+        nome: data.nome,
+        apelido: data.apelido,
+        email: data.email,
+        telefone: data.telefone,
+        cep: data.cep,
+        endereco: data.endereco,
+        tipo: data.tipo,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (initialData?.id) {
+        const { error: updateError } = await supabase
+          .from('usuario')
+          .update(promoterData)
+          .eq('id', initialData.id);
+
+        if (updateError) throw updateError;
+
+        // Atualiza as marcas vinculadas
+        const { error: deleteError } = await supabase
+          .from('promoter_marca')
+          .delete()
+          .eq('promoter_id', initialData.id);
+
+        if (deleteError) throw deleteError;
+
+        const marcasToInsert = data.marcas.map(marcaId => ({
+          promoter_id: initialData.id,
+          marca_id: marcaId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('promoter_marca')
+          .insert(marcasToInsert);
+
+        if (insertError) throw insertError;
+
+        toast.success('Promotor atualizado com sucesso!');
+      } else {
+        const { data: newPromoter, error: insertError } = await supabase
+          .from('usuario')
+          .insert(promoterData)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        const marcasToInsert = data.marcas.map(marcaId => ({
+          promoter_id: newPromoter.id,
+          marca_id: marcaId,
+        }));
+
+        const { error: marcasError } = await supabase
+          .from('promoter_marca')
+          .insert(marcasToInsert);
+
+        if (marcasError) throw marcasError;
+
+        toast.success('Promotor criado com sucesso!');
+      }
+
+      onSave(promoterData);
       onCancel();
     } catch (error) {
-      console.error("Erro ao salvar usuário:", error);
-      toast.error("Erro ao salvar usuário");
+      console.error('Erro ao salvar promotor:', error);
+      toast.error('Erro ao salvar promotor');
     }
   };
 

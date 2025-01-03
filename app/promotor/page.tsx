@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "components/ui/select";
-import { supabase } from "lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 interface Store {
@@ -37,39 +37,20 @@ export default function PromotorPage() {
   const [networks, setNetworks] = useState<string[]>([]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const phone = localStorage.getItem("userPhone");
-      if (!phone) {
-        toast.error("Usuário não está logado");
-        router.push("/");
-        return false;
-      }
-
-      const { data: userData, error: userError } = await supabase
-        .from("usuario")
-        .select("tipo")
-        .eq("telefone", phone)
-        .single();
-
-      if (userError || !userData || userData.tipo?.toUpperCase() !== "PROMOTOR") {
-        toast.error("Acesso não autorizado");
-        router.push("/");
-        return false;
-      }
-
-      return true;
-    };
-
     const loadStores = async () => {
       try {
-        const isAuthorized = await checkAuth();
-        if (!isAuthorized) return;
+        const userPhone = localStorage.getItem("userPhone");
 
-        const phone = localStorage.getItem("userPhone");
+        if (!userPhone) {
+          toast.error("Usuário não está logado");
+          router.push("/");
+          return;
+        }
+
         const { data: userData, error: userError } = await supabase
           .from("usuario")
           .select("id")
-          .eq("telefone", phone)
+          .eq("telefone", userPhone)
           .single();
 
         if (userError || !userData) {
@@ -106,7 +87,12 @@ export default function PromotorPage() {
       }
     };
 
-    loadStores();
+    if (!localStorage.getItem("userPhone")) {
+      toast.error("Usuário não está logado");
+      router.push("/");
+    } else {
+      loadStores();
+    }
   }, [router]);
 
   const filteredStores = useMemo(() => {
