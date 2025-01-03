@@ -204,14 +204,6 @@ export default function RNCPage() {
       });
     }
 
-    if (filtros.rede) {
-      dadosFiltrados = dadosFiltrados.filter(item => item.rede_id === filtros.rede);
-    }
-
-    if (filtros.loja) {
-      dadosFiltrados = dadosFiltrados.filter(item => item.loja_id === filtros.loja);
-    }
-
     setRncData(dadosFiltrados);
   };
 
@@ -225,8 +217,6 @@ export default function RNCPage() {
       const rowsToExport = selectedRows;
       const dadosExport = rowsToExport.map((rnc) => ({
         Data: new Date(rnc.data).toLocaleDateString('pt-BR'),
-        Rede: rnc.rede_id?.toUpperCase() || 'N/A',
-        Loja: rnc.loja_id?.toUpperCase() || 'N/A',
         Marca: rnc.marca_id?.toUpperCase() || 'N/A',
         Produto: rnc.produto_id?.toUpperCase() || 'N/A',
         Motivo: rnc.motivo,
@@ -309,8 +299,6 @@ export default function RNCPage() {
 
         const infoData = [
           ['Data', new Date(rnc.data).toLocaleDateString('pt-BR')],
-          ['Rede', rnc.rede_id?.toUpperCase() || 'N/A'],
-          ['Loja', rnc.loja_id?.toUpperCase() || 'N/A'],
           ['Marca', rnc.marca_id?.toUpperCase() || 'N/A'],
           ['Produto', rnc.produto_id?.toUpperCase() || 'N/A'],
           ['Motivo', rnc.motivo],
@@ -504,14 +492,6 @@ export default function RNCPage() {
       cell: ({ row }) => new Date(row.getValue("data")).toLocaleDateString('pt-BR'),
     },
     {
-      accessorKey: "rede_id",
-      header: "Rede",
-    },
-    {
-      accessorKey: "loja_id",
-      header: "Loja",
-    },
-    {
       accessorKey: "marca_id",
       header: "Marca",
     },
@@ -609,26 +589,6 @@ export default function RNCPage() {
 
         <div className="bg-white rounded-lg p-6 shadow-sm">
           <div className="space-y-4">
-            {/* Rede */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-1.5">Rede</Label>
-              <Input
-                value={filtros.rede || ""}
-                className="w-full bg-gray-50"
-                disabled
-              />
-            </div>
-
-            {/* Loja */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-1.5">Loja</Label>
-              <Input
-                value={filtros.loja || ""}
-                className="w-full bg-gray-50"
-                disabled
-              />
-            </div>
-
             {/* Marca */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-1.5">Marca</Label>

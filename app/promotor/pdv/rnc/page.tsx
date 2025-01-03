@@ -297,15 +297,6 @@ export default function RNCPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-3 py-4 md:p-6 max-w-[800px]">
-        <Button
-          variant="ghost"
-          className="mb-4 md:mb-6"
-          onClick={() => router.push("/promotor")}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-
         <div className="flex flex-col items-center text-center space-y-3 md:space-y-6 mb-4 md:mb-8">
           <motion.div 
             className="relative"
@@ -531,11 +522,20 @@ export default function RNCPage() {
             )}
           </div>
 
-          {/* Botão de Enviar */}
-          <div className="pt-4">
+          {/* Botões de ação */}
+          <div className="pt-4 flex justify-between items-center">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+              onClick={() => router.push("/promotor")}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
+            </Button>
+
             <Button
               onClick={handleSubmit}
-              className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white"
+              className="bg-rose-500 hover:bg-rose-600 text-white"
               disabled={isLoading}
             >
               {isLoading ? (
