@@ -117,39 +117,71 @@ export default function RNCPage() {
   const loadRNC = async () => {
     try {
       setIsLoading(true);
-      const { data: rncData, error } = await supabase
-        .from('rnc')
-        .select('*')
-        .order('data', { ascending: false });
 
-      if (error) throw error;
+      // Busca as marcas do usuário
+      const phone = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("userPhone="))
+        ?.split("=")[1];
 
-      const formattedData = await Promise.all((rncData || []).map(async item => {
-        // Processa as URLs das fotos
-        let fotosUrls = [];
-        if (Array.isArray(item.fotos)) {
-          fotosUrls = item.fotos.map((foto) => {
-            if (foto.startsWith('http')) return foto;
-            const { data } = supabase.storage.from('rnc_photos').getPublicUrl(foto);
-            return data.publicUrl;
-          });
+      if (!phone) {
+        toast.error("Usuário não está logado");
+        return;
+      }
+
+      // Busca os dados do usuário
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("id, tipo")
+        .eq("telefone", phone)
+        .single();
+
+      if (userError || !userData) {
+        console.error("Erro ao buscar usuário:", userError);
+        return;
+      }
+
+      // Se for admin completo, não filtra por marca
+      if (userData.tipo === "Admin") {
+        const { data: marcasData } = await supabase
+          .from("promoter_marca")
+          .select("marca:marca_id(nome)")
+          .eq("promoter_id", userData.id);
+
+        // Se não tiver marcas vinculadas, é admin completo
+        if (!marcasData || marcasData.length === 0) {
+          const { data, error } = await supabase
+            .from("rnc")
+            .select("*");
+
+          if (error) throw error;
+          setRncCompleto(data || []);
+          setRncData(data || []);
+          return;
         }
 
-        return {
-          ...item,
-          rede_id: (item.rede_id || '').toUpperCase(),
-          loja_id: (item.loja_id || '').toUpperCase(),
-          marca_id: (item.marca_id || '').toUpperCase(),
-          produto_id: (item.produto_id || '').toUpperCase(),
-          fotos: fotosUrls,
-        };
-      }));
+        // Se tiver marcas vinculadas, filtra por elas
+        const marcasPermitidas = marcasData.map(m => m.marca.nome);
+        const { data, error } = await supabase
+          .from("rnc")
+          .select("*");
 
-      setRncCompleto(formattedData);
-      setRncData(formattedData);
+        if (error) throw error;
+
+        const dadosFiltrados = data?.filter(item => 
+          marcasPermitidas.includes(item.marca)
+        ) || [];
+
+        setRncCompleto(dadosFiltrados);
+        setRncData(dadosFiltrados);
+      } else {
+        // Se não for admin, não mostra nada
+        setRncCompleto([]);
+        setRncData([]);
+      }
     } catch (error) {
-      console.error('Erro ao carregar RNC:', error);
-      toast.error('Erro ao carregar dados');
+      console.error("Erro ao carregar RNC:", error);
+      toast.error("Erro ao carregar RNC");
     } finally {
       setIsLoading(false);
     }
@@ -277,10 +309,10 @@ export default function RNCPage() {
 
         const infoData = [
           ['Data', new Date(rnc.data).toLocaleDateString('pt-BR')],
-          ['Rede', rnc.rede_id || 'N/A'],
-          ['Loja', rnc.loja_id || 'N/A'],
-          ['Marca', rnc.marca_id],
-          ['Produto', rnc.produto_id],
+          ['Rede', rnc.rede_id?.toUpperCase() || 'N/A'],
+          ['Loja', rnc.loja_id?.toUpperCase() || 'N/A'],
+          ['Marca', rnc.marca_id?.toUpperCase() || 'N/A'],
+          ['Produto', rnc.produto_id?.toUpperCase() || 'N/A'],
           ['Motivo', rnc.motivo],
           ['Nota Fiscal', rnc.numero_nota_fiscal],
           ['Valor Total', new Intl.NumberFormat('pt-BR', { 

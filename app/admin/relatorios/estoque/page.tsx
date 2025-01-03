@@ -6,11 +6,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
 import { Trash2, Download, Search, X } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 interface Estoque {
   id: number;
@@ -31,6 +32,7 @@ interface Filtros {
 }
 
 export default function EstoquePage() {
+  const { isFullAdmin, userMarcas } = useUserPermissions();
   const [estoque, setEstoque] = useState<Estoque[]>([]);
   const [estoqueCompleto, setEstoqueCompleto] = useState<Estoque[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +42,7 @@ export default function EstoquePage() {
   useEffect(() => {
     setSelectedCount(selectedRows.length);
   }, [selectedRows]);
+
   const [filtros, setFiltros] = useState<Filtros>({
     busca: "",
     dataInicio: null,
@@ -58,17 +61,68 @@ export default function EstoquePage() {
   const loadEstoque = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from("estoque")
-        .select("*");
 
-      if (error) {
-        console.error("Erro detalhado do Supabase:", error);
-        throw error;
+      // Busca as marcas do usuário
+      const phone = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("userPhone="))
+        ?.split("=")[1];
+
+      if (!phone) {
+        toast.error("Usuário não está logado");
+        return;
       }
-      
-      setEstoqueCompleto(data || []);
-      setEstoque(data || []);
+
+      // Busca os dados do usuário
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("id, tipo")
+        .eq("telefone", phone)
+        .single();
+
+      if (userError || !userData) {
+        console.error("Erro ao buscar usuário:", userError);
+        return;
+      }
+
+      // Se for admin completo, não filtra por marca
+      if (userData.tipo === "Admin") {
+        const { data: marcasData } = await supabase
+          .from("promoter_marca")
+          .select("marca:marca_id(nome)")
+          .eq("promoter_id", userData.id);
+
+        // Se não tiver marcas vinculadas, é admin completo
+        if (!marcasData || marcasData.length === 0) {
+          const { data, error } = await supabase
+            .from("estoque")
+            .select("*");
+
+          if (error) throw error;
+          setEstoqueCompleto(data || []);
+          setEstoque(data || []);
+          return;
+        }
+
+        // Se tiver marcas vinculadas, filtra por elas
+        const marcasPermitidas = marcasData.map(m => m.marca.nome);
+        const { data, error } = await supabase
+          .from("estoque")
+          .select("*");
+
+        if (error) throw error;
+
+        const dadosFiltrados = data?.filter(item => 
+          marcasPermitidas.includes(item.marca)
+        ) || [];
+
+        setEstoqueCompleto(dadosFiltrados);
+        setEstoque(dadosFiltrados);
+      } else {
+        // Se não for admin, não mostra nada
+        setEstoqueCompleto([]);
+        setEstoque([]);
+      }
     } catch (error) {
       console.error("Erro ao carregar estoque:", error);
       toast.error("Erro ao carregar estoque");
@@ -218,135 +272,80 @@ export default function EstoquePage() {
     {
       accessorKey: "estoque_fisico",
       header: "Estoque Físico",
-      cell: ({ row }) => {
-        const numero = row.original.estoque_fisico;
-        return numero.toLocaleString('pt-BR', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2
-        });
-      },
+      cell: ({ row }) => row.original.estoque_fisico.toLocaleString('pt-BR'),
     },
     {
       accessorKey: "estoque_virtual",
       header: "Estoque Virtual",
-      cell: ({ row }) => {
-        const numero = row.original.estoque_virtual;
-        return numero.toLocaleString('pt-BR', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2
-        });
-      },
+      cell: ({ row }) => row.original.estoque_virtual.toLocaleString('pt-BR'),
     },
     {
       id: "actions",
-      header: "Ações",
       cell: ({ row }) => {
         return (
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleDelete(row.original.id)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={() => handleDelete(row.original.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         );
       },
     },
   ];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Relatório de Estoque</h1>
-        <div className="flex gap-2">
-          {selectedCount > 0 && (
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                if (!window.confirm(`Tem certeza que deseja excluir ${selectedCount} registros?`)) {
-                  return;
-                }
-                try {
-                  for (const item of selectedRows) {
-                    await supabase.from("estoque").delete().eq("id", item.id);
-                  }
-                  toast.success(`${selectedCount} registros excluídos com sucesso!`);
-                  loadEstoque();
-                  setSelectedRows([]);
-                } catch (error) {
-                  toast.error("Erro ao excluir registros");
-                }
-              }}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Excluir Selecionados ({selectedCount})
-            </Button>
-          )}
-          <Button onClick={exportToExcel}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar Excel
-            {selectedCount > 0 && ` (${selectedCount} selecionados)`}
-          </Button>
-        </div>
+    <div className="container mx-auto py-10">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold mb-2">Relatório de Estoque</h1>
+        <p className="text-gray-600">
+          Visualize e exporte os dados de estoque das lojas
+        </p>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Buscar</label>
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
+              type="text"
               placeholder="Buscar por rede, loja, marca ou produto..."
               value={filtros.busca}
               onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Período</label>
-            <DatePickerWithRange
-              onChange={(range) => {
-                setFiltros({
-                  ...filtros,
-                  dataInicio: range?.from || null,
-                  dataFim: range?.to || null,
-                });
-              }}
-              from={filtros.dataInicio}
-              to={filtros.dataFim}
+              className="pl-10"
             />
           </div>
         </div>
-        <div className="flex justify-between gap-2">
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                if (selectedRows.length === estoque.length) {
-                  setSelectedRows([]);
-                } else {
-                  setSelectedRows([...estoque]);
-                }
-              }}
-            >
-              {selectedRows.length === estoque.length ? (
-                <>
-                  <X className="w-4 h-4 mr-2" />
-                  Desmarcar Todos
-                </>
-              ) : (
-                <>
-                  <Checkbox className="w-4 h-4 mr-2" />
-                  Selecionar Todos
-                </>
-              )}
-            </Button>
-          </div>
-          <Button variant="outline" onClick={limparFiltros}>
-            <X className="w-4 h-4 mr-2" />
-            Limpar Filtros
+        <div className="w-full md:w-auto">
+          <DatePickerWithRange
+            value={{
+              from: filtros.dataInicio,
+              to: filtros.dataFim,
+            }}
+            onChange={(range) =>
+              setFiltros({
+                ...filtros,
+                dataInicio: range?.from || null,
+                dataFim: range?.to || null,
+              })
+            }
+          />
+        </div>
+        {(filtros.busca || filtros.dataInicio || filtros.dataFim) && (
+          <Button
+            variant="ghost"
+            onClick={limparFiltros}
+            className="w-full md:w-auto"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Limpar filtros
           </Button>
-        </div>
+        )}
+        <Button onClick={exportToExcel} className="w-full md:w-auto">
+          <Download className="h-4 w-4 mr-2" />
+          Exportar
+        </Button>
       </div>
 
       <DataTable

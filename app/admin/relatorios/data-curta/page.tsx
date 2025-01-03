@@ -54,21 +54,71 @@ export default function DataCurtaPage() {
   const loadDataCurta = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from("data_curta")
-        .select("*")
-        .order('data_validade', { ascending: true });
 
-      if (error) {
-        console.error("Erro detalhado do Supabase:", error);
-        throw error;
+      // Busca as marcas do usuário
+      const phone = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("userPhone="))
+        ?.split("=")[1];
+
+      if (!phone) {
+        toast.error("Usuário não está logado");
+        return;
       }
-      
-      setDataCurtaCompleto(data || []);
-      setDataCurta(data || []);
+
+      // Busca os dados do usuário
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("id, tipo")
+        .eq("telefone", phone)
+        .single();
+
+      if (userError || !userData) {
+        console.error("Erro ao buscar usuário:", userError);
+        return;
+      }
+
+      // Se for admin completo, não filtra por marca
+      if (userData.tipo === "Admin") {
+        const { data: marcasData } = await supabase
+          .from("promoter_marca")
+          .select("marca:marca_id(nome)")
+          .eq("promoter_id", userData.id);
+
+        // Se não tiver marcas vinculadas, é admin completo
+        if (!marcasData || marcasData.length === 0) {
+          const { data, error } = await supabase
+            .from("data_curta")
+            .select("*");
+
+          if (error) throw error;
+          setDataCurtaCompleto(data || []);
+          setDataCurta(data || []);
+          return;
+        }
+
+        // Se tiver marcas vinculadas, filtra por elas
+        const marcasPermitidas = marcasData.map(m => m.marca.nome);
+        const { data, error } = await supabase
+          .from("data_curta")
+          .select("*");
+
+        if (error) throw error;
+
+        const dadosFiltrados = data?.filter(item => 
+          marcasPermitidas.includes(item.marca)
+        ) || [];
+
+        setDataCurtaCompleto(dadosFiltrados);
+        setDataCurta(dadosFiltrados);
+      } else {
+        // Se não for admin, não mostra nada
+        setDataCurtaCompleto([]);
+        setDataCurta([]);
+      }
     } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-      toast.error("Erro ao carregar dados");
+      console.error("Erro ao carregar data curta:", error);
+      toast.error("Erro ao carregar data curta");
     } finally {
       setIsLoading(false);
     }

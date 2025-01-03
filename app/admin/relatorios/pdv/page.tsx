@@ -123,32 +123,71 @@ export default function PDVPage() {
   const loadPDV = async () => {
     try {
       setIsLoading(true);
-      const { data: pdvData, error: pdvError } = await supabase
-        .from("pdv")
-        .select("*")
-        .order('updated_at', { ascending: false });
 
-      if (pdvError) {
-        console.error("Erro ao buscar PDV:", pdvError);
-        throw pdvError;
+      // Busca as marcas do usuário
+      const phone = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("userPhone="))
+        ?.split("=")[1];
+
+      if (!phone) {
+        toast.error("Usuário não está logado");
+        return;
       }
 
-      const formattedData = (pdvData || []).map(item => ({
-        id: item.id,
-        marca: (item.marca || '').toUpperCase(),
-        ponto_extra_conquistado: item.ponto_extra_conquistado,
-        fotos: item.fotos || [],
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        rede: (item.rede || 'N/A').toUpperCase(),
-        loja: (item.loja || 'N/A').toUpperCase()
-      }));
-      
-      setPdvCompleto(formattedData);
-      setPdvData(formattedData);
+      // Busca os dados do usuário
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("id, tipo")
+        .eq("telefone", phone)
+        .single();
+
+      if (userError || !userData) {
+        console.error("Erro ao buscar usuário:", userError);
+        return;
+      }
+
+      // Se for admin completo, não filtra por marca
+      if (userData.tipo === "Admin") {
+        const { data: marcasData } = await supabase
+          .from("promoter_marca")
+          .select("marca:marca_id(nome)")
+          .eq("promoter_id", userData.id);
+
+        // Se não tiver marcas vinculadas, é admin completo
+        if (!marcasData || marcasData.length === 0) {
+          const { data, error } = await supabase
+            .from("pdv")
+            .select("*");
+
+          if (error) throw error;
+          setPdvCompleto(data || []);
+          setPdvData(data || []);
+          return;
+        }
+
+        // Se tiver marcas vinculadas, filtra por elas
+        const marcasPermitidas = marcasData.map(m => m.marca.nome);
+        const { data, error } = await supabase
+          .from("pdv")
+          .select("*");
+
+        if (error) throw error;
+
+        const dadosFiltrados = data?.filter(item => 
+          marcasPermitidas.includes(item.marca)
+        ) || [];
+
+        setPdvCompleto(dadosFiltrados);
+        setPdvData(dadosFiltrados);
+      } else {
+        // Se não for admin, não mostra nada
+        setPdvCompleto([]);
+        setPdvData([]);
+      }
     } catch (error) {
       console.error("Erro ao carregar PDV:", error);
-      toast.error("Erro ao carregar dados do PDV");
+      toast.error("Erro ao carregar PDV");
     } finally {
       setIsLoading(false);
     }
