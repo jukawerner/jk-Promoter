@@ -73,25 +73,62 @@ export default function RNCPage() {
   useEffect(() => {
     const fetchMarcas = async () => {
       try {
-        const { data, error } = await supabase
-          .from('marca')
-          .select('*')
-          .order('nome');
+        // Buscar o telefone do usuário do localStorage
+        const phone = localStorage.getItem("userPhone");
+        if (!phone) {
+          toast.error("Usuário não encontrado");
+          router.push("/");
+          return;
+        }
 
-        if (error) throw error;
-        const formattedData = data?.map(item => ({
-          ...item,
-          nome: item.nome.toUpperCase()
-        }));
-        setMarcas(formattedData || []);
+        // Primeiro, buscar o ID do promotor pelo telefone
+        const { data: userData, error: userError } = await supabase
+          .from("usuario")
+          .select("id")
+          .eq("telefone", phone)
+          .single();
+
+        if (userError || !userData) {
+          console.error("Erro ao buscar usuário:", userError);
+          toast.error("Erro ao buscar usuário");
+          return;
+        }
+
+        // Agora, buscar as marcas vinculadas ao promotor
+        const { data: promoterBrands, error: brandsError } = await supabase
+          .from('promoter_marca')
+          .select(`
+            marca:marca_id (
+              id,
+              nome
+            )
+          `)
+          .eq('promoter_id', userData.id);
+
+        if (brandsError) {
+          console.error("Erro ao buscar marcas:", brandsError);
+          toast.error("Erro ao carregar marcas");
+          return;
+        }
+
+        // Transformar os dados para o formato esperado
+        const marcasData = promoterBrands
+          .map(item => item.marca)
+          .filter(brand => brand !== null)
+          .map(brand => ({
+            id: brand.id.toString(),
+            nome: brand.nome
+          }));
+
+        setMarcas(marcasData);
       } catch (error) {
-        console.error('Erro ao carregar marcas:', error);
-        toast.error('Erro ao carregar marcas');
+        console.error("Erro ao carregar marcas:", error);
+        toast.error("Erro ao carregar marcas");
       }
     };
 
     fetchMarcas();
-  }, []);
+  }, [router]);
 
   const carregarProdutos = async (marcaNome: string) => {
     try {

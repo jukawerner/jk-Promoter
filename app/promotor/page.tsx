@@ -5,7 +5,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { WhatsappButton } from "components/whatsapp-button";
 import { StoreCard } from "components/promoter/store-card";
-import { BrandsPage } from "components/promoter/brands-page";
 import { Input } from "components/ui/input";
 import { Button } from "components/ui/button";
 import { Search, MapPin, Store, Building2, X } from "lucide-react";
@@ -32,7 +31,7 @@ interface Store {
 export default function PromotorPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [stores, setStores] = useState<Store[]>([]);
   const [networks, setNetworks] = useState<string[]>([]);
@@ -111,158 +110,125 @@ export default function PromotorPage() {
   }, [router]);
 
   const filteredStores = useMemo(() => {
-    return stores.filter(store => {
-      const matchesSearch = 
+    return stores.filter((store) => {
+      const matchesSearch =
+        !searchQuery ||
         store.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        store.endereco.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesNetwork = !selectedNetwork || store.rede.nome === selectedNetwork;
+        store.endereco.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.bairro.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.cidade.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesNetwork =
+        !selectedNetwork || selectedNetwork === 'all' || store.rede.nome === selectedNetwork;
+
       return matchesSearch && matchesNetwork;
     });
-  }, [searchQuery, selectedNetwork, stores]);
+  }, [stores, searchQuery, selectedNetwork]);
 
   const handleStoreClick = (store: Store) => {
     localStorage.setItem("redeSelected", store.rede.nome);
     localStorage.setItem("lojaSelected", store.nome);
-  };
-
-  const handleClearFilters = () => {
-    setSearchQuery("");
-    setSelectedNetwork("");
+    router.push("/promotor/pdv/estoque-loja");
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-50"
-    >
-      <div className="px-4 py-6 md:container md:mx-auto md:p-6 max-w-7xl">
-        <div className="flex flex-col space-y-6">
-          {/* Header Section */}
-          <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:items-center md:space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-rose-100 p-3 rounded-xl">
-                <Store className="w-6 h-6 text-rose-600" />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-                  Minhas Lojas
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Visualize e gerencie todas as suas lojas
-                </p>
-              </div>
-            </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold mb-2">Minhas Lojas</h1>
+        <p className="text-gray-600">
+          Selecione uma loja para acessar as funcionalidades
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Buscar por nome, endereço, bairro..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
+        </div>
+        <div className="w-full md:w-64">
+          <Select
+            value={selectedNetwork}
+            onValueChange={setSelectedNetwork}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por rede" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as redes</SelectItem>
+              {networks.map((network) => (
+                <SelectItem key={network} value={network}>
+                  {network}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {(searchQuery || selectedNetwork !== 'all') && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedNetwork("all");
+            }}
+            className="w-full md:w-auto"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Limpar filtros
+          </Button>
+        )}
+      </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4 md:space-y-6"
-            >
-              {/* Filters Section */}
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Buscar por loja ou endereço..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 h-12 md:h-10"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                      <SelectTrigger className="w-full h-12 md:h-10 md:w-[200px]">
-                        <SelectValue placeholder="Filtrar por rede" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {networks.map((network) => (
-                          <SelectItem key={network} value={network}>
-                            {network}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {(searchQuery || selectedNetwork) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleClearFilters}
-                        className="h-12 w-12 md:h-10 md:w-10"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stores Grid */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-                <AnimatePresence>
-                  {isLoading ? (
-                    // Loading skeletons
-                    Array.from({ length: 6 }).map((_, index) => (
-                      <motion.div
-                        key={`skeleton-${index}`}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="bg-white rounded-xl h-[180px] md:h-[200px] animate-pulse"
-                      />
-                    ))
-                  ) : filteredStores.length > 0 ? (
-                    // Store cards
-                    filteredStores.map((store) => (
-                      <motion.div
-                        key={store.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="touch-manipulation"
-                      >
-                        <StoreCard
-                          store={{
-                            id: store.id,
-                            rede: store.rede.nome,
-                            loja: store.nome,
-                            endereco: [
-                              store.endereco && store.bairro ? `${store.endereco}, ${store.bairro}` : store.endereco,
-                              store.cidade && store.uf ? `${store.cidade} - ${store.uf}` : ''
-                            ].filter(Boolean).join('\n'),
-                            status: "pending",
-                            ultimaVisita: new Date().toISOString(),
-                            marcas: []
-                          }}
-                          onClick={() => handleStoreClick(store)}
-                        />
-                      </motion.div>
-                    ))
-                  ) : (
-                    // Empty state
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="col-span-full flex flex-col items-center justify-center py-12 text-center"
-                    >
-                      <Building2 className="h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Nenhuma loja encontrada
-                      </h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Tente ajustar os filtros de busca
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((n) => (
+            <div
+              key={n}
+              className="h-48 bg-gray-100 rounded-lg animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AnimatePresence>
+            {filteredStores.map((store) => (
+              <motion.div
+                key={store.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <StoreCard
+                  store={{
+                    id: store.id,
+                    rede: store.rede.nome,
+                    loja: store.nome,
+                    endereco: [
+                      store.endereco,
+                      store.bairro,
+                      store.cidade,
+                      store.uf,
+                    ].filter(Boolean).join('\n'),
+                    status: "pending",
+                    ultimaVisita: new Date().toISOString(),
+                  }}
+                  onClick={() => handleStoreClick(store)}
+                />
+              </motion.div>
+            ))}
           </AnimatePresence>
         </div>
-      </div>
-    </motion.div>
+      )}
+
+      <WhatsappButton />
+    </div>
   );
 }

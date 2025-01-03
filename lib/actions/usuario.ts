@@ -46,6 +46,7 @@ export interface Usuario {
   created_at?: string;
   updated_at?: string;
   interacoes?: number;
+  marcas?: number[];
 }
 
 export type CreateUsuarioInput = Omit<Usuario, 'id' | 'created_at' | 'updated_at'>;
@@ -139,47 +140,51 @@ export async function getUsuarios(): Promise<Usuario[]> {
   console.log('Buscando lista de usuários...');
   
   try {
-    const { data, error } = await supabase
+    // Primeiro busca os usuários
+    const { data: usuarios, error } = await supabase
       .from('usuario')
       .select('*')
-      .order('nome');
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar usuários:', error);
       throw error;
     }
 
-    console.log('Usuários recuperados com sucesso:', data);
-    
-    if (!data || data.length === 0) {
-      console.warn('Nenhum usuário encontrado');
-      return [];
-    }
+    // Para cada usuário, busca suas marcas
+    const usuariosComMarcas = await Promise.all(usuarios.map(async (usuario) => {
+      const { data: marcas } = await supabase
+        .from('promoter_marca')
+        .select('marca_id')
+        .eq('promoter_id', usuario.id);
 
-    // Verifica se os dados contêm a estrutura esperada
-    const hasValidStructure = data.every(usuario => 
-      usuario.id && usuario.nome && usuario.email
-    );
+      return {
+        ...usuario,
+        marcas: marcas?.map(m => m.marca_id) || []
+      };
+    }));
 
-    if (!hasValidStructure) {
-      console.error('Estrutura de dados inválida:', data);
-      throw new Error('Estrutura de dados inválida retornada do banco de dados. Verifique:\n' +
-        '- Se a tabela "usuario" existe\n' +
-        '- Se as colunas necessárias estão presentes\n' +
-        '- Se os dados estão no formato esperado\n' +
-        '- Se as permissões de acesso estão configuradas corretamente\n' +
-        '- Se o relacionamento com a tabela "informacoes" está configurado corretamente\n' +
-        '- Se há dados nas tabelas relacionadas\n' +
-        '- Se as políticas de RLS (Row Level Security) estão configuradas corretamente\n' +
-        '- Se o usuário autenticado tem permissão para acessar os dados\n' +
-        '- Se o token de autenticação é válido e não expirou');
-    }
-
-    return data;
+    console.log('Usuários recuperados com sucesso:', usuariosComMarcas);
+    return usuariosComMarcas;
   } catch (error) {
-    console.error('Erro crítico ao buscar usuários:', error);
+    console.error('Erro ao buscar usuários:', error);
     throw error;
   }
+}
+
+export async function createUsuario(data: CreateUsuarioInput): Promise<Usuario> {
+  const { data: newUser, error } = await supabase
+    .from('usuario')
+    .insert([data])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao criar usuário:', error);
+    throw error;
+  }
+
+  return newUser;
 }
 
 export async function updateUsuario(id: number, data: Partial<CreateUsuarioInput>): Promise<Usuario> {

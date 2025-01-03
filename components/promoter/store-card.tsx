@@ -30,11 +30,6 @@ interface StoreCardProps {
     endereco: string;
     status: string;
     ultimaVisita: string;
-    marcas: Array<{
-      id: number;
-      nome: string;
-      avatar: string;
-    }>;
   };
   onClick: () => void;
 }
@@ -108,25 +103,8 @@ export function StoreCard({ store, onClick }: StoreCardProps) {
             </div>
           </div>
 
-          {/* Brands preview */}
-          <div className="flex items-center justify-between">
-            <div className="flex -space-x-2">
-              {store.marcas.slice(0, 3).map((marca) => (
-                <img
-                  key={marca.id}
-                  src={marca.avatar}
-                  alt={marca.nome}
-                  className="w-7 h-7 md:w-8 md:h-8 rounded-full border-2 border-white"
-                />
-              ))}
-              {store.marcas.length > 3 && (
-                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
-                  <span className="text-xs text-gray-600 font-medium">
-                    +{store.marcas.length - 3}
-                  </span>
-                </div>
-              )}
-            </div>
+          {/* Bottom section */}
+          <div className="flex items-center justify-end">
             <ArrowRight className="w-5 h-5 text-gray-400" />
           </div>
         </div>

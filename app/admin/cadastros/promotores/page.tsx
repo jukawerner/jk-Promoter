@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ImportModal } from "@/components/admin/promoters/import-modal";
 import { toast } from "sonner";
 import { createUsuario, getUsuarios, updateUsuario, deleteUsuario, uploadAvatar, Usuario } from "@/lib/actions/usuario";
+import { createClient } from "@supabase/auth-helpers-nextjs";
 
 interface Promoter extends Usuario {}
 
@@ -60,7 +61,7 @@ export default function CadastroPromotor() {
         nome: data.nome,
         apelido: data.apelido,
         email: data.email,
-        telefone: telefone, // Telefone sem formatação
+        telefone: telefone,
         endereco: data.endereco,
         cep: data.cep,
         tipo: data.tipo,
@@ -73,28 +74,28 @@ export default function CadastroPromotor() {
       if (editingPromoter) {
         console.log('Atualizando usuário existente...');
         savedUser = await updateUsuario(editingPromoter.id, userData);
-        // Atualiza o usuário localmente para evitar reload
-        if (savedUser) {
-          setPromoters(prev => prev.map(p => 
-            p.id === editingPromoter.id ? savedUser as Usuario : p
-          ));
-        }
       } else {
         console.log('Criando novo usuário...');
         savedUser = await createUsuario(userData);
-        // Adiciona o novo usuário localmente para evitar reload
-        if (savedUser) {
-          setPromoters(prev => [...prev, savedUser as Usuario]);
-        }
       }
       
       console.log('Usuário salvo:', savedUser);
-      toast.success(editingPromoter ? "Usuário atualizado com sucesso!" : "Usuário criado com sucesso!");
-      setShowForm(false);
-      setEditingPromoter(null);
+
+      // Atualiza a lista local
+      if (savedUser) {
+        if (editingPromoter) {
+          setPromoters(prev => prev.map(p => 
+            p.id === editingPromoter.id ? { ...savedUser, marcas: data.marcas } : p
+          ));
+        } else {
+          setPromoters(prev => [...prev, { ...savedUser, marcas: data.marcas }]);
+        }
+      }
+
+      return savedUser; // Retorna o usuário salvo para o PromoterForm
     } catch (error) {
-      toast.error("Erro ao salvar usuário");
-      console.error(error);
+      console.error("Erro ao salvar usuário:", error);
+      throw error; // Propaga o erro para o PromoterForm tratar
     } finally {
       setIsLoading(false);
     }

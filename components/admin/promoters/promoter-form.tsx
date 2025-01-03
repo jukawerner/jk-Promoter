@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { User, Loader2 } from "lucide-react";
 import { MapPicker } from "./map-picker";
+import { BrandMultiSelect } from "@/components/admin/brands/brand-multi-select";
+import { createClient } from "@/lib/supabase/client";
 
 const promoterSchema = z.object({
   nome: z.string().min(2, "O nome deve ter pelo menos 2 caracteres"),
@@ -21,6 +23,7 @@ const promoterSchema = z.object({
   cep: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido"),
   endereco: z.string().min(5, "O endereço deve ter pelo menos 5 caracteres"),
   tipo: z.enum(["Promotor", "Admin"], { required_error: "Selecione um tipo de usuário" }),
+  marcas: z.array(z.number()).min(1, "Selecione pelo menos uma marca"),
 });
 
 interface PromoterFormProps {
@@ -33,6 +36,7 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.avatar_url || "");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [selectedBrands, setSelectedBrands] = useState<number[]>(initialData?.marcas || []);
 
   const {
     register,
@@ -51,8 +55,38 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
       console.log('Dados iniciais recebidos:', initialData);
       reset(initialData);
       setAvatarUrl(initialData.avatar_url || "");
+      if (initialData.marcas) {
+        setSelectedBrands(initialData.marcas);
+        setValue('marcas', initialData.marcas);
+      }
     }
-  }, [initialData, reset]);
+  }, [initialData, reset, setValue]);
+
+  useEffect(() => {
+    if (initialData?.id) {
+      const loadPromoterMarcas = async () => {
+        const supabase = createClient();
+        const { data: marcas, error } = await supabase
+          .from('promoter_marca')
+          .select('marca_id')
+          .eq('promoter_id', initialData.id);
+
+        if (error) {
+          console.error('Erro ao carregar marcas do promotor:', error);
+          toast.error('Erro ao carregar marcas do promotor');
+          return;
+        }
+
+        if (marcas) {
+          const marcaIds = marcas.map(m => m.marca_id);
+          setSelectedBrands(marcaIds);
+          setValue('marcas', marcaIds);
+        }
+      };
+
+      loadPromoterMarcas();
+    }
+  }, [initialData?.id, setValue]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,17 +114,14 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
 
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    // Remove tudo que não é número
     value = value.replace(/\D/g, '');
     
-    // Formata o CEP
     if (value.length <= 8) {
       value = value.replace(/^(\d{5})(\d)/, '$1-$2');
     }
     
     setValue('cep', value);
 
-    // Busca o endereço quando o CEP estiver completo
     if (value.replace(/\D/g, '').length === 8) {
       setIsLoadingCep(true);
       try {
@@ -100,7 +131,6 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
         if (!data.erro) {
           const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
           setValue('endereco', endereco, { shouldValidate: true });
-          // Dispara um evento de change para atualizar o formulário
           const event = new Event('change', { bubbles: true });
           document.getElementById('endereco')?.dispatchEvent(event);
         } else {
@@ -116,23 +146,58 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
 
   const onSubmit = async (data: z.infer<typeof promoterSchema>) => {
     try {
-      console.log('Enviando dados do formulário:', {
+      // Primeiro, salva os dados do promotor
+      const promoterData = await onSave({
         ...data,
         avatarFile,
         avatarUrl,
-        endereco: data.endereco // Garantindo que o endereço seja enviado
+        endereco: data.endereco,
+        marcas: selectedBrands // Enviando as marcas selecionadas
       });
-      
-      await onSave({
-        ...data,
-        avatarFile,
-        avatarUrl,
-        endereco: data.endereco // Garantindo que o endereço seja enviado
-      });
-      toast.success("Usuário salvo com sucesso!");
+
+      // Se o promotor foi salvo com sucesso
+      if (promoterData?.id) {
+        const supabase = createClient();
+        console.log('Salvando marcas para o promoter:', promoterData.id);
+        console.log('Marcas selecionadas:', selectedBrands);
+        
+        // Remove relacionamentos antigos
+        const { error: deleteError } = await supabase
+          .from('promoter_marca')
+          .delete()
+          .eq('promoter_id', promoterData.id);
+
+        if (deleteError) {
+          console.error('Erro ao remover marcas antigas:', deleteError);
+          throw deleteError;
+        }
+
+        // Se houver marcas selecionadas, insere os novos relacionamentos
+        if (selectedBrands.length > 0) {
+          const relationshipData = selectedBrands.map(marcaId => ({
+            promoter_id: promoterData.id,
+            marca_id: marcaId
+          }));
+
+          console.log('Inserindo novas marcas:', relationshipData);
+
+          const { error: insertError } = await supabase
+            .from('promoter_marca')
+            .insert(relationshipData);
+
+          if (insertError) {
+            console.error('Erro ao inserir novas marcas:', insertError);
+            throw insertError;
+          }
+        }
+
+        toast.success("Usuário e marcas salvos com sucesso!");
+      }
+
+      onCancel();
     } catch (error) {
-      console.error("Erro ao salvar usuário:", error);
-      toast.error("Erro ao salvar usuário");
+      console.error("Erro ao salvar usuário ou marcas:", error);
+      toast.error("Erro ao salvar usuário ou marcas");
     }
   };
 
@@ -219,6 +284,19 @@ export function PromoterForm({ onSave, onCancel, initialData }: PromoterFormProp
               />
               {errors.endereco && (
                 <p className="text-sm text-red-500">{errors.endereco.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Marcas</Label>
+              <BrandMultiSelect
+                value={selectedBrands}
+                onChange={setSelectedBrands}
+                promoterId={initialData?.id}
+                readOnly={false}
+              />
+              {errors.marcas && (
+                <p className="text-sm text-red-500">{errors.marcas.message}</p>
               )}
             </div>
 
